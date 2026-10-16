@@ -25,6 +25,8 @@
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch { } };
   const cfg = load();
   cfg.running = false; // always start stopped; the user presses ▶
+  // +1 whenever you set a new farm map / spot: a trip still heading for the old one sees it and gives up
+  let farmGen = 0;
 
   // ---- reading the game UI ----
   const $ = s => document.querySelector(s);
@@ -70,11 +72,12 @@
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
   // walk back to the saved farm spot (server-side pathing, same message as click-to-move)
-  async function walkToSpot(spot) {
+  async function walkToSpot(spot, still = () => true) {
     if (!spot) return true;
     const deadline = Date.now() + 90e3;
     let lastSend = 0, last = myPos(), lastMoveAt = Date.now();
     while (Date.now() < deadline && cfg.running) {
+      if (!still()) return false;
       if (isDead()) return false;
       const p = myPos(), r = room();
       if (!p || !r) { await sleep(1000); continue; }
@@ -165,12 +168,16 @@
   // where to farm right now: the bounty's map (whole map) while a bounty runs, else the saved farm map + spot
   async function backToFarm(t = tgt()) {
     if (!t.map) return false;
+    const g = farmGen, still = () => g === farmGen;
+    const changed = () => { if (still()) return false; log('เปลี่ยนจุดฟาร์มแล้ว — เลิกไปจุดเดิม'); return true; };
     setPhase('กลับไปฟาร์ม ' + t.map);
-    if (!await travelTo(t.map)) return false;
+    if (!await travelTo(t.map, still)) { changed(); return false; }
     await sleep(1500);
+    if (changed()) return false;
     setAuto(false);
     if (cfg.quietCh || cfg.followLeader) { setPhase('เลือก CH'); await moveToQuietChannel(); }
-    if (t.spot) { setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(t.spot); await sleep(500); }
+    if (t.spot) { setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(t.spot, still); await sleep(500); }
+    if (changed()) return false;
     setAuto(true);
     return true;
   }
@@ -361,11 +368,11 @@
   const setAuto = on => { if (autoOn() !== on) click($('#autobig'), on ? 'เปิด AUTO' : 'ปิด AUTO'); };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  async function travelTo(name) {
+  async function travelTo(name, still = () => true) {
     if (mapName() === name) return true;
     const deadline = Date.now() + 6 * 60e3;
     let lastGo = 0, lastMap = mapName(), lastMapAt = Date.now();
-    while (Date.now() < deadline && cfg.running) {
+    while (Date.now() < deadline && cfg.running && still()) {
       if (isDead()) return false;
       if (mapName() === name) return true;
       if (mapName() !== lastMap) { lastMap = mapName(); lastMapAt = Date.now(); }
@@ -494,8 +501,9 @@
         startCheck = false;
         setAuto(false);
         if (cfg.quietCh || cfg.followLeader) { setPhase('เลือก CH'); await moveToQuietChannel(); }
-        setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(cfg.farmSpot); await sleep(500);
-        setAuto(true);
+        const g = farmGen;
+        setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(cfg.farmSpot, () => g === farmGen); await sleep(500);
+        if (g === farmGen) setAuto(true); // new spot picked meanwhile -> the next tick walks there
       } else if (cfg.bossHunt && (boss = findBoss())) {
         await fightBoss(boss);
       } else {
@@ -762,7 +770,7 @@
   }
   const remember = () => {
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปยืนที่จุดฟาร์มก่อนแล้วกด "จำจุดนี้"`); return; }
-    cfg.farmMap = mapName(); cfg.farmSpot = myPos(); save(); render(); log(cfg.farmSpot ? `จำจุดฟาร์ม ${cfg.farmMap} (${cfg.farmSpot.x.toFixed(1)}, ${cfg.farmSpot.y.toFixed(1)})` : 'จำแมพแล้ว แต่ยังอ่านพิกัดไม่ได้ — ขยับตัวแล้วกดใหม่'); };
+    cfg.farmMap = mapName(); cfg.farmSpot = myPos(); farmGen++; save(); render(); log(cfg.farmSpot ? `จำจุดฟาร์ม ${cfg.farmMap} (${cfg.farmSpot.x.toFixed(1)}, ${cfg.farmSpot.y.toFixed(1)})` : 'จำแมพแล้ว แต่ยังอ่านพิกัดไม่ได้ — ขยับตัวแล้วกดใหม่'); };
   // pick the farm spot on the game's big map: a tap there makes the game send moveTo {x, y} -> that is the new spot
   const bigMapOpen = () => { const m = $('#mmbig'); return !!m && !m.hidden; };
   let pickUntil = 0;
@@ -771,7 +779,7 @@
     if (!pickUntil || type !== 'input' || !msg || msg.type !== 'moveTo' || !bigMapOpen()) return;
     setPick(false);
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปแมพฟาร์มก่อนแล้วเลือกจุดใหม่`); return; }
-    cfg.farmMap = mapName(); cfg.farmSpot = { x: +(+msg.x).toFixed(2), y: +(+msg.y).toFixed(2) };
+    cfg.farmMap = mapName(); cfg.farmSpot = { x: +(+msg.x).toFixed(2), y: +(+msg.y).toFixed(2) }; farmGen++;
     log(`ตั้งจุดฟาร์ม ${cfg.farmMap} (${cfg.farmSpot.x.toFixed(1)}, ${cfg.farmSpot.y.toFixed(1)}) — เดินไปฟาร์ม`);
     cfg.running = true; startCheck = true; stoppedLogged = false; save(); render();
   };
