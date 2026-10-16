@@ -134,6 +134,13 @@ const server = http.createServer(async (req, res) => {
       return res.end(fs.readFileSync(path.join(PUBLIC, 'index.html')));
     }
     if (req.method === 'GET' && url.pathname === '/api/status') return json(res, 200, statusBody());
+    // other files of the page (style.css, …): plain names inside manager/public only
+    const sf = req.method === 'GET' && url.pathname.match(/^\/([\w-]+\.(css|js|png|svg|ico))$/);
+    if (sf && fs.existsSync(path.join(PUBLIC, sf[1]))) {
+      const type = { css: 'text/css', js: 'text/javascript', png: 'image/png', svg: 'image/svg+xml', ico: 'image/x-icon' }[sf[2]];
+      res.writeHead(200, { 'Content-Type': type + (/css|js/.test(sf[2]) ? '; charset=utf-8' : ''), 'Cache-Control': 'no-store' });
+      return res.end(fs.readFileSync(path.join(PUBLIC, sf[1])));
+    }
     if (req.method !== 'POST') return json(res, 404, { error: 'not found' });
     let m;
     if ((m = url.pathname.match(/^\/api\/browser\/(\w+)\/open$/))) return json(res, 200, { ok: true, msg: await openBrowser(m[1]) });

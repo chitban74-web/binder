@@ -1,335 +1,300 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Binder Town Manager</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
-  /* same tokens as Pelican Manager (manager/public/style.css) */
-  :root {
-    --bg-main: #060a14;
-    --bg-card: rgba(14, 21, 40, 0.78);
-    --bg-card-hover: rgba(22, 32, 58, 0.88);
-    --bg-inset: rgba(4, 8, 20, 0.55);
-    --line: rgba(148, 163, 184, 0.12);
-    --line-strong: rgba(148, 163, 184, 0.22);
-    --border-glow: rgba(56, 189, 248, 0.45);
-    --text-main: #eef3fc;
-    --text-muted: #8d9ab5;
-    --text-faint: #5d6983;
-    --primary: #0ea5e9;
-    --primary-hover: #0284c7;
-    --green: #34d399;
-    --amber: #fbbf24;
-    --red: #f87171;
-    --purple: #a78bfa;
-    --font-sans: 'Plus Jakarta Sans', 'IBM Plex Sans Thai', system-ui, 'Segoe UI', sans-serif;
-    --font-mono: 'JetBrains Mono', 'IBM Plex Sans Thai', ui-monospace, Consolas, monospace;
-    --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  [hidden] { display: none !important; }
-  body {
-    background: var(--bg-main);
-    background-image:
-      radial-gradient(1200px 600px at 0% -10%, rgba(14, 165, 233, 0.14), transparent 60%),
-      radial-gradient(900px 600px at 100% 110%, rgba(139, 92, 246, 0.13), transparent 60%);
-    background-attachment: fixed;
-    color: var(--text-main); font: 14px/1.5 var(--font-sans); min-height: 100vh; -webkit-font-smoothing: antialiased;
-  }
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.18); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
-  .mono { font-family: var(--font-mono); }
-  .muted { color: var(--text-muted); }
-  svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .app { max-width: 1400px; margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 16px; }
-
-  /* header */
-  .app-header {
-    position: sticky; top: 12px; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-    background: rgba(10, 16, 32, 0.95); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); padding: 14px 18px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); backdrop-filter: blur(14px);
-  }
-  .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
-  .brand-logo { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(135deg, #0ea5e9, #8b5cf6); box-shadow: 0 6px 20px rgba(14, 165, 233, 0.35); }
-  .brand-logo svg { width: 24px; height: 24px; color: #fff; }
-  .brand h1 { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; }
-  .brand .sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); }
-  .ver-pill { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.3); color: #7dd3fc; }
-  .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--line-strong); background: var(--bg-inset); color: var(--text-muted); }
-  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .chip.ok { color: var(--green); border-color: rgba(52, 211, 153, 0.35); background: rgba(52, 211, 153, 0.08); }
-  .chip.warn { color: var(--amber); border-color: rgba(251, 191, 36, 0.35); background: rgba(251, 191, 36, 0.08); }
-  .chip.bad { color: var(--red); border-color: rgba(248, 113, 113, 0.35); background: rgba(248, 113, 113, 0.08); }
-  .chip.info { color: #7dd3fc; border-color: rgba(14, 165, 233, 0.35); background: rgba(14, 165, 233, 0.08); }
-
-  /* buttons */
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 14px; border-radius: var(--radius-sm);
-    font: 600 13px/1 var(--font-sans); cursor: pointer; border: 1px solid var(--line-strong); background: rgba(148, 163, 184, 0.08); color: var(--text-main);
-    transition: background .15s, border-color .15s, transform .1s; }
-  .btn:hover:not(:disabled) { background: rgba(148, 163, 184, 0.16); border-color: rgba(148, 163, 184, 0.35); }
-  .btn:active:not(:disabled) { transform: translateY(1px); }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn:focus-visible, .tab-btn:focus-visible, summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-  .btn svg.i { width: 16px; height: 16px; }
-  .btn.primary { background: linear-gradient(135deg, #0ea5e9, #0284c7); border-color: rgba(56, 189, 248, 0.6); color: #fff; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3); }
-  .btn.primary:hover:not(:disabled) { background: linear-gradient(135deg, #38bdf8, #0ea5e9); }
-  .btn.go { background: linear-gradient(135deg, #10b981, #059669); border-color: rgba(52, 211, 153, 0.6); color: #fff; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25); }
-  .btn.go:hover:not(:disabled) { background: linear-gradient(135deg, #34d399, #10b981); }
-  .btn.stop { background: rgba(248, 113, 113, 0.12); border-color: rgba(248, 113, 113, 0.45); color: #fecaca; }
-  .btn.stop:hover:not(:disabled) { background: rgba(248, 113, 113, 0.22); }
-
-  /* stat cards */
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-  .stat { display: flex; gap: 14px; align-items: center; padding: 16px 18px; border-radius: var(--radius-lg); background: var(--bg-card); border: 1px solid var(--line); }
-  .stat-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; }
-  .stat-icon svg { width: 22px; height: 22px; }
-  .stat-icon.blue { background: rgba(14, 165, 233, 0.12); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.25); }
-  .stat-icon.green { background: rgba(52, 211, 153, 0.12); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.25); }
-  .stat-icon.red { background: rgba(248, 113, 113, 0.12); color: var(--red); border: 1px solid rgba(248, 113, 113, 0.25); }
-  .stat-icon.purple { background: rgba(167, 139, 250, 0.12); color: var(--purple); border: 1px solid rgba(167, 139, 250, 0.25); }
-  .stat-body { flex: 1; min-width: 0; }
-  .stat-label { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
-  .stat-value { font: 700 26px/1.2 var(--font-mono); }
-  .stat-value small { font-size: 14px; color: var(--text-faint); font-weight: 600; }
-  .bar { height: 6px; border-radius: 99px; background: rgba(148, 163, 184, 0.12); overflow: hidden; margin-top: 6px; }
-  .bar > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0ea5e9, #22e3c4); transition: width .4s; }
-  .bar.green > i { background: linear-gradient(90deg, #10b981, #34d399); }
-  .bar.amber > i { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-  .bar.red > i { background: linear-gradient(90deg, #ef4444, #f87171); }
-  .bar.purple > i { background: linear-gradient(90deg, #8b5cf6, #c4b5fd); }
-
-  /* tabs */
-  .tab-bar { display: flex; gap: 6px; padding: 5px; border-radius: 14px; background: var(--bg-inset); border: 1px solid var(--line); width: fit-content; max-width: 100%; overflow-x: auto; }
-  .tab-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 10px; border: 1px solid transparent; background: none; color: var(--text-muted); font: 600 13.5px var(--font-sans); cursor: pointer; white-space: nowrap; }
-  .tab-btn:hover { color: var(--text-main); }
-  .tab-btn.active { color: var(--text-main); background: rgba(14, 165, 233, 0.14); border-color: rgba(14, 165, 233, 0.4); }
-  .tab-count { font: 700 11.5px var(--font-mono); padding: 1px 8px; border-radius: 99px; background: rgba(148, 163, 184, 0.14); }
-  .tab-btn.active .tab-count { background: rgba(14, 165, 233, 0.3); color: #e0f2fe; }
-  .pane { display: none; } .pane.active { display: block; }
-
-  /* cards */
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
-  .card { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px; transition: border-color .15s, background .15s; }
-  .card:hover { border-color: var(--line-strong); background: var(--bg-card-hover); }
-  .card.running { border-color: rgba(52, 211, 153, 0.3); }
-  .card.dead { border-color: rgba(248, 113, 113, 0.45); }
-  .card-head { display: flex; align-items: center; gap: 12px; }
-  .avatar { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 16px; color: #fff; flex: none; }
-  .card-title { flex: 1; min-width: 0; }
-  .card-title b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .card-title span { display: block; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .phase { padding: 10px 12px; border-radius: var(--radius-md); background: var(--bg-inset); border: 1px solid var(--line); font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .phase svg { color: var(--primary); }
-  .card.dead .phase { color: #fecaca; border-color: rgba(248, 113, 113, 0.3); } .card.dead .phase svg { color: var(--red); }
-  .meters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
-  .meter-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); font-weight: 600; }
-  .meter-label b { color: var(--text-main); font-family: var(--font-mono); font-weight: 600; }
-  .meter-label b.low { color: var(--red); }
-  .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
-  .facts dt { color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-  .facts dt svg { width: 14px; height: 14px; }
-  .facts dd { min-width: 0; overflow-wrap: anywhere; }
-  .actions { display: flex; gap: 8px; }
-  .actions .btn { flex: 1; }
-  details.log { border-top: 1px solid var(--line); padding-top: 8px; }
-  details.log summary { cursor: pointer; font-size: 12.5px; color: var(--text-muted); font-weight: 600; list-style: none; display: flex; align-items: center; gap: 6px; }
-  details.log summary::-webkit-details-marker { display: none; }
-  details.log summary svg { width: 14px; height: 14px; transition: transform .15s; }
-  details.log[open] summary svg { transform: rotate(90deg); }
-  details.log ol { list-style: none; margin-top: 6px; max-height: 150px; overflow: auto; font: 12px/1.6 var(--font-mono); color: var(--text-muted); }
-
-  /* browsers */
-  .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
-  .note { margin-top: 12px; font-size: 13px; color: var(--text-muted); }
-  .empty { padding: 36px 20px; text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); color: var(--text-muted); display: grid; gap: 12px; justify-items: center; }
-  .empty svg { width: 34px; height: 34px; color: var(--text-faint); }
-  .empty b { color: var(--text-main); font-size: 15px; }
-
-  /* toast */
-  #toast { position: fixed; right: 16px; bottom: 16px; z-index: 100; max-width: min(440px, calc(100vw - 32px)); padding: 12px 16px; border-radius: var(--radius-md);
-    background: rgba(10, 16, 32, 0.97); border: 1px solid var(--border-glow); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); white-space: pre-wrap; font-size: 13.5px;
-    opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .2s, transform .2s; }
-  #toast.show { opacity: 1; transform: none; pointer-events: auto; }
-  #toast.bad { border-color: rgba(248, 113, 113, 0.6); }
-  @media (max-width: 640px) {
-    .app-header { position: static; }
-    .grid { grid-template-columns: 1fr; }
-    .meters { grid-template-columns: 1fr; }
-  }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Binder Town — Multi-Client Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-pad" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="4"/><path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/></symbol>
-  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></symbol>
-  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
-  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
-  <symbol id="i-reload" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
-  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
-  <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
-  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></symbol>
-  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
-  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
-  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 8-6-16-3 8H2"/></symbol>
-  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
-  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-</svg>
-<div class="app">
-  <header class="app-header">
-    <div class="brand">
-      <div class="brand-logo"><svg class="i"><use href="#i-pad"/></svg></div>
-      <div>
-        <h1>Binder Town Manager</h1>
-        <div class="sub">ตัวช่วยฟาร์มหลายแท็บ <span id="ver" class="ver-pill">…</span></div>
+  <!-- layout follows Pelican Manager (manager/public/index.html); buttons marked "soon" are placeholders for now -->
+  <div class="app-container">
+    <!-- TOP HEADER -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo"><span>🏰</span></div>
+        <div class="brand-text">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <h1 style="margin: 0;">Binder Town Manager</h1>
+            <div class="device-nickname-badge" title="บทบาทของเครื่องนี้ในการอัปเดต">
+              <span class="device-icon">💻</span>
+              <span class="device-label">เครื่อง:</span>
+              <b id="role" style="font-size: 12px;">…</b>
+            </div>
+          </div>
+          <span class="subtext">Multi-Tab Helper & Bot Control <span class="ver-pill" id="ver">…</span></span>
+        </div>
       </div>
-    </div>
-    <div class="header-actions">
-      <span id="role" class="chip"></span>
-      <span id="upd" class="chip"></span>
-      <button id="chk" class="btn"><svg class="i"><use href="#i-reload"/></svg>เช็กอัปเดต</button>
-      <button id="pull" class="btn primary" hidden><svg class="i"><use href="#i-down"/></svg><span>อัปเดต</span></button>
-    </div>
-  </header>
 
-  <section class="stats">
-    <div class="stat"><div class="stat-icon blue"><svg class="i"><use href="#i-pad"/></svg></div>
-      <div class="stat-body"><div class="stat-label">helper พร้อม</div><div class="stat-value" id="s-ready">0</div><div class="bar"><i id="b-ready" style="width:0"></i></div></div></div>
-    <div class="stat"><div class="stat-icon green"><svg class="i"><use href="#i-activity"/></svg></div>
-      <div class="stat-body"><div class="stat-label">กำลังฟาร์ม</div><div class="stat-value" id="s-run">0</div><div class="bar green"><i id="b-run" style="width:0"></i></div></div></div>
-    <div class="stat"><div class="stat-icon red"><svg class="i"><use href="#i-alert"/></svg></div>
-      <div class="stat-body"><div class="stat-label">ต้องดู (ตาย / หยุด)</div><div class="stat-value" id="s-warn">0</div></div></div>
-    <div class="stat"><div class="stat-icon purple"><svg class="i"><use href="#i-globe"/></svg></div>
-      <div class="stat-body"><div class="stat-label">เบราว์เซอร์เปิดอยู่</div><div class="stat-value" id="s-br">0</div></div></div>
-  </section>
+      <div class="header-actions">
+        <div class="captcha-solved-badge soon" data-soon="ตัวนับแก้ Captcha" role="button" tabindex="0" title="ตัวนับแก้ Captcha (เร็วๆ นี้)">
+          <span class="captcha-icon">🤖</span>
+          <span class="captcha-label">แก้ Captcha:</span>
+          <span class="captcha-count">0</span>
+          <span class="captcha-unit">ครั้ง</span>
+          <span class="captcha-chevron">▼</span>
+        </div>
+        <div class="btn-group">
+          <button id="btn-launch-all" class="btn btn-success" title="เปิดเกมในทุกเบราว์เซอร์ที่มีในเครื่อง"><span class="icon">🚀</span> เปิดทุกจอ</button>
+          <button class="btn btn-danger soon" data-soon="ปิดทุกจอ" title="ปิดเบราว์เซอร์เกมทุกตัว"><span class="icon">⏹️</span> ปิดทุกจอ</button>
+        </div>
+        <button id="btn-add-profile" class="btn btn-primary" title="เปิดเกมในเบราว์เซอร์อื่น (1 เบราว์เซอร์ = 1 ไอดี)"><span class="icon">➕</span> เพิ่มโปรไฟล์</button>
+        <button class="btn btn-patcher soon" data-soon="ติดตั้งสคริปต์เกม" title="สถานะ helper ในแท็บเกม">
+          <span class="icon">⚡</span> <span>สคริปต์เกม</span> <span id="helper-badge" class="badge patcher-badge">…</span>
+        </button>
+        <button id="btn-update" class="btn" title="เช็กอัปเดตจาก GitHub" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="icon">⬇️</span> <span id="upd-label">เช็กอัปเดต</span>
+        </button>
+        <button id="btn-refresh" class="btn btn-icon" title="รีเฟรชข้อมูล"><span class="icon">🔄</span></button>
+      </div>
+    </header>
 
-  <nav class="tab-bar" role="tablist">
-    <button class="tab-btn active" data-tab="tabs" role="tab" aria-selected="true"><svg class="i"><use href="#i-pad"/></svg>แท็บเกม <span class="tab-count" id="c-tabs">0</span></button>
-    <button class="tab-btn" data-tab="browsers" role="tab" aria-selected="false"><svg class="i"><use href="#i-globe"/></svg>เบราว์เซอร์ <span class="tab-count" id="c-br">0</span></button>
-  </nav>
+    <!-- METRICS OVERVIEW BAR -->
+    <section class="metrics-bar">
+      <div class="metric-card">
+        <div class="metric-icon" style="--h: 210;">🗂️</div>
+        <div class="metric-body">
+          <div class="metric-label">แท็บเกมทั้งหมด</div>
+          <div class="metric-val" id="metric-total">0</div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon" style="--h: 155;">🖥️</div>
+        <div class="metric-body">
+          <div class="metric-label">จอที่ helper พร้อม</div>
+          <div class="metric-val text-success"><span id="metric-online">0</span><small class="metric-of" id="metric-online-of">/ 0</small></div>
+          <div class="metric-bar"><div class="metric-bar-fill ok" id="metric-online-bar"></div></div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon" style="--h: 175;">⚔️</div>
+        <div class="metric-body">
+          <div class="metric-label">กำลัง Auto-Farm</div>
+          <div class="metric-val text-cyan"><span id="metric-farming">0</span><small class="metric-of" id="metric-farming-of">/ 0</small></div>
+          <div class="metric-bar"><div class="metric-bar-fill cyan" id="metric-farming-bar"></div></div>
+        </div>
+      </div>
+      <div class="metric-card metric-zeny">
+        <div class="metric-icon" style="--h: 45;">💰</div>
+        <div class="metric-body">
+          <div class="metric-label">ยอดเงินรวมทุกตัว (Total Gold)</div>
+          <div class="metric-val">— G</div>
+          <div class="sc-zrate">เร็วๆ นี้<small>helper ยังไม่ได้อ่าน Gold</small></div>
+        </div>
+      </div>
+    </section>
 
-  <section class="pane active" data-pane="tabs"><div id="tabs" class="grid"></div></section>
-  <section class="pane" data-pane="browsers">
-    <div id="browsers" class="bgrid"></div>
-    <p class="note">แต่ละเบราว์เซอร์ใช้โปรไฟล์ของตัวเองในโฟลเดอร์ profiles ล็อกอินครั้งแรกครั้งเดียว ถ้าใช้คนละไอดี ให้แยกเบราว์เซอร์</p>
-  </section>
-</div>
-<div id="toast" role="status" aria-live="polite"></div>
+    <!-- PROFILES GRID -->
+    <main class="profiles-section">
+      <div class="section-title-row">
+        <div class="section-title-left">
+          <nav class="tab-bar" role="tablist">
+            <button type="button" class="tab-btn active" data-tab="profiles" role="tab"><span class="icon">🎮</span> รายชื่อจอเกมและบอท <span class="tab-count" id="tab-count-profiles">0</span></button>
+            <button type="button" class="tab-btn" data-tab="zeny" role="tab"><span class="icon">💰</span> ระบบรวมเงิน</button>
+            <button type="button" class="tab-btn" data-tab="screens" role="tab"><span class="icon">📺</span> ดูจอเกม</button>
+            <button type="button" class="tab-btn" data-tab="browsers" role="tab"><span class="icon">🌐</span> เบราว์เซอร์ <span class="tab-count" id="tab-count-browsers">0</span></button>
+          </nav>
+          <span class="live-pill"><i></i> Realtime Sync · 2s</span>
+        </div>
+        <div class="toolbar" data-tab-only="profiles">
+          <div class="toolbar-group">
+            <div class="dropdown">
+              <button class="btn btn-ghost btn-sm soon" data-soon="จัดหน้าต่าง"><span class="icon">📐</span> จัดหน้าต่าง ▾</button>
+              <div class="dropdown-content">
+                <a href="#" data-soon="ย่อ & จัดเรียงอัตโนมัติ">ย่อ & จัดเรียงอัตโนมัติ (Compact)</a>
+                <a href="#" data-soon="แบ่งครึ่งจอ">แบ่งครึ่งจอ (ซ้าย-ขวา)</a>
+                <a href="#" data-soon="จัดตารางเต็มจอ">จัดตารางเต็มจอ (อัตโนมัติตามจำนวนจอ)</a>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm soon" data-soon="ซ่อนทุกจอ"><span class="icon">👁️</span> ซ่อนทุกจอ (Headless)</button>
+            <button id="btn-start-bot-all" class="btn btn-ghost btn-sm" title="กด ▶ ใน helper ทุกแท็บที่หยุดอยู่"><span class="icon">▶️</span> START BOT ทุกจอ</button>
+            <button id="btn-stop-bot-all" class="btn btn-ghost btn-sm" title="กด ■ ใน helper ทุกแท็บที่ทำงานอยู่"><span class="icon">⏹️</span> STOP BOT ทุกจอ</button>
+            <button class="btn btn-ghost btn-sm soon" data-soon="เช็คน้ำหนัก"><span class="icon">⚖️</span> เช็คน้ำหนัก</button>
+            <button class="btn btn-ghost btn-sm soon" data-soon="Auto ตอบ"><span class="icon">🤖</span> Auto ตอบ: ปิด</button>
+            <button class="btn btn-ghost btn-sm soon" data-soon="Proxy สมัคร"><span class="icon">🌐</span> Proxy สมัคร: ปิด</button>
+            <button class="btn btn-ghost btn-sm soon" data-soon="ล่าบอส (ตั้งจากเว็บ)" title="ตอนนี้เปิด/ปิดได้ที่แผง helper ในเกม"><span class="icon">👑</span> ล่าบอส</button>
+            <button class="btn btn-ghost btn-sm soon" data-soon="ปาร์ตี้ (ตั้งจากเว็บ)" title="ตอนนี้ตั้ง 'ไป CH เดียวกับหัวตี้' ได้ที่แผง helper ในเกม"><span class="icon">👥</span> ปาร์ตี้</button>
+            <button id="btn-reload-all" class="btn btn-ghost btn-sm" title="โหลด helper ใหม่ทุกแท็บ (สถานะ ▶ คงเดิม)"><span class="icon">♻️</span> โหลด helper ใหม่</button>
+          </div>
+          <div class="toolbar-group">
+            <button class="btn btn-ghost btn-sm soon" data-soon="Plan Script"><span class="icon">📜</span> Plan Script</button>
+            <button class="btn btn-ghost btn-sm soon" data-soon="Save List"><span class="icon">💾</span> Save List</button>
+            <button class="btn btn-ghost btn-sm soon" data-soon="Import"><span class="icon">📥</span> Import</button>
+            <button class="btn btn-ghost btn-sm soon" data-soon="Export"><span class="icon">📤</span> Export</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: GAME TABS & BOTS -->
+      <section class="tab-pane active" data-pane="profiles">
+        <div class="sc-bar">
+          <button class="sc-chip on" data-filter="all">ทุกจอ <b id="f-all">0</b></button>
+          <button class="sc-chip" data-filter="run"><span class="d" style="background: var(--accent-green)"></span>ทำงาน <b id="f-run">0</b></button>
+          <button class="sc-chip att" data-filter="att"><span class="d" style="background: var(--accent-amber)"></span>ต้องดู <b id="f-att">0</b></button>
+          <span class="sc-sp"></span>
+          <input id="sc-search" class="sc-search" type="search" placeholder="ค้นหา แมพ / เบราว์เซอร์ / สถานะ" aria-label="ค้นหาแท็บเกม">
+          <div class="sc-seg" role="group" aria-label="ขนาดการ์ด"><button class="on" data-size="full">ปกติ</button><button data-size="compact">ย่อ</button></div>
+        </div>
+        <div class="profiles-grid sc-root" id="profiles-grid"></div>
+      </section>
+
+      <!-- TAB: GOLD (placeholder) -->
+      <section class="tab-pane" data-pane="zeny">
+        <div class="soon-pane"><span class="big">💰</span><b>ระบบรวมเงิน</b><span>รวม Gold ทุกตัว ดูรายได้ต่อชั่วโมง และโอนรวมเงิน · เร็วๆ นี้</span></div>
+      </section>
+
+      <!-- TAB: SCREENS (placeholder) -->
+      <section class="tab-pane" data-pane="screens">
+        <div class="soon-pane"><span class="big">📺</span><b>ดูจอเกม</b><span>ภาพสดของทุกแท็บเกมในหน้าเดียว · เร็วๆ นี้</span></div>
+      </section>
+
+      <!-- TAB: BROWSERS -->
+      <section class="tab-pane" data-pane="browsers">
+        <div class="br-grid" id="browsers"></div>
+        <p class="sc-off" style="margin-top: 12px;">แต่ละเบราว์เซอร์ใช้โปรไฟล์ของตัวเองในโฟลเดอร์ profiles ล็อกอินครั้งแรกครั้งเดียว ถ้าใช้คนละไอดี ให้แยกเบราว์เซอร์</p>
+      </section>
+    </main>
+  </div>
+  <div id="bt-toast" role="status" aria-live="polite"></div>
+
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const ic = (id, cls = 'i') => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+const pct = (a, b) => b ? Math.max(0, Math.min(100, Math.round(a / b * 100))) : 0;
 let toastT = 0;
 function say(text, bad) {
-  const t = $('#toast'); if (!text) return t.classList.remove('show');
+  const t = $('#bt-toast'); if (!text) return t.classList.remove('show');
   t.textContent = text; t.classList.toggle('bad', !!bad); t.classList.add('show');
-  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), bad ? 9000 : 4000);
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), bad ? 9000 : 3500);
 }
-async function post(url) {
-  try { const r = await fetch(url, { method: 'POST' }); const j = await r.json(); if (j.msg) say(j.msg, !j.ok); return j; }
+async function post(url, quiet) {
+  try { const r = await fetch(url, { method: 'POST' }); const j = await r.json(); if (j.msg && !quiet) say(j.msg, !j.ok); return j; }
   catch (e) { say('ติดต่อตัวจัดการไม่ได้: ' + e.message, true); return {}; }
 }
-const STATE = { loading: ['ยังไม่เข้าเกม', 'warn'], world: ['กำลังโหลด helper', 'warn'], helper: ['helper พร้อม', 'ok'] };
-const COLORS = { edge: '#0ea5e9,#2563eb', chrome: '#f59e0b,#ef4444', brave: '#fb7185,#f97316', vivaldi: '#ef4444,#a855f7' };
-const avatar = (key, name) => `<div class="avatar" style="background:linear-gradient(135deg,${COLORS[key] || '#64748b,#334155'})">${esc((name || '?')[0])}</div>`;
-const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
-const openLogs = new Set();
+const HUE = { edge: 205, chrome: 35, brave: 15, vivaldi: 0 };
+const ui = { filter: 'all', q: '', compact: false, offClosed: false };
+let last = null;
 
 function renderUpdate(u) {
   if (!u) return;
-  $('#role').innerHTML = u.main ? '<span class="dot"></span>เครื่องหลัก' : u.autoPull ? '<span class="dot"></span>อัปเดตตามเครื่องหลัก' : '<span class="dot"></span>อัปเดตเอง';
-  $('#role').className = 'chip ' + (u.main ? 'info' : '');
-  if (!u.isRepo) { $('#ver').textContent = 'ไม่ใช่ git'; $('#upd').className = 'chip bad'; $('#upd').textContent = u.error || 'อัปเดตไม่ได้'; $('#pull').hidden = true; return; }
-  $('#ver').textContent = `${u.commit} · ${u.date}`;
-  $('#upd').className = 'chip ' + (u.error ? 'bad' : u.behind ? 'warn' : 'ok');
-  $('#upd').innerHTML = '<span class="dot"></span>' + esc(u.error ? 'เช็กอัปเดตไม่ได้' : u.behind ? `มีอัปเดต ${u.behind} commit` : u.checkedAt ? 'เวอร์ชันล่าสุด' : 'ยังไม่ได้เช็ก');
-  $('#upd').title = u.error || (u.incoming || []).join('\n');
-  $('#pull').hidden = !u.behind;
-  $('#pull span').textContent = `อัปเดต (${u.behind})`;
-  $('#pull').title = (u.incoming || []).join('\n');
+  $('#role').textContent = u.main ? 'เครื่องหลัก' : u.autoPull ? 'อัปเดตตามเครื่องหลัก' : 'อัปเดตเอง';
+  $('#ver').textContent = u.isRepo ? `${u.commit} · ${u.date}` : 'ไม่ใช่ git';
+  const b = $('#btn-update');
+  b.dataset.pull = u.behind ? '1' : '';
+  $('#upd-label').textContent = u.behind ? `อัปเดต (${u.behind} ใหม่)` : u.error ? 'เช็กอัปเดตไม่ได้' : 'เวอร์ชันล่าสุด';
+  b.title = u.error || (u.incoming || []).join('\n') || 'กดเพื่อเช็กอัปเดตจาก GitHub';
+  b.className = 'btn ' + (u.behind ? 'btn-primary' : '');
 }
 function renderBrowsers(list) {
-  $('#browsers').innerHTML = list.map(b => `<div class="card">
-    <div class="card-head">${avatar(b.key, b.name)}<div class="card-title"><b>${esc(b.name)}</b><span class="mono">port ${b.port} · ${b.tabs.length} แท็บเกม</span></div>
-      <span class="chip ${b.running ? 'ok' : b.installed ? '' : 'bad'}"><span class="dot"></span>${b.running ? 'เปิดอยู่' : b.installed ? 'ปิด' : 'ไม่มีในเครื่อง'}</span></div>
-    <button class="btn ${b.running ? '' : 'primary'}" data-open="${b.key}" ${b.installed ? '' : 'disabled'}>${ic(b.running ? 'plus' : 'play')}${b.running ? 'เปิดแท็บเกมเพิ่ม' : 'เปิดเกม'}</button></div>`).join('');
+  $('#tab-count-browsers').textContent = list.filter(b => b.running).length;
+  $('#browsers').innerHTML = list.map(b => `<article class="sc ${b.running ? 'st-farm' : b.installed ? 'st-off' : 'st-bad'}" style="--h:${HUE[b.key] ?? 220}">
+    <div class="sc-hd"><span class="sc-pt letter" style="background:hsl(${HUE[b.key] ?? 220},70%,45%)">${esc(b.name[0])}<span class="dot"></span></span>
+      <div class="sc-who"><b>${esc(b.name)}</b><small><span>port ${b.port}</span><span class="sc-cls">${b.tabs.length} แท็บเกม</span></small></div></div>
+    <div class="sc-ft"><span class="sc-mode"><span class="p"></span>${b.running ? 'เปิดอยู่' : b.installed ? 'ปิดอยู่' : 'ไม่มีในเครื่อง'}</span>
+      <button class="sc-btn ${b.running ? 'menu' : 'start'}" data-open="${b.key}" ${b.installed ? '' : 'disabled'}>${b.running ? '➕ เปิดแท็บเกมเพิ่ม' : '▶ เปิดเกม'}</button></div>
+  </article>`).join('');
 }
-function tabCard(t) {
-  const s = t.status, [label, cls] = STATE[t.state] || [t.state, ''];
-  const head = `<div class="card-head">${avatar(t.key, t.browser)}<div class="card-title"><b>${esc(s && s.map ? s.map : t.browser)}</b>
-    <span>${s ? `${esc(t.browser)} · CH${s.channel || '?'} · Lv ${s.level || '?'}` : 'รอเข้าเกม'}</span></div>
-    <span class="chip ${s ? (s.dead ? 'bad' : s.running ? 'ok' : '') : cls}"><span class="dot"></span>${s ? (s.dead ? 'ตาย' : s.running ? 'ทำงาน' : 'หยุด') : label}</span></div>`;
-  if (!s) return `<div class="card">${head}<div class="phase">${ic('alert')}${esc(t.title || label)}</div></div>`;
-  const w = s.weight || 0, wc = w >= 90 ? 'red' : w >= 70 ? 'amber' : 'green';
-  const pots = (s.potions || []).map(p => {
-    const low = p.min && p.have !== null && p.have < p.min, max = Math.max(p.to || 0, p.have || 0, 1);
-    return `<div><div class="meter-label">${esc(p.name)}<b class="${low ? 'low' : ''}">${p.have ?? '?'}${p.min ? ` / ขั้นต่ำ ${p.min}` : ''}</b></div>
-      <div class="bar ${low ? 'red' : ''}"><i style="width:${pct(p.have || 0, max)}%"></i></div></div>`;
+
+// one card per game tab, same structure as Pelican Manager's profile card (.sc)
+function card(t) {
+  const s = t.status, hue = HUE[t.key] ?? 220;
+  const st = !s ? 'st-off' : s.dead ? 'st-bad' : !s.running ? 'st-idle' : s.weight >= 90 ? 'st-warn' : /ฟาร์ม/.test(s.phase) ? 'st-farm' : 'st-busy';
+  const head = `<div class="sc-hd"><button class="sc-pt letter soon-pt" style="background:hsl(${hue},70%,45%)" data-soon="ดูตัวละคร / อุปกรณ์" title="ดูตัวละคร / อุปกรณ์ (เร็วๆ นี้)">${esc(t.browser[0])}<span class="dot"></span>${s && s.level ? `<span class="lv">${s.level}</span>` : ''}</button>
+    <div class="sc-who"><b title="${esc(t.browser)}">${esc(t.browser)}</b><small><span class="n">${s ? 'Lv ' + (s.level || '?') : 'ยังไม่เข้าเกม'}</span>${s && s.town ? `<span class="sc-cls">${esc(s.town)}</span>` : ''}</small></div>
+    ${s ? `<span class="sc-ch">CH ${s.channel || '?'}</span>` : ''}</div>`;
+  if (!s) return `<article class="sc st-off" style="--h:${hue}">${head}<div class="sc-off">${esc(t.title || 'รอโหลดเกม')}<br>เข้าเกมแล้ว helper จะโหลดเอง</div></article>`;
+  const w = s.weight || 0;
+  const pots = (s.potions || []).slice(0, 2).map(p => {
+    const low = p.min && p.have !== null && p.have < p.min;
+    return `<i title="${esc(p.name)}">${esc((p.k || "ยา").toUpperCase())}</i><div class="sc-t pot ${low ? 'low' : ''}"><u style="width:${pct(p.have || 0, Math.max(p.to || 0, p.have || 0, 1))}%"></u></div><em${low ? ' style="color:#fca5a5"' : ''}>${p.have ?? '?'}</em>`;
   }).join('');
   const b = s.bounty;
-  const bounty = b ? `<div style="grid-column:1/-1"><div class="meter-label">ค่าหัว ${esc(b.mob)} (ตัวที่ ${b.done + 1}/${b.total})<b>${b.prog}/${b.need}</b></div>
-    <div class="bar purple"><i style="width:${pct(b.prog, b.need)}%"></i></div></div>` : '';
-  const spot = s.farmMap ? esc(s.farmMap) + (s.farmSpot ? ` <span class="mono muted">(${s.farmSpot.x.toFixed(0)}, ${s.farmSpot.y.toFixed(0)})</span>` : '') : '<span class="muted">ยังไม่ตั้ง</span>';
-  const logs = s.log || [];
-  return `<div class="card ${s.dead ? 'dead' : s.running ? 'running' : ''}">${head}
-    <div class="phase">${ic(s.dead ? 'alert' : 'activity')}<span>${esc(s.phase)}</span></div>
-    <div class="meters">
-      <div><div class="meter-label">น้ำหนัก<b class="${w >= 90 ? 'low' : ''}">${w}%</b></div><div class="bar ${wc}"><i style="width:${Math.min(100, w)}%"></i></div></div>
-      ${pots}${bounty}
-    </div>
-    <dl class="facts">
-      <dt>${ic('pin')}จุดฟาร์ม</dt><dd>${spot}</dd>
-      <dt>${ic('map')}เมืองขาย</dt><dd>${esc(s.town || '—')}</dd>
-      <dt>${ic('target')}AUTO</dt><dd>${s.auto ? 'เปิด' : '<span class="muted">ปิด</span>'}</dd>
-    </dl>
-    <div class="actions">
-      <button class="btn ${s.running ? 'stop' : 'go'}" data-toggle="${t.id}">${ic(s.running ? 'stop' : 'play')}${s.running ? 'หยุด' : 'เริ่ม'}</button>
-      <button class="btn" data-reload="${t.id}" title="โหลด helper ใหม่ในแท็บนี้">${ic('reload')}โหลด helper ใหม่</button>
-    </div>
-    ${logs.length ? `<details class="log" data-log="${t.id}" ${openLogs.has(t.id) ? 'open' : ''}><summary>${ic('chev')}บันทึกล่าสุด · ${esc(logs[0])}</summary>
-      <ol>${logs.map(l => `<li>${esc(l)}</li>`).join('')}</ol></details>` : ''}
-  </div>`;
+  const alert = s.dead ? `<div class="sc-alert bad">💀 ตัวละครตาย helper จะเกิดใหม่และกลับไปฟาร์มเอง</div>`
+    : !s.running ? `<div class="sc-alert warn">⏸ helper หยุดอยู่<button class="act" data-toggle="${t.id}">▶ เริ่ม</button></div>`
+    : w >= 90 ? `<div class="sc-alert warn">🎒 กระเป๋าใกล้เต็ม (${w}%)</div>` : '';
+  return `<article class="sc ${st}" style="--h:${hue}">${head}${alert}
+    <div class="sc-bars"><i>WT</i><div class="sc-t wt ${w >= 90 ? 'full' : w >= 70 ? 'hot' : ''}"><u style="width:${Math.min(100, w)}%"></u></div><em>${w}%</em>${pots}</div>
+    ${b ? `<div class="sc-exp"><div style="grid-column:1/-1"><span>ค่าหัว ${esc(b.mob)} (${b.done + 1}/${b.total}) <em>${b.prog}/${b.need}</em></span><div class="sc-t bq"><u style="width:${pct(b.prog, b.need)}%"></u></div></div></div>` : ''}
+    <div class="sc-info"><div class="map"><small>แมพ</small><b title="${esc(s.map)}">${esc(s.map || '—')}</b></div>
+      <div class="k"><small>จุดฟาร์ม</small><b>${s.farmSpot ? `${s.farmSpot.x.toFixed(0)}, ${s.farmSpot.y.toFixed(0)}` : '—'}</b></div>
+      <div class="k"><small>Gold</small><b class="gold">—</b></div></div>
+    ${(s.log || [])[0] ? `<div class="sc-log" title="${esc((s.log || []).join('\n'))}">📝 ${esc(s.log[0])}</div>` : ''}
+    <div class="sc-ft"><span class="sc-mode" title="${esc(s.phase)}"><span class="p"></span>${esc(s.phase)}</span>
+      <button class="sc-btn ${s.running ? 'stop' : 'start'}" data-toggle="${t.id}" title="${s.running ? 'หยุด helper (เกมยังเปิด)' : 'เริ่ม helper'}">${s.running ? '⏸ หยุด' : '▶ เริ่ม'}</button>
+      <button class="sc-btn menu soon" data-soon="เมนูบอทบนเว็บ" title="เมนูบอท (เร็วๆ นี้)">🎮 เมนู</button>
+      <button class="sc-btn ic" data-reload="${t.id}" title="โหลด helper ใหม่ในแท็บนี้">♻</button></div>
+  </article>`;
 }
 function renderTabs(list) {
   const all = list.flatMap(b => b.tabs.map(t => ({ ...t, browser: b.name, key: b.key })));
-  const ready = all.filter(t => t.status).length, run = all.filter(t => t.status && t.status.running).length;
-  const warn = all.filter(t => t.status && (t.status.dead || !t.status.running)).length;
-  $('#s-ready').innerHTML = `${ready}<small> / ${all.length}</small>`; $('#b-ready').style.width = pct(ready, all.length) + '%';
-  $('#s-run').innerHTML = `${run}<small> / ${all.length}</small>`; $('#b-run').style.width = pct(run, all.length) + '%';
-  $('#s-warn').textContent = warn; $('#s-warn').style.color = warn ? 'var(--red)' : '';
-  $('#s-br').innerHTML = `${list.filter(b => b.running).length}<small> / ${list.filter(b => b.installed).length}</small>`;
-  $('#c-tabs').textContent = all.length; $('#c-br').textContent = list.filter(b => b.running).length;
-  $('#tabs').innerHTML = all.length ? all.map(tabCard).join('')
-    : `<div class="empty" style="grid-column:1/-1">${ic('pad')}<b>ยังไม่มีแท็บเกม</b><span>เปิดเกมจากแท็บ "เบราว์เซอร์" แล้วล็อกอินเข้าเกม helper จะโหลดเองเมื่อเข้าเกมแล้ว</span>
-      <button class="btn primary" data-goto="browsers">${ic('globe')}ไปที่เบราว์เซอร์</button></div>`;
+  const on = all.filter(t => t.status), run = on.filter(t => t.status.running), att = on.filter(t => t.status.dead || !t.status.running || t.status.weight >= 90);
+  $('#metric-total').textContent = all.length; $('#tab-count-profiles').textContent = all.length;
+  $('#metric-online').textContent = on.length; $('#metric-online-of').textContent = '/ ' + all.length; $('#metric-online-bar').style.width = pct(on.length, all.length) + '%';
+  $('#metric-farming').textContent = run.length; $('#metric-farming-of').textContent = '/ ' + all.length; $('#metric-farming-bar').style.width = pct(run.length, all.length) + '%';
+  $('#helper-badge').textContent = `พร้อม ${on.length}/${all.length}`;
+  $('#f-all').textContent = all.length; $('#f-run').textContent = run.length; $('#f-att').textContent = att.length;
+  const q = ui.q.toLowerCase();
+  const pass = t => (ui.filter === 'all' || (ui.filter === 'run' ? run.includes(t) : att.includes(t)))
+    && (!q || [t.browser, t.title, t.status && t.status.map, t.status && t.status.phase].some(x => String(x || '').toLowerCase().includes(q)));
+  const groups = [['att', '⚠️ ต้องดู', att.filter(pass)], ['ok', 'ทำงานปกติ', run.filter(t => !att.includes(t)).filter(pass)], ['off', 'ยังไม่เข้าเกม', all.filter(t => !t.status).filter(pass)]];
+  const g = $('#profiles-grid');
+  g.classList.toggle('compact', ui.compact);
+  g.innerHTML = all.length ? groups.filter(([, , l]) => l.length).map(([k, label, l]) =>
+    `<div class="sc-group ${k}${k === 'off' && ui.offClosed ? ' closed' : ''}" ${k === 'off' ? 'data-off="1"' : ''}>${k === 'off' ? '<span class="car">▾</span>' : ''}${label} <span class="n">${l.length}</span><span class="line"></span></div>
+     ${k === 'off' && ui.offClosed ? '' : `<div class="sc-grid">${l.map(card).join('')}</div>`}`).join('') || '<div class="sc-empty">ไม่มีแท็บที่ตรงกับตัวกรอง</div>'
+    : `<div class="sc-empty">ยังไม่มีแท็บเกม กด "🚀 เปิดทุกจอ" หรือ "➕ เพิ่มโปรไฟล์" แล้วล็อกอินเข้าเกม helper จะโหลดเองเมื่อเข้าเกมแล้ว</div>`;
 }
 let lastOk = true;
 async function refresh() {
   try {
-    const r = await fetch('/api/status'); const j = await r.json();
+    const j = await (await fetch('/api/status')).json(); last = j;
     renderUpdate(j.update); renderBrowsers(j.browsers); renderTabs(j.browsers);
     if (!lastOk) say(''); lastOk = true;
   } catch { if (lastOk) say('ติดต่อตัวจัดการไม่ได้ หน้าต่างดำ (Start_Binder.bat) ยังเปิดอยู่ไหม?', true); lastOk = false; }
 }
 function showTab(name) {
-  for (const b of document.querySelectorAll('.tab-btn')) { const on = b.dataset.tab === name; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); }
-  for (const p of document.querySelectorAll('.pane')) p.classList.toggle('active', p.dataset.pane === name);
+  for (const b of document.querySelectorAll('.tab-btn')) b.classList.toggle('active', b.dataset.tab === name);
+  for (const p of document.querySelectorAll('.tab-pane')) p.classList.toggle('active', p.dataset.pane === name);
+  $('.toolbar').style.display = name === 'profiles' ? '' : 'none';
 }
-document.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.log) d.open ? openLogs.add(d.dataset.log) : openLogs.delete(d.dataset.log); }, true);
+const allTabs = () => last ? last.browsers.flatMap(b => b.tabs) : [];
+async function each(list, url, verb) {
+  if (!list.length) return say(`ไม่มีแท็บที่ต้อง${verb}`);
+  for (const t of list) await post(url(t), true);
+  say(`${verb}แล้ว ${list.length} แท็บ`);
+}
+$('#sc-search').addEventListener('input', e => { ui.q = e.target.value; if (last) renderTabs(last.browsers); });
 document.addEventListener('click', async e => {
+  const soon = e.target.closest('[data-soon]');
+  if (soon) { e.preventDefault(); return say(`"${soon.dataset.soon}" ยังไม่พร้อมใช้งาน — กำลังทำ เร็วๆ นี้`); }
+  const off = e.target.closest('[data-off]');
+  if (off) { ui.offClosed = !ui.offClosed; return renderTabs(last.browsers); }
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   if (b.dataset.tab) return showTab(b.dataset.tab);
-  if (b.dataset.goto) return showTab(b.dataset.goto);
-  if (b.dataset.open) { b.disabled = true; say('กำลังเปิด…'); await post(`/api/browser/${b.dataset.open}/open`); }
-  else if (b.dataset.toggle) { b.disabled = true; await post(`/api/tab/${b.dataset.toggle}/toggle`); }
-  else if (b.dataset.reload) { b.disabled = true; await post(`/api/tab/${b.dataset.reload}/reload`); }
-  else if (b.id === 'chk') { b.disabled = true; const j = await post('/api/update/check'); if (j.update) { renderUpdate(j.update); say(j.update.behind ? `มีอัปเดต ${j.update.behind} commit:\n${j.update.incoming.join('\n')}` : (j.update.error || 'เป็นเวอร์ชันล่าสุดแล้ว'), !!j.update.error); } b.disabled = false; }
-  else if (b.id === 'pull') { b.disabled = true; say('กำลังอัปเดต…'); const j = await post('/api/update/pull'); if (j.restart) setTimeout(() => location.reload(), 5000); }
+  if (b.dataset.filter) { ui.filter = b.dataset.filter; for (const c of document.querySelectorAll('[data-filter]')) c.classList.toggle('on', c === b); return renderTabs(last.browsers); }
+  if (b.dataset.size) { ui.compact = b.dataset.size === 'compact'; for (const c of document.querySelectorAll('[data-size]')) c.classList.toggle('on', c === b); return renderTabs(last.browsers); }
+  b.disabled = true;
+  try {
+    if (b.dataset.open) { say('กำลังเปิด…'); await post(`/api/browser/${b.dataset.open}/open`); }
+    else if (b.dataset.toggle) await post(`/api/tab/${b.dataset.toggle}/toggle`);
+    else if (b.dataset.reload) await post(`/api/tab/${b.dataset.reload}/reload`);
+    else if (b.id === 'btn-launch-all') {
+      const list = last ? last.browsers.filter(x => x.installed && !x.running) : [];
+      if (!list.length) say('ทุกเบราว์เซอร์ที่มีในเครื่องเปิดอยู่แล้ว');
+      for (const x of list) { say('กำลังเปิด ' + x.name + '…'); await post(`/api/browser/${x.key}/open`); }
+    }
+    else if (b.id === 'btn-add-profile') { showTab('browsers'); say('เลือกเบราว์เซอร์ที่จะเปิดเกม (1 เบราว์เซอร์ = 1 ไอดี)'); }
+    else if (b.id === 'btn-start-bot-all') await each(allTabs().filter(t => t.status && !t.status.running), t => `/api/tab/${t.id}/toggle`, 'เริ่ม');
+    else if (b.id === 'btn-stop-bot-all') await each(allTabs().filter(t => t.status && t.status.running), t => `/api/tab/${t.id}/toggle`, 'หยุด');
+    else if (b.id === 'btn-reload-all') await each(allTabs().filter(t => t.status), t => `/api/tab/${t.id}/reload`, 'โหลด helper ใหม่');
+    else if (b.id === 'btn-update') {
+      if (b.dataset.pull) { say('กำลังอัปเดต…'); const j = await post('/api/update/pull'); if (j.restart) setTimeout(() => location.reload(), 5000); }
+      else { const j = await post('/api/update/check'); if (j.update) { renderUpdate(j.update); say(j.update.behind ? `มีอัปเดต ${j.update.behind} commit:\n${j.update.incoming.join('\n')}` : (j.update.error || 'เป็นเวอร์ชันล่าสุดแล้ว'), !!j.update.error); } }
+    }
+  } finally { b.disabled = false; }
   refresh();
 });
 refresh(); setInterval(refresh, 2000);

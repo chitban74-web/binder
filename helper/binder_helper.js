@@ -687,7 +687,7 @@
       return {
         running: cfg.running, phase, map: mapName(), channel: chOf(r), level: myLevel(), weight: weightPct(), auto: autoOn(), dead: isDead(),
         farmMap: cfg.farmMap, farmSpot: cfg.farmSpot, town: cfg.town,
-        potions: potionPlans().map(p => ({ name: potName(p.item), have: p.have, min: p.min, to: p.to })),
+        potions: potionPlans().map(p => ({ k: p.k, name: potName(p.item), have: p.have, min: p.min, to: p.to })),
         bounty: bq.active ? { done: bq.i, total: bq.list.length, mob: b && b.mob, map: b && b.mapName, prog: b && b.prog, need: b && b.need } : null,
         log: logs.slice(0, 8),
       };
