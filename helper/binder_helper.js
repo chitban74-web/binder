@@ -9,7 +9,8 @@
 //  • the game refuses channel switches and warps in combat: both wait for combat to end (AUTO fights back only while hit, 60 s max)
 //  • bounty window (🎯 ค่าหัว): today's bounties you can reach → each one: its map, AUTO targets = that mob only,
 //    farm area = whole map, claim when done → next; at the end AUTO settings go back and you return to the farm spot
-//  • elite spawn points (34 elites, 28 maps): purple skull on the minimap; skull + dashed area + name/level on the big map
+//  • elites (from the server's census): purple skull on the minimap / big map at their live position; dead ones stay
+//    marked (faded) where they were last seen
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
 // It presses the game's own buttons (warp, world map "go", respawn, sell, AUTO). The messages it sends itself go
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
@@ -117,6 +118,7 @@
             : (e.type === 'cast' || e.type === 'basicAttack') && e.id === r.sessionId;
           if (mine) combatUntil = performance.now() + 5000;
           if (e.type === 'hit' && e.targetId === r.sessionId) hitMeAt = performance.now();
+          if (e.type === 'census') onCensus(r, e);
         }
       });
     } catch { }
@@ -884,10 +886,32 @@
       if (big) drawMobIcons(big, 24);
     } catch (e) { /* map not ready */ }
   }, 150);
-  // ---- elite spawn points: purple skull on the game's minimap (#minimap) and big map (#mmbigcv) ----
-  // From the game's layouts (build 20261015) scaled to world tiles like the game does (zone w/h and rects x the
-  // per-map factor): mapId -> { w, h, e: [[type, level, x0, y0, x1, y1, count], ...] }. Both maps draw the whole map.
-  const ELITE_SPAWNS = {"southvale_field":{"w":81,"h":81,"e":[["elder_sprout",5,62,52,71,62,1]]},"whispering_woods":{"w":90,"h":90,"e":[["thicket_stag",5,57,48,71,61,1]]},"riverside":{"w":118,"h":73,"e":[["tide_brute",13,84,48,99,57,1]]},"old_quarry":{"w":76,"h":101,"e":[["brute",15,17,9,31,20,3],["quarry_brute",17,48,27,59,36,1]]},"honeyrill":{"w":90,"h":81,"e":[["willow_brute",8,70,52,80,61,1]]},"bracken_sink":{"w":90,"h":90,"e":[["moss_brute",15,67,11,80,26,1]]},"verdigris_rise":{"w":81,"h":95,"e":[["copper_brute",20,17,68,29,80,1]]},"pitchwood":{"w":90,"h":90,"e":[["pitch_brute",31,16,6,32,16,1]]},"yellowlick_flats":{"w":98,"h":81,"e":[["salt_brute",37,35,63,49,72,1]]},"peatcut_bog":{"w":90,"h":87,"e":[["peat_elder",43,22,68,35,78,1]]},"sledrun_gully":{"w":73,"h":101,"e":[["gully_brute",54,28,3,41,13,1]]},"brinecrust_shoals":{"w":95,"h":87,"e":[["floe_brute",61,74,65,89,78,1]]},"kitewind_terraces":{"w":84,"h":95,"e":[["terrace_sentinel",71,60,71,72,82,1]]},"glasswrack":{"w":87,"h":81,"e":[["wrack_brute",81,9,5,22,14,1]]},"marrowdeep":{"w":81,"h":81,"e":[["marrow_horror",91,23,5,35,14,1]]},"rustbell_barracks":{"w":76,"h":76,"e":[["rust_captain",99,56,59,67,67,1]]},"ancient_ruins":{"w":98,"h":98,"e":[["remnant",18,56,54,81,67,5],["remnant",18,43,68,58,81,3]]},"sunfield_plains":{"w":106,"h":81,"e":[["field_brute",25,77,59,92,68,1]]},"gloomroot_forest":{"w":90,"h":90,"e":[["corrupt_treant",31,67,28,77,39,1]]},"ember_hollow":{"w":95,"h":95,"e":[["cinder_brute",37,37,71,48,82,1]]},"mistmire_swamp":{"w":109,"h":76,"e":[["mire_elder",41,83,6,96,12,1]]},"duskgate_pass":{"w":73,"h":109,"e":[["dusk_remnant",44,39,35,52,51,2],["dusk_remnant",44,18,35,28,47,2],["gate_brute",45,41,7,52,20,1],["gate_brute",45,18,7,26,20,1]]},"frostpeak_slopes":{"w":76,"h":106,"e":[["rime_brute",53,37,7,43,16,1]]},"frozen_mere":{"w":98,"h":98,"e":[["mere_lurker",59,45,59,56,65,1]]},"cloudspire_ruins":{"w":90,"h":90,"e":[["storm_remnant",67,16,40,31,50,2],["storm_remnant",67,6,62,21,69,2],["cloud_brute",71,25,60,39,71,1],["cloud_brute",71,57,20,67,31,1]]},"shattered_vale":{"w":95,"h":84,"e":[["vale_remnant",80,39,9,53,15,2],["vale_remnant",80,51,21,63,27,2],["shard_brute",81,42,58,53,66,1]]},"umbral_depths":{"w":87,"h":87,"e":[["umbral_horror",88,7,32,20,47,2],["depth_brute",91,63,34,71,40,1],["depth_brute",91,66,46,74,53,1]]},"throne_of_warden":{"w":70,"h":70,"e":[["throne_guard",80,13,20,25,30,2],["golden_sentinel",67,44,20,57,30,2]]}};
+  // ---- elites: purple skull on the game's minimap (#minimap) and big map (#mmbigcv) ----
+  // The game moves elites away from their layout rect (next to a cluster of normal mobs, 1-3 per map), so the
+  // marks come from the server's own "census" (every mob on the map, every ~2 s): live elites = bright skull at
+  // their real position. Where each elite was last seen is remembered per map (localStorage), so a dead one stays
+  // marked (faded) at its spot until it respawns. Both maps draw the whole map: tile -> pixel = canvas / map size.
+  const ELITE_MAP_SIZE = {"southvale_field":[81,81],"whispering_woods":[90,90],"riverside":[118,73],"old_quarry":[76,101],"honeyrill":[90,81],"bracken_sink":[90,90],"verdigris_rise":[81,95],"pitchwood":[90,90],"yellowlick_flats":[98,81],"peatcut_bog":[90,87],"sledrun_gully":[73,101],"brinecrust_shoals":[95,87],"kitewind_terraces":[84,95],"glasswrack":[87,81],"marrowdeep":[81,81],"rustbell_barracks":[76,76],"ancient_ruins":[98,98],"sunfield_plains":[106,81],"gloomroot_forest":[90,90],"ember_hollow":[95,95],"mistmire_swamp":[109,76],"duskgate_pass":[73,109],"frostpeak_slopes":[76,106],"frozen_mere":[98,98],"cloudspire_ruins":[90,90],"shattered_vale":[95,84],"umbral_depths":[87,87],"throne_of_warden":[70,70]}; // mapId -> [w, h] in tiles (layout size x the game's per-map factor)
+  const ELITE_LEVEL = {"elder_sprout":5,"thicket_stag":5,"tide_brute":13,"brute":15,"quarry_brute":17,"willow_brute":8,"moss_brute":15,"copper_brute":20,"pitch_brute":31,"salt_brute":37,"peat_elder":43,"gully_brute":54,"floe_brute":61,"terrace_sentinel":71,"wrack_brute":81,"marrow_horror":91,"rust_captain":99,"remnant":18,"field_brute":25,"corrupt_treant":31,"cinder_brute":37,"mire_elder":41,"dusk_remnant":44,"gate_brute":45,"rime_brute":53,"mere_lurker":59,"storm_remnant":67,"cloud_brute":71,"vale_remnant":80,"shard_brute":81,"umbral_horror":88,"depth_brute":91,"throne_guard":80,"golden_sentinel":67}; // elite mobType -> level
+  const EL_KEY = 'bth_elites';
+  const eliteSeen = (() => { try { return JSON.parse(localStorage.getItem(EL_KEY) || '{}'); } catch { return {}; } })(); // mapId -> [{ type, x, y }]
+  let eliteLive = { map: '', list: [] };
+  function onCensus(r, c) {
+    const map = r.state.mapId, live = [];
+    for (let i = 0; i + 4 < (c.m || []).length; i += 5) {
+      const type = (c.t || [])[c.m[i + 2]];
+      if (ELITE_LEVEL[type] !== undefined) live.push({ type, x: c.m[i], y: c.m[i + 1] });
+    }
+    eliteLive = { map, list: live };
+    // same type within 20 tiles = the same elite (the game keeps elites >= 18 tiles apart)
+    const seen = eliteSeen[map] = eliteSeen[map] || [];
+    let changed = false;
+    for (const e of live) {
+      const s = seen.find(p => p.type === e.type && Math.hypot(p.x - e.x, p.y - e.y) < 20);
+      if (!s) { seen.push({ ...e }); changed = true; } else if (s.x !== e.x || s.y !== e.y) { s.x = e.x; s.y = e.y; changed = true; }
+    }
+    if (changed) try { localStorage.setItem(EL_KEY, JSON.stringify(eliteSeen)); } catch { }
+  }
   const eliteOverlays = new Map(); // game canvas -> our canvas
   function drawSkull(g, x, y, s) {
     g.save(); g.translate(x, y);
@@ -902,28 +926,28 @@
   function drawElites(cv, size, big) {
     let o = eliteOverlays.get(cv);
     if (!o) { o = document.createElement('canvas'); o.className = 'bth-elitemap'; o.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483001'; document.body.appendChild(o); eliteOverlays.set(cv, o); }
-    const r = room(), m = r && ELITE_SPAWNS[r.state.mapId], rect = cv.getBoundingClientRect();
-    const shown = !!m && rect.width > 0 && cv.offsetParent !== null;
+    const r = room(), map = r && r.state.mapId, wh = map && ELITE_MAP_SIZE[map], rect = cv.getBoundingClientRect();
+    const live = eliteLive.map === map ? eliteLive.list : [];
+    const dead = ((map && eliteSeen[map]) || []).filter(p => !live.some(e => e.type === p.type && Math.hypot(p.x - e.x, p.y - e.y) < 20));
+    const shown = !!wh && (live.length || dead.length) && rect.width > 0 && cv.offsetParent !== null;
     o.style.display = shown ? '' : 'none';
     if (!shown) return;
     const dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
     o.style.left = rect.left + 'px'; o.style.top = rect.top + 'px'; o.style.width = rect.width + 'px'; o.style.height = rect.height + 'px';
     if (o.width !== W || o.height !== H) { o.width = W; o.height = H; }
-    const g = o.getContext('2d'), kx = W / m.w, ky = H / m.h, s = size * dpr;
+    const g = o.getContext('2d'), kx = W / wh[0], ky = H / wh[1], s = size * dpr;
     g.clearRect(0, 0, W, H);
-    for (const [type, lv, x0, y0, x1, y1, n] of m.e) {
-      const cx = (x0 + x1 + 1) / 2 * kx, cy = (y0 + y1 + 1) / 2 * ky;
-      if (big) { // the spawn area itself + name on the big map
-        g.fillStyle = 'rgba(168,85,247,.14)'; g.strokeStyle = 'rgba(168,85,247,.7)'; g.lineWidth = dpr; g.setLineDash([3 * dpr, 2 * dpr]);
-        g.fillRect(x0 * kx, y0 * ky, (x1 - x0 + 1) * kx, (y1 - y0 + 1) * ky); g.strokeRect(x0 * kx, y0 * ky, (x1 - x0 + 1) * kx, (y1 - y0 + 1) * ky); g.setLineDash([]);
-      }
-      drawSkull(g, cx, cy, s);
+    const mark = (e, alive) => {
+      const cx = (e.x + 0.5) * kx, cy = (e.y + 0.5) * ky;
+      g.globalAlpha = alive ? 1 : 0.45; drawSkull(g, cx, cy, s); g.globalAlpha = 1;
       if (big) {
-        g.font = `600 ${Math.round(10 * dpr)}px Kanit, sans-serif`; g.textAlign = 'center'; g.lineWidth = 3 * dpr; g.strokeStyle = 'rgba(0,0,0,.75)'; g.fillStyle = '#e9d5ff';
-        const t = `${type.replace(/_/g, ' ')} Lv${lv}${n > 1 ? ' ×' + n : ''}`;
+        g.font = `600 ${Math.round(10 * dpr)}px Kanit, sans-serif`; g.textAlign = 'center'; g.lineWidth = 3 * dpr; g.strokeStyle = 'rgba(0,0,0,.75)'; g.fillStyle = alive ? '#e9d5ff' : '#b8a6cc';
+        const t = `${e.type.replace(/_/g, ' ')} Lv${ELITE_LEVEL[e.type]}${alive ? '' : ' · รอเกิด'}`;
         g.strokeText(t, cx, cy + s * 0.95); g.fillText(t, cx, cy + s * 0.95);
       }
-    }
+    };
+    for (const e of dead) mark(e, false);
+    for (const e of live) mark(e, true);
   }
   const eliteTimer = setInterval(() => {
     try { const mm = $('#minimap'), bg = $('#mmbigcv'); if (mm) drawElites(mm, 11, false); if (bg) drawElites(bg, 20, true); } catch (e) { /* map not ready */ }
