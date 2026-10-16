@@ -10,6 +10,7 @@
 //    (AUTO stays on); town warps wait for combat to end (AUTO fights back only while hit, 60 s max)
 //  • bounty window (🎯 ค่าหัว): today's bounties you can reach → each one: its map, AUTO targets = that mob only,
 //    farm area = whole map, claim when done → next; at the end AUTO settings go back and you return to the farm spot
+//  • elite spawn points (34 elites, 28 maps): purple skull on the minimap; skull + dashed area + name/level on the big map
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
 // It presses the game's own buttons (warp, world map "go", respawn, sell, AUTO). The messages it sends itself go
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
@@ -899,6 +900,50 @@
       if (big) drawMobIcons(big, 24);
     } catch (e) { /* map not ready */ }
   }, 150);
+  // ---- elite spawn points: purple skull on the game's minimap (#minimap) and big map (#mmbigcv) ----
+  // From the game's layouts (build 20261015) scaled to world tiles like the game does (zone w/h and rects x the
+  // per-map factor): mapId -> { w, h, e: [[type, level, x0, y0, x1, y1, count], ...] }. Both maps draw the whole map.
+  const ELITE_SPAWNS = {"southvale_field":{"w":81,"h":81,"e":[["elder_sprout",5,62,52,71,62,1]]},"whispering_woods":{"w":90,"h":90,"e":[["thicket_stag",5,57,48,71,61,1]]},"riverside":{"w":118,"h":73,"e":[["tide_brute",13,84,48,99,57,1]]},"old_quarry":{"w":76,"h":101,"e":[["brute",15,17,9,31,20,3],["quarry_brute",17,48,27,59,36,1]]},"honeyrill":{"w":90,"h":81,"e":[["willow_brute",8,70,52,80,61,1]]},"bracken_sink":{"w":90,"h":90,"e":[["moss_brute",15,67,11,80,26,1]]},"verdigris_rise":{"w":81,"h":95,"e":[["copper_brute",20,17,68,29,80,1]]},"pitchwood":{"w":90,"h":90,"e":[["pitch_brute",31,16,6,32,16,1]]},"yellowlick_flats":{"w":98,"h":81,"e":[["salt_brute",37,35,63,49,72,1]]},"peatcut_bog":{"w":90,"h":87,"e":[["peat_elder",43,22,68,35,78,1]]},"sledrun_gully":{"w":73,"h":101,"e":[["gully_brute",54,28,3,41,13,1]]},"brinecrust_shoals":{"w":95,"h":87,"e":[["floe_brute",61,74,65,89,78,1]]},"kitewind_terraces":{"w":84,"h":95,"e":[["terrace_sentinel",71,60,71,72,82,1]]},"glasswrack":{"w":87,"h":81,"e":[["wrack_brute",81,9,5,22,14,1]]},"marrowdeep":{"w":81,"h":81,"e":[["marrow_horror",91,23,5,35,14,1]]},"rustbell_barracks":{"w":76,"h":76,"e":[["rust_captain",99,56,59,67,67,1]]},"ancient_ruins":{"w":98,"h":98,"e":[["remnant",18,56,54,81,67,5],["remnant",18,43,68,58,81,3]]},"sunfield_plains":{"w":106,"h":81,"e":[["field_brute",25,77,59,92,68,1]]},"gloomroot_forest":{"w":90,"h":90,"e":[["corrupt_treant",31,67,28,77,39,1]]},"ember_hollow":{"w":95,"h":95,"e":[["cinder_brute",37,37,71,48,82,1]]},"mistmire_swamp":{"w":109,"h":76,"e":[["mire_elder",41,83,6,96,12,1]]},"duskgate_pass":{"w":73,"h":109,"e":[["dusk_remnant",44,39,35,52,51,2],["dusk_remnant",44,18,35,28,47,2],["gate_brute",45,41,7,52,20,1],["gate_brute",45,18,7,26,20,1]]},"frostpeak_slopes":{"w":76,"h":106,"e":[["rime_brute",53,37,7,43,16,1]]},"frozen_mere":{"w":98,"h":98,"e":[["mere_lurker",59,45,59,56,65,1]]},"cloudspire_ruins":{"w":90,"h":90,"e":[["storm_remnant",67,16,40,31,50,2],["storm_remnant",67,6,62,21,69,2],["cloud_brute",71,25,60,39,71,1],["cloud_brute",71,57,20,67,31,1]]},"shattered_vale":{"w":95,"h":84,"e":[["vale_remnant",80,39,9,53,15,2],["vale_remnant",80,51,21,63,27,2],["shard_brute",81,42,58,53,66,1]]},"umbral_depths":{"w":87,"h":87,"e":[["umbral_horror",88,7,32,20,47,2],["depth_brute",91,63,34,71,40,1],["depth_brute",91,66,46,74,53,1]]},"throne_of_warden":{"w":70,"h":70,"e":[["throne_guard",80,13,20,25,30,2],["golden_sentinel",67,44,20,57,30,2]]}};
+  const eliteOverlays = new Map(); // game canvas -> our canvas
+  function drawSkull(g, x, y, s) {
+    g.save(); g.translate(x, y);
+    g.fillStyle = '#a855f7'; g.strokeStyle = 'rgba(20,6,32,.9)'; g.lineWidth = Math.max(1, s * 0.09);
+    g.beginPath(); g.arc(0, -s * 0.08, s * 0.42, Math.PI * 0.85, Math.PI * 2.15); // cranium
+    g.lineTo(s * 0.26, s * 0.42); g.lineTo(-s * 0.26, s * 0.42); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#1a0626';
+    for (const ex of [-0.17, 0.17]) { g.beginPath(); g.arc(ex * s, -s * 0.06, s * 0.11, 0, Math.PI * 2); g.fill(); }
+    g.beginPath(); g.moveTo(0, s * 0.1); g.lineTo(-s * 0.06, s * 0.2); g.lineTo(s * 0.06, s * 0.2); g.closePath(); g.fill();
+    g.restore();
+  }
+  function drawElites(cv, size, big) {
+    let o = eliteOverlays.get(cv);
+    if (!o) { o = document.createElement('canvas'); o.className = 'bth-elitemap'; o.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483001'; document.body.appendChild(o); eliteOverlays.set(cv, o); }
+    const r = room(), m = r && ELITE_SPAWNS[r.state.mapId], rect = cv.getBoundingClientRect();
+    const shown = !!m && rect.width > 0 && cv.offsetParent !== null;
+    o.style.display = shown ? '' : 'none';
+    if (!shown) return;
+    const dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
+    o.style.left = rect.left + 'px'; o.style.top = rect.top + 'px'; o.style.width = rect.width + 'px'; o.style.height = rect.height + 'px';
+    if (o.width !== W || o.height !== H) { o.width = W; o.height = H; }
+    const g = o.getContext('2d'), kx = W / m.w, ky = H / m.h, s = size * dpr;
+    g.clearRect(0, 0, W, H);
+    for (const [type, lv, x0, y0, x1, y1, n] of m.e) {
+      const cx = (x0 + x1 + 1) / 2 * kx, cy = (y0 + y1 + 1) / 2 * ky;
+      if (big) { // the spawn area itself + name on the big map
+        g.fillStyle = 'rgba(168,85,247,.14)'; g.strokeStyle = 'rgba(168,85,247,.7)'; g.lineWidth = dpr; g.setLineDash([3 * dpr, 2 * dpr]);
+        g.fillRect(x0 * kx, y0 * ky, (x1 - x0 + 1) * kx, (y1 - y0 + 1) * ky); g.strokeRect(x0 * kx, y0 * ky, (x1 - x0 + 1) * kx, (y1 - y0 + 1) * ky); g.setLineDash([]);
+      }
+      drawSkull(g, cx, cy, s);
+      if (big) {
+        g.font = `600 ${Math.round(10 * dpr)}px Kanit, sans-serif`; g.textAlign = 'center'; g.lineWidth = 3 * dpr; g.strokeStyle = 'rgba(0,0,0,.75)'; g.fillStyle = '#e9d5ff';
+        const t = `${type.replace(/_/g, ' ')} Lv${lv}${n > 1 ? ' ×' + n : ''}`;
+        g.strokeText(t, cx, cy + s * 0.95); g.fillText(t, cx, cy + s * 0.95);
+      }
+    }
+  }
+  const eliteTimer = setInterval(() => {
+    try { const mm = $('#minimap'), bg = $('#mmbigcv'); if (mm) drawElites(mm, 11, false); if (bg) drawElites(bg, 20, true); } catch (e) { /* map not ready */ }
+  }, 500);
   function miniPhaseText(t) {
     const farmWeight = t.match(/^ฟาร์ม\s*[·-]\s*น้ำหนัก\s*([^·]*)/);
     return farmWeight ? 'น้ำหนัก ' + farmWeight[1].trim() : t.slice(0, 24);
@@ -1020,7 +1065,7 @@
   const chInfoTimer = setInterval(showChInfo, 1000);
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
