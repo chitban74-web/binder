@@ -12,6 +12,8 @@ const PORT = +process.env.BINDER_PORT || 3889;
 const HELPER = path.join(ROOT, 'helper', 'binder_helper.js');
 const PUBLIC = path.join(__dirname, 'public');
 const CHECK_MS = 3000, UPDATE_CHECK_MS = 10 * 60e3;
+// off: no git fetch at startup or on a timer; check / pull only from the web buttons
+const AUTO_UPDATE_CHECK = process.env.BINDER_AUTO_UPDATE === '1';
 const RESTART_CODE = 3;
 
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
@@ -149,7 +151,7 @@ const server = http.createServer(async (req, res) => {
   if (typeof WebSocket !== 'function' || typeof fetch !== 'function') { log('Node รุ่นนี้เก่าเกินไป (ต้อง 22 ขึ้นไป)'); process.exit(1); }
   server.on('error', e => { log(e.code === 'EADDRINUSE' ? `port ${PORT} ถูกใช้อยู่ — เปิดตัวจัดการซ้ำอยู่หรือเปล่า?` : e.message); process.exit(1); });
   server.listen(PORT, '127.0.0.1', () => log(`ตัวจัดการ Binder Town: http://localhost:${PORT}`));
-  checkUpdate(true).then(u => { if (u.behind) log(`มีอัปเดตใหม่ ${u.behind} commit — กดอัปเดตในหน้าเว็บ`); });
-  setInterval(() => checkUpdate(true), UPDATE_CHECK_MS);
+  checkUpdate(AUTO_UPDATE_CHECK).then(u => { if (u.behind) log(`มีอัปเดตใหม่ ${u.behind} commit — กดอัปเดตในหน้าเว็บ`); });
+  if (AUTO_UPDATE_CHECK) setInterval(() => checkUpdate(true), UPDATE_CHECK_MS);
   loop();
 })();
