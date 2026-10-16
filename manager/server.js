@@ -84,7 +84,12 @@ async function checkUpdate(fetchFirst = true) {
   update.branch = (await git('rev-parse', '--abbrev-ref', 'HEAD')).out;
   const head = await git('log', '-1', '--format=%h|%cd', '--date=format:%Y-%m-%d %H:%M');
   [update.commit, update.date] = head.out.split('|');
-  if (fetchFirst) { const f = await git('fetch', '--quiet', 'origin'); update.error = f.ok ? '' : 'git fetch ไม่สำเร็จ: ' + f.err; }
+  if (fetchFirst) {
+    const f = await git('fetch', '--quiet', 'origin');
+    // GitHub wants a login: this PC needs the read-only token (set_token.bat in the Binder_Town folder)
+    const auth = /could not read Username|Invalid username or token|Authentication failed|terminal prompts disabled/i.test(f.err);
+    update.error = f.ok ? '' : auth ? 'GitHub ต้องใช้ token — ดับเบิลคลิก set_token.bat ในโฟลเดอร์ Binder_Town แล้ววาง token' : 'git fetch ไม่สำเร็จ: ' + f.err;
+  }
   const up = await git('rev-list', '--count', 'HEAD..@{u}');
   update.behind = up.ok ? +up.out || 0 : 0;
   const inc = update.behind ? await git('log', '--format=%h %s', 'HEAD..@{u}') : { out: '' };
