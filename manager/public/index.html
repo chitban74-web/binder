@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binder Town Manager</title>
+<style>
+  :root { --bg: #f4f6fa; --card: #fff; --line: #dde3ee; --text: #1c2333; --muted: #6a7489; --accent: #2f6fdb; --ok: #1f9d55; --warn: #c27c0e; --bad: #c0392b; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #141821; --card: #1d2230; --line: #2c3446; --text: #e6eaf2; --muted: #8d97ab; --accent: #6b9bff; --ok: #3ccf7f; --warn: #f0b04a; --bad: #ff6b5e; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", Tahoma, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--card); flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  main { padding: 16px 20px; max-width: 1200px; margin: 0 auto; display: grid; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .muted { color: var(--muted); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+  .pill.ok { color: var(--ok); border-color: currentColor; } .pill.warn { color: var(--warn); border-color: currentColor; } .pill.bad { color: var(--bad); border-color: currentColor; }
+  button { font: inherit; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .browsers { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .kv { display: grid; grid-template-columns: 90px 1fr; gap: 2px 8px; margin: 8px 0; font-size: 13px; }
+  .log { font-size: 12px; color: var(--muted); max-height: 120px; overflow: auto; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 6px; }
+  #msg { white-space: pre-wrap; }
+  .spacer { flex: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Binder Town Manager</h1>
+  <span class="muted">http://localhost:3889</span>
+  <span class="spacer"></span>
+  <span id="ver" class="muted"></span>
+  <button id="chk">เช็คอัปเดต</button>
+  <button id="pull" class="primary" hidden>อัปเดต</button>
+</header>
+<main>
+  <div id="msg" class="card" hidden></div>
+  <section class="card">
+    <h2>เบราว์เซอร์</h2>
+    <div id="browsers" class="browsers"></div>
+    <p class="muted" style="margin:10px 0 0">แต่ละเบราว์เซอร์ใช้โปรไฟล์ของตัวเอง (โฟลเดอร์ profiles) — ล็อกอินครั้งแรกครั้งเดียว · คนละไอดีให้ใช้คนละเบราว์เซอร์</p>
+  </section>
+  <section class="card">
+    <h2>แท็บเกม</h2>
+    <div id="tabs" class="tabs"></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+function say(text, bad) { const m = $('#msg'); m.hidden = !text; m.textContent = text || ''; m.style.borderColor = bad ? 'var(--bad)' : ''; }
+async function post(url) {
+  try { const r = await fetch(url, { method: 'POST' }); const j = await r.json(); if (j.msg) say(j.msg, !j.ok); return j; }
+  catch (e) { say('ติดต่อตัวจัดการไม่ได้: ' + e.message, true); return {}; }
+}
+const STATE = { loading: ['ยังไม่เข้าเกม', 'warn'], world: ['กำลังโหลด helper', 'warn'], helper: ['helper พร้อม', 'ok'] };
+
+function renderUpdate(u) {
+  if (!u || !u.isRepo) { $('#ver').textContent = u && u.error ? u.error : ''; $('#pull').hidden = true; return; }
+  $('#ver').textContent = `${u.branch} · ${u.commit} · ${u.date}` + (u.error ? ' · ' + u.error : '');
+  $('#pull').hidden = !u.behind;
+  $('#pull').textContent = `อัปเดต (${u.behind} ใหม่)`;
+  $('#pull').title = (u.incoming || []).join('\n');
+}
+function renderBrowsers(list) {
+  $('#browsers').innerHTML = list.map(b => `<div class="card" style="padding:10px 12px">
+    <div class="row"><b>${esc(b.name)}</b><span class="spacer"></span>
+      <span class="pill ${b.running ? 'ok' : ''}">${b.running ? 'เปิดอยู่' : b.installed ? 'ปิด' : 'ไม่มีในเครื่อง'}</span></div>
+    <div class="row muted" style="margin:6px 0">port ${b.port} · แท็บเกม ${b.tabs.length}</div>
+    <button data-open="${b.key}" ${b.installed ? '' : 'disabled'}>${b.running ? 'เปิดแท็บเกมเพิ่ม' : 'เปิดเกม'}</button></div>`).join('');
+}
+function renderTabs(list) {
+  const all = list.flatMap(b => b.tabs.map(t => ({ ...t, browser: b.name })));
+  if (!all.length) { $('#tabs').innerHTML = '<p class="muted">ยังไม่มีแท็บเกม — กด "เปิดเกม" ที่เบราว์เซอร์ด้านบน แล้วล็อกอินเข้าเกม</p>'; return; }
+  $('#tabs').innerHTML = all.map(t => {
+    const s = t.status, [label, cls] = STATE[t.state] || [t.state, ''];
+    const pots = s ? s.potions.map(p => `${esc(p.name)} ${p.have ?? '?'}${p.min ? ` (ขั้นต่ำ ${p.min})` : ''}`).join(' · ') : '';
+    const bounty = s && s.bounty ? `${esc(s.bounty.mob)} ${s.bounty.prog}/${s.bounty.need} @ ${esc(s.bounty.map)} · ตัวที่ ${s.bounty.done + 1}/${s.bounty.total}` : '—';
+    return `<div class="card">
+      <div class="row"><b>${esc(t.browser)}</b><span class="pill ${cls}">${label}</span><span class="spacer"></span>
+        ${s ? `<span class="pill ${s.running ? 'ok' : ''}">${s.running ? 'ทำงาน' : 'หยุด'}</span>` : ''}</div>
+      ${s ? `<div class="kv">
+        <span class="muted">สถานะ</span><span>${esc(s.phase)}</span>
+        <span class="muted">แมพ</span><span>${esc(s.map)} · CH${s.channel || '?'} · Lv ${s.level || '?'}${s.dead ? ' · <b style="color:var(--bad)">ตาย</b>' : ''}</span>
+        <span class="muted">จุดฟาร์ม</span><span>${s.farmMap ? esc(s.farmMap) + (s.farmSpot ? ` (${s.farmSpot.x.toFixed(0)}, ${s.farmSpot.y.toFixed(0)})` : '') : 'ยังไม่ตั้ง'}</span>
+        <span class="muted">น้ำหนัก</span><span>${s.weight}% · AUTO ${s.auto ? 'เปิด' : 'ปิด'}</span>
+        <span class="muted">ยา</span><span>${pots || '—'}</span>
+        <span class="muted">ค่าหัว</span><span>${bounty}</span></div>
+      <div class="row"><button class="${s.running ? '' : 'primary'}" data-toggle="${t.id}">${s.running ? '■ หยุด' : '▶ เริ่ม'}</button>
+        <button data-reload="${t.id}">โหลด helper ใหม่</button></div>
+      <div class="log">${(s.log || []).map(esc).join('<br>')}</div>` : `<p class="muted">${esc(t.title || '')}</p>`}
+    </div>`;
+  }).join('');
+}
+async function refresh() {
+  try {
+    const r = await fetch('/api/status'); const j = await r.json();
+    renderUpdate(j.update); renderBrowsers(j.browsers); renderTabs(j.browsers);
+  } catch { $('#ver').textContent = 'ติดต่อตัวจัดการไม่ได้ — หน้าต่างดำยังเปิดอยู่ไหม?'; }
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.open) { b.disabled = true; say('กำลังเปิด…'); await post(`/api/browser/${b.dataset.open}/open`); }
+  else if (b.dataset.toggle) await post(`/api/tab/${b.dataset.toggle}/toggle`);
+  else if (b.dataset.reload) await post(`/api/tab/${b.dataset.reload}/reload`);
+  else if (b.id === 'chk') { b.disabled = true; const j = await post('/api/update/check'); if (j.update) { renderUpdate(j.update); say(j.update.behind ? `มีอัปเดต ${j.update.behind} commit:\n${j.update.incoming.join('\n')}` : (j.update.error || 'เป็นเวอร์ชันล่าสุดแล้ว'), !!j.update.error); } b.disabled = false; }
+  else if (b.id === 'pull') { b.disabled = true; say('กำลังอัปเดต…'); const j = await post('/api/update/pull'); if (j.restart) setTimeout(() => location.reload(), 5000); }
+  refresh();
+});
+refresh(); setInterval(refresh, 2000);
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "binder-town-tools",
+  "private": true,
+  "description": "Dump Binder Town client data and protocol",
+  "scripts": {
+    "dump": "node dump.js"
+  },
+  "dependencies": {
+    "@colyseus/schema": "^3.0.76",
+    "acorn": "^8.14.0",
+    "acorn-walk": "^8.3.4"
+  }
+}

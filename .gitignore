@@ -1,0 +1,9 @@
+# browser profiles: contain your game login (cookies) - never commit
+profiles/
+# copies of the game's own files and data dumped from them (rebuild with tools/dump.js)
+raw/
+data/
+# dependencies / build output
+node_modules/
+*.zip
+*.log

@@ -1,0 +1,3000 @@
+{
+ "send": {
+  "marketBoard": {
+   "fields": {
+    "...spread": "...v",
+    "bsort": [
+     "r"
+    ]
+   },
+   "examples": [
+    "n.send({type:\"marketBoard\",...v,bsort:r})"
+   ]
+  },
+  "marketItem": {
+   "fields": {
+    "itemId": [
+     "c.itemId"
+    ],
+    "range": [
+     "c.range"
+    ]
+   },
+   "examples": [
+    "n.send({type:\"marketItem\",itemId:c.itemId,range:c.range})"
+   ]
+  },
+  "autoState": {
+   "fields": {
+    "on": [
+     "!0",
+     "!1",
+     "!this.pausedUntil"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"autoState\",on:!0})",
+    "this.d.send({type:\"autoState\",on:!1})",
+    "this.d.send({type:\"autoState\",on:!1})"
+   ]
+  },
+  "lootFilter": {
+   "fields": {
+    "off": [
+     "e?[]:this.d.cfg().lootOff??[]",
+     "Ot.lootOff"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"lootFilter\",off:e?[]:this.d.cfg().lootOff??[]})",
+    "T.send({type:\"lootFilter\",off:Ot.lootOff})"
+   ]
+  },
+  "dodge": {
+   "fields": {
+    "dx": [
+     "m.x-n.x",
+     "e?t.dirX:t.facingX",
+     "I"
+    ],
+    "dy": [
+     "m.y-n.y",
+     "e?t.dirY:t.facingY",
+     "R"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"dodge\",dx:m.x-n.x,dy:m.y-n.y})",
+    "T.send({type:\"dodge\",dx:e?t.dirX:t.facingX,dy:e?t.dirY:t.facingY})",
+    "T.send({type:\"dodge\",dx:I,dy:R})"
+   ]
+  },
+  "moveTo": {
+   "fields": {
+    "x": [
+     "m.x",
+     "s.x",
+     "c.x+.5",
+     "O.x"
+    ],
+    "y": [
+     "m.y",
+     "s.y",
+     "c.y+.5",
+     "O.y"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"moveTo\",x:m.x,y:m.y})",
+    "this.d.send({type:\"moveTo\",x:s.x,y:s.y})",
+    "this.d.send({type:\"moveTo\",x:c.x+.5,y:c.y+.5})"
+   ]
+  },
+  "useItem": {
+   "fields": {
+    "itemId": [
+     "l",
+     "c",
+     "c[0]",
+     "y"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"useItem\",itemId:l})",
+    "this.d.send({type:\"useItem\",itemId:c})",
+    "this.d.send({type:\"useItem\",itemId:c[0]})"
+   ]
+  },
+  "skill": {
+   "fields": {
+    "skillId": [
+     "S.id",
+     "t",
+     "C.sid"
+    ],
+    "x": [
+     "O?n.x:i.x",
+     "i.x",
+     "pn.x",
+     "e"
+    ],
+    "y": [
+     "O?n.y:i.y",
+     "i.y",
+     "pn.y",
+     "n"
+    ],
+    "auto": [
+     "!0"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"skill\",skillId:S.id,x:O?n.x:i.x,y:O?n.y:i.y,auto:!0})",
+    "T.send({type:\"skill\",skillId:t,x:i.x,y:i.y})",
+    "T.send({type:\"skill\",skillId:t,x:pn.x,y:pn.y})"
+   ]
+  },
+  "attack": {
+   "fields": {
+    "x": [
+     "i.x",
+     "t"
+    ],
+    "y": [
+     "i.y",
+     "e"
+    ],
+    "auto": [
+     "!0"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"attack\",x:i.x,y:i.y,auto:!0})",
+    "T.send({type:\"attack\",x:t,y:e})",
+    "T.send({type:\"attack\",x:t,y:e})"
+   ]
+  },
+  "fish": {
+   "fields": {
+    "x": [
+     "i.wx",
+     "t+.5",
+     "la.x+.5"
+    ],
+    "y": [
+     "i.wy",
+     "e+.5",
+     "la.y+.5"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"fish\",x:i.wx,y:i.wy})",
+    "T.send({type:\"fish\",x:t+.5,y:e+.5})",
+    "T.send({type:\"fish\",x:la.x+.5,y:la.y+.5})"
+   ]
+  },
+  "gather": {
+   "fields": {
+    "nodeId": [
+     "i",
+     "t",
+     "Ds"
+    ]
+   },
+   "examples": [
+    "this.d.send({type:\"gather\",nodeId:i})",
+    "T.send({type:\"gather\",nodeId:t})",
+    "T.send({type:\"gather\",nodeId:t})"
+   ]
+  },
+  "petPull": {
+   "fields": {
+    "banner": [
+     "$"
+    ],
+    "n": [
+     "S"
+    ]
+   },
+   "examples": [
+    "e.send({type:\"petPull\",banner:$,n:S})"
+   ]
+  },
+  "petBuy": {
+   "fields": {
+    "pet": [
+     "U.key"
+    ]
+   },
+   "examples": [
+    "e.send({type:\"petBuy\",pet:U.key})"
+   ]
+  },
+  "commissionPost": {
+   "fields": {
+    "item": [
+     "o"
+    ],
+    "qty": [
+     "i"
+    ],
+    "unit": [
+     "r"
+    ],
+    "grade": [
+     "l"
+    ],
+    "affix": [
+     "c"
+    ]
+   },
+   "examples": [
+    "e.send({type:\"commissionPost\",item:o,qty:i,unit:r,grade:l,affix:c})"
+   ]
+  },
+  "commissionCancel": {
+   "fields": {
+    "id": [
+     "v.id"
+    ]
+   },
+   "examples": [
+    "e.send({type:\"commissionCancel\",id:v.id})"
+   ]
+  },
+  "commissionFill": {
+   "fields": {
+    "id": [
+     "g.id"
+    ],
+    "qty": [
+     "1",
+     "R"
+    ],
+    "itemId": [
+     "L.ref"
+    ]
+   },
+   "examples": [
+    "e.send({type:\"commissionFill\",id:g.id,qty:1,itemId:L.ref})",
+    "e.send({type:\"commissionFill\",id:g.id,qty:R})"
+   ]
+  },
+  "commissionQuery": {
+   "fields": {},
+   "examples": [
+    "e.send({type:\"commissionQuery\"})"
+   ]
+  },
+  "respawn": {
+   "fields": {
+    "here": [
+     "!0"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"respawn\"})",
+    "T.send({type:\"respawn\",here:!0})"
+   ]
+  },
+  "dyeChange": {
+   "fields": {
+    "hair": [
+     "n.hair"
+    ],
+    "outfit": [
+     "n.outfit"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"dyeChange\",hair:n.hair,outfit:n.outfit})"
+   ]
+  },
+  "cosmeticShow": {
+   "fields": {
+    "slot": [
+     "e",
+     "\"mount\"",
+     "h"
+    ],
+    "show": [
+     "a",
+     "L2.has(\"mount\")",
+     "w"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"cosmeticShow\",slot:e,show:a})",
+    "T.send({type:\"cosmeticShow\",slot:e,show:a})",
+    "T.send({type:\"cosmeticShow\",slot:\"mount\",show:L2.has(\"mount\")})"
+   ]
+  },
+  "cosmeticUnequip": {
+   "fields": {
+    "slot": [
+     "e",
+     "\"mount\"",
+     "n",
+     "t"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"cosmeticUnequip\",slot:e})",
+    "T.send({type:\"cosmeticUnequip\",slot:e})",
+    "T.send({type:\"cosmeticUnequip\",slot:\"mount\"})"
+   ]
+  },
+  "cosmeticEquip": {
+   "fields": {
+    "itemId": [
+     "r",
+     "e.dataset.ref",
+     "y",
+     "t"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"cosmeticEquip\",itemId:r})",
+    "T.send({type:\"cosmeticEquip\",itemId:e.dataset.ref})",
+    "T.send({type:\"cosmeticEquip\",itemId:y})"
+   ]
+  },
+  "unequip": {
+   "fields": {
+    "slot": [
+     "e",
+     "h",
+     "t"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"unequip\",slot:e})",
+    "T.send({type:\"unequip\",slot:h})",
+    "T.send({type:\"unequip\",slot:h})"
+   ]
+  },
+  "equip": {
+   "fields": {
+    "itemId": [
+     "n",
+     "y",
+     "t"
+    ],
+    "slot": [
+     "t.dataset.slot",
+     "\"weapon\"",
+     "\"offhand\"",
+     "\"accessory\""
+    ]
+   },
+   "examples": [
+    "T.send({type:\"equip\",itemId:n,slot:t.dataset.slot})",
+    "T.send({type:\"equip\",itemId:y})",
+    "T.send({type:\"equip\",itemId:y,slot:\"weapon\"})"
+   ]
+  },
+  "insPause": {
+   "fields": {
+    "ins": [
+     "t"
+    ],
+    "off": [
+     "!e"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"insPause\",ins:t,off:!e})"
+   ]
+  },
+  "lockItem": {
+   "fields": {
+    "itemId": [
+     "s"
+    ],
+    "locked": [
+     "f"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"lockItem\",itemId:s,locked:f})"
+   ]
+  },
+  "skillMod": {
+   "fields": {
+    "skillId": [
+     "t"
+    ],
+    "mod": [
+     "z",
+     "e"
+    ]
+   },
+   "examples": [
+    "Ws.send({type:\"skillMod\",skillId:t,mod:z})",
+    "T.send({type:\"skillMod\",skillId:t,mod:e})"
+   ]
+  },
+  "skillUp": {
+   "fields": {
+    "skillId": [
+     "t",
+     "E",
+     "N"
+    ]
+   },
+   "examples": [
+    "Ws.send({type:\"skillUp\",skillId:t})",
+    "Ws.send({type:\"skillUp\",skillId:E})",
+    "Ws.send({type:\"skillUp\",skillId:t})"
+   ]
+  },
+  "achQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"achQuery\"})"
+   ]
+  },
+  "titleSet": {
+   "fields": {
+    "id": [
+     "e.id",
+     "s.dataset.title??\"\""
+    ]
+   },
+   "examples": [
+    "T.send({type:\"titleSet\",id:e.id})",
+    "T.send({type:\"titleSet\",id:s.dataset.title??\"\"})"
+   ]
+  },
+  "salvageMany": {
+   "fields": {
+    "itemIds": [
+     "t.slice(i,i+dC)"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"salvageMany\",itemIds:t.slice(i,i+dC)})"
+   ]
+  },
+  "sell": {
+   "fields": {
+    "itemId": [
+     "y",
+     "t"
+    ],
+    "qty": [
+     "x",
+     "1",
+     "e"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"sell\",itemId:y,qty:x})",
+    "T.send({type:\"sell\",itemId:y,qty:1})",
+    "T.send({type:\"sell\",itemId:t,qty:e})"
+   ]
+  },
+  "salvage": {
+   "fields": {
+    "itemId": [
+     "y"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"salvage\",itemId:y})"
+   ]
+  },
+  "discard": {
+   "fields": {
+    "itemId": [
+     "y"
+    ],
+    "qty": [
+     "x",
+     "1"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"discard\",itemId:y,qty:x})",
+    "T.send({type:\"discard\",itemId:y,qty:1})"
+   ]
+  },
+  "promoClaim": {
+   "fields": {
+    "id": [
+     "s",
+     "tb",
+     "p.slice(5)"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"promoClaim\",id:s})",
+    "T.send({type:\"promoClaim\",id:tb})",
+    "T.send({type:\"promoClaim\",id:p.slice(5)})"
+   ]
+  },
+  "appearance": {
+   "fields": {
+    "gender": [
+     "s.gender"
+    ],
+    "hair": [
+     "s.hair"
+    ],
+    "outfit": [
+     "s.outfit"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"appearance\",gender:s.gender,hair:s.hair,outfit:s.outfit})"
+   ]
+  },
+  "huntQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"huntQuery\"})",
+    "T.send({type:\"huntQuery\"})"
+   ]
+  },
+  "toolUp": {
+   "fields": {
+    "line": [
+     "d"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"toolUp\",line:d})"
+   ]
+  },
+  "expertisePick": {
+   "fields": {
+    "line": [
+     "d"
+    ],
+    "row": [
+     "Number(Y.dataset.xrow)"
+    ],
+    "pick": [
+     "Number(Y.dataset.xpick)"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"expertisePick\",line:d,row:Number(Y.dataset.xrow),pick:Number(Y.dataset.xpick)})"
+   ]
+  },
+  "gatherGear": {
+   "fields": {
+    "slot": [
+     "Y.dataset.ggslot"
+    ],
+    "itemId": [
+     "Y.dataset.ggwear"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"gatherGear\",slot:Y.dataset.ggslot})",
+    "T.send({type:\"gatherGear\",itemId:Y.dataset.ggwear})"
+   ]
+  },
+  "bountyClaim": {
+   "fields": {
+    "id": [
+     "Y.dataset.claim",
+     "r.dataset.claim"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"bountyClaim\",id:Y.dataset.claim})",
+    "T.send({type:\"bountyClaim\",id:r.dataset.claim})"
+   ]
+  },
+  "craftTry": {
+   "fields": {
+    "station": [
+     "fk"
+    ],
+    "mats": [
+     "[...zi]"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"craftTry\",station:fk,mats:[...zi]})"
+   ]
+  },
+  "craft": {
+   "fields": {
+    "recipeId": [
+     "e.id",
+     "t"
+    ],
+    "prefer": [
+     "xL"
+    ],
+    "...spread": "...d?{kind:Cg}:{}"
+   },
+   "examples": [
+    "T.send({type:\"craft\",recipeId:e.id,prefer:xL,...d?{kind:Cg}:{}})",
+    "T.send({type:\"craft\",recipeId:t})"
+   ]
+  },
+  "bankItem": {
+   "fields": {
+    "action": [
+     "t"
+    ],
+    "vault": [
+     "Qc"
+    ],
+    "itemId": [
+     "e"
+    ],
+    "qty": [
+     "n"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"bankItem\",action:t,vault:Qc,itemId:e,qty:n})"
+   ]
+  },
+  "bankBuyVault": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"bankBuyVault\"})"
+   ]
+  },
+  "bankQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"bankQuery\"})"
+   ]
+  },
+  "bankGold": {
+   "fields": {
+    "action": [
+     "e"
+    ],
+    "amount": [
+     "n"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"bankGold\",action:e,amount:n})"
+   ]
+  },
+  "socialQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"socialQuery\"})",
+    "T.send({type:\"socialQuery\"})",
+    "T.send({type:\"socialQuery\"})"
+   ]
+  },
+  "rename": {
+   "fields": {
+    "name": [
+     "t"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"rename\",name:t})"
+   ]
+  },
+  "partyBoardQuery": {
+   "fields": {
+    "map": [
+     "t",
+     "Mo"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partyBoardQuery\",map:t})",
+    "T.send({type:\"partyBoardQuery\",map:Mo})",
+    "T.send({type:\"partyBoardQuery\",map:Mo})"
+   ]
+  },
+  "guildListQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"guildListQuery\"})",
+    "T.send({type:\"guildListQuery\"})"
+   ]
+  },
+  "friendRequest": {
+   "fields": {
+    "name": [
+     "a",
+     "n"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"friendRequest\",name:a})",
+    "T.send({type:\"friendRequest\",name:n})"
+   ]
+  },
+  "friendRemove": {
+   "fields": {
+    "name": [
+     "s"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"friendRemove\",name:s})"
+   ]
+  },
+  "block": {
+   "fields": {
+    "target": [
+     "s",
+     "n"
+    ],
+    "on": [
+     "!1",
+     "!s"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"block\",target:s,on:!1})",
+    "T.send({type:\"block\",target:n,on:!s})"
+   ]
+  },
+  "partyInvite": {
+   "fields": {
+    "name": [
+     "s",
+     "n",
+     "e.dataset.name??document.getElementById(\"partyinvite\").value.trim()"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partyInvite\",name:s})",
+    "T.send({type:\"partyInvite\",name:n})",
+    "T.send({type:\"partyInvite\",name:e.dataset.name??document.getElementById(\"partyinvite\").value.trim()})"
+   ]
+  },
+  "tradeOffer": {
+   "fields": {
+    "items": [
+     "t"
+    ],
+    "gold": [
+     "e"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"tradeOffer\",items:t,gold:e})"
+   ]
+  },
+  "tradeCancel": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"tradeCancel\"})",
+    "T.send({type:\"tradeCancel\"})"
+   ]
+  },
+  "tradeLock": {
+   "fields": {
+    "on": [
+     "!e.myLock"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"tradeLock\",on:!e.myLock})"
+   ]
+  },
+  "tradeConfirm": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"tradeConfirm\"})"
+   ]
+  },
+  "inspectUid": {
+   "fields": {
+    "uid": [
+     "e.uid",
+     "e.dataset.uid"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"inspectUid\",uid:e.uid})",
+    "T.send({type:\"inspectUid\",uid:e.dataset.uid})"
+   ]
+  },
+  "inspect": {
+   "fields": {
+    "id": [
+     "e.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"inspect\",id:e.id})"
+   ]
+  },
+  "partyCreate": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"partyCreate\"})",
+    "T.send({type:\"partyCreate\"})"
+   ]
+  },
+  "guildInvite": {
+   "fields": {
+    "name": [
+     "n",
+     "e.dataset.name??document.getElementById(\"guildinvite\").value.trim()"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"guildInvite\",name:n})",
+    "T.send({type:\"guildInvite\",name:e.dataset.name??document.getElementById(\"guildinvite\").value.trim()})"
+   ]
+  },
+  "tradeRequest": {
+   "fields": {
+    "id": [
+     "e.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"tradeRequest\",id:e.id})"
+   ]
+  },
+  "like": {
+   "fields": {
+    "uid": [
+     "t.uid"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"like\",uid:t.uid})"
+   ]
+  },
+  "partyGoto": {
+   "fields": {
+    "memberId": [
+     "t"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partyGoto\",memberId:t})",
+    "T.send({type:\"partyGoto\",memberId:t})"
+   ]
+  },
+  "partyApply": {
+   "fields": {
+    "id": [
+     "s",
+     "t.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partyApply\",id:s})",
+    "T.send({type:\"partyApply\",id:t.id})"
+   ]
+  },
+  "guildApply": {
+   "fields": {
+    "id": [
+     "s"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"guildApply\",id:s})"
+   ]
+  },
+  "joinAnswer": {
+   "fields": {
+    "kind": [
+     "e.dataset.kind===\"guild\"?\"guild\":\"party\"",
+     "q.kind"
+    ],
+    "id": [
+     "s",
+     "q.id"
+    ],
+    "accept": [
+     "n===\"joinYes\"",
+     "!0",
+     "!1"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"joinAnswer\",kind:e.dataset.kind===\"guild\"?\"guild\":\"party\",id:s,accept:n===\"joinYes\"})",
+    "T.send({type:\"joinAnswer\",kind:q.kind,id:q.id,accept:!0})",
+    "T.send({type:\"joinAnswer\",kind:q.kind,id:q.id,accept:!1})"
+   ]
+  },
+  "partyRecruit": {
+   "fields": {
+    "open": [
+     "c",
+     "n.checked",
+     "!0"
+    ],
+    "note": [
+     "d",
+     "l",
+     "a",
+     "s"
+    ],
+    "auto": [
+     "SK()",
+     "n.checked",
+     "a"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partyRecruit\",open:c,note:d,auto:SK()})",
+    "T.send({type:\"partyRecruit\",open:c,note:l,auto:n.checked})",
+    "T.send({type:\"partyRecruit\",open:n.checked,note:a,auto:SK()})"
+   ]
+  },
+  "guildRecruit": {
+   "fields": {
+    "open": [
+     "c",
+     "n.checked"
+    ],
+    "note": [
+     "d",
+     "a"
+    ],
+    "auto": [
+     "((i=document.getElementById(\"guildauto\"))==null?void 0:i.checked)??!1"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"guildRecruit\",open:c,note:d,auto:((i=document.getElementById(\"guildauto\"))==null?void 0:i.checked)??!1})",
+    "T.send({type:\"guildRecruit\",open:n.checked,note:a})"
+   ]
+  },
+  "partyRally": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"partyRally\"})"
+   ]
+  },
+  "partyLeave": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"partyLeave\"})"
+   ]
+  },
+  "partyKick": {
+   "fields": {
+    "memberId": [
+     "s"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partyKick\",memberId:s})"
+   ]
+  },
+  "partyPromote": {
+   "fields": {
+    "memberId": [
+     "s"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partyPromote\",memberId:s})"
+   ]
+  },
+  "partySettings": {
+   "fields": {
+    "xpMode": [
+     "e.dataset.v"
+    ],
+    "lootMode": [
+     "e.dataset.v"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partySettings\",xpMode:e.dataset.v})",
+    "T.send({type:\"partySettings\",lootMode:e.dataset.v})"
+   ]
+  },
+  "guildCreate": {
+   "fields": {
+    "name": [
+     "l"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"guildCreate\",name:l})"
+   ]
+  },
+  "guildDonate": {
+   "fields": {
+    "amount": [
+     "l"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"guildDonate\",amount:l})",
+    "T.send({type:\"guildDonate\",amount:l})"
+   ]
+  },
+  "guildUpgrade": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"guildUpgrade\"})"
+   ]
+  },
+  "guildRole": {
+   "fields": {
+    "memberId": [
+     "s"
+    ],
+    "role": [
+     "e.dataset.role"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"guildRole\",memberId:s,role:e.dataset.role})"
+   ]
+  },
+  "guildKick": {
+   "fields": {
+    "memberId": [
+     "s"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"guildKick\",memberId:s})"
+   ]
+  },
+  "guildLeave": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"guildLeave\"})"
+   ]
+  },
+  "guildDisband": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"guildDisband\"})"
+   ]
+  },
+  "warpMenu": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"warpMenu\"})",
+    "T.send({type:\"warpMenu\"})"
+   ]
+  },
+  "warpTo": {
+   "fields": {
+    "mapId": [
+     "m",
+     "b.dataset.warp"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"warpTo\",mapId:m})",
+    "T.send({type:\"warpTo\",mapId:b.dataset.warp})"
+   ]
+  },
+  "traitPick": {
+   "fields": {
+    "line": [
+     "t"
+    ],
+    "pick": [
+     "l"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"traitPick\",line:t,pick:l})"
+   ]
+  },
+  "albumSet": {
+   "fields": {
+    "slot": [
+     "F"
+    ],
+    "cardRef": [
+     "z"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"albumSet\",slot:F,cardRef:z})"
+   ]
+  },
+  "cardExchange": {
+   "fields": {
+    "mobType": [
+     "z"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"cardExchange\",mobType:z})"
+   ]
+  },
+  "albumClear": {
+   "fields": {
+    "slot": [
+     "S.dataset.slot"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"albumClear\",slot:S.dataset.slot})"
+   ]
+  },
+  "spiritOffer": {
+   "fields": {
+    "mob": [
+     "A"
+    ],
+    "coins": [
+     "z"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"spiritOffer\",mob:A,coins:z})"
+   ]
+  },
+  "cardDissolve": {
+   "fields": {
+    "cardRef": [
+     "A"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"cardDissolve\",cardRef:A})"
+   ]
+  },
+  "dailyClaim": {
+   "fields": {
+    "id": [
+     "m.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"dailyClaim\",id:m.id})"
+   ]
+  },
+  "passClaim": {
+   "fields": {
+    "tier": [
+     "k"
+    ],
+    "track": [
+     "v"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"passClaim\",tier:k,track:v})"
+   ]
+  },
+  "passClaimAll": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"passClaimAll\"})"
+   ]
+  },
+  "passBuyTier": {
+   "fields": {
+    "n": [
+     "n"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"passBuyTier\",n})"
+   ]
+  },
+  "passQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"passQuery\"})",
+    "T.send({type:\"passQuery\"})",
+    "T.send({type:\"passQuery\"})"
+   ]
+  },
+  "intlCancel": {
+   "fields": {
+    "orderId": [
+     "a"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"intlCancel\",orderId:a})"
+   ]
+  },
+  "topupHistory": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"topupHistory\"})",
+    "T.send({type:\"topupHistory\"})",
+    "T.send({type:\"topupHistory\"})"
+   ]
+  },
+  "slipSubmit": {
+   "fields": {
+    "orderId": [
+     "t.id",
+     "e.id"
+    ],
+    "qr": [
+     "`${i.dataset.fake}-${t.id}-${Date.now()}`",
+     "n"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"slipSubmit\",orderId:t.id,qr:`${i.dataset.fake}-${t.id}-${Date.now()}`})",
+    "T.send({type:\"slipSubmit\",orderId:e.id,qr:n})"
+   ]
+  },
+  "slipClaimToken": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"slipClaimToken\"})"
+   ]
+  },
+  "gemexTrade": {
+   "fields": {
+    "side": [
+     "t"
+    ],
+    "crystals": [
+     "n"
+    ],
+    "limit": [
+     "a.gold",
+     "s.gold"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"gemexTrade\",side:t,crystals:n,limit:a.gold})",
+    "T.send({type:\"gemexTrade\",side:t,crystals:n,limit:s.gold})"
+   ]
+  },
+  "gemexQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"gemexQuery\"})"
+   ]
+  },
+  "lanternQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"lanternQuery\"})"
+   ]
+  },
+  "lanternEdit": {
+   "fields": {
+    "op": [
+     "n"
+    ],
+    "i": [
+     "Number(e.dataset.i)"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"lanternEdit\",op:n,i:Number(e.dataset.i)})"
+   ]
+  },
+  "historyQuery": {
+   "fields": {
+    "kind": [
+     "Ou"
+    ],
+    "scope": [
+     "zp"
+    ],
+    "page": [
+     "Z3"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"historyQuery\",kind:Ou,scope:zp,page:Z3})"
+   ]
+  },
+  "mailRead": {
+   "fields": {
+    "id": [
+     "r.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"mailRead\",id:r.id})"
+   ]
+  },
+  "mailClaim": {
+   "fields": {
+    "id": [
+     "e.id",
+     "\"all\""
+    ]
+   },
+   "examples": [
+    "T.send({type:\"mailClaim\",id:e.id})",
+    "T.send({type:\"mailClaim\",id:\"all\"})"
+   ]
+  },
+  "mailDelete": {
+   "fields": {
+    "id": [
+     "e.id",
+     "\"read\""
+    ]
+   },
+   "examples": [
+    "T.send({type:\"mailDelete\",id:e.id})",
+    "T.send({type:\"mailDelete\",id:\"read\"})"
+   ]
+  },
+  "rankQuery": {
+   "fields": {
+    "board": [
+     "Pl"
+    ],
+    "job": [
+     "jo"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"rankQuery\",board:Pl,job:jo})"
+   ]
+  },
+  "mailQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"mailQuery\"})"
+   ]
+  },
+  "shopBuy": {
+   "fields": {
+    "offerId": [
+     "t"
+    ],
+    "qty": [
+     "f"
+    ],
+    "pay": [
+     "e"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"shopBuy\",offerId:t,qty:f,pay:e})"
+   ]
+  },
+  "intlOrder": {
+   "fields": {
+    "pkgId": [
+     "t"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"intlOrder\",pkgId:t})"
+   ]
+  },
+  "topup": {
+   "fields": {
+    "pkgId": [
+     "t"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"topup\",pkgId:t})"
+   ]
+  },
+  "marketQuery": {
+   "fields": {
+    "...spread": "...e"
+   },
+   "examples": [
+    "T.send({type:\"marketQuery\",...e})"
+   ]
+  },
+  "marketCancel": {
+   "fields": {
+    "id": [
+     "t.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"marketCancel\",id:t.id})"
+   ]
+  },
+  "marketCollect": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"marketCollect\"})"
+   ]
+  },
+  "marketGuide": {
+   "fields": {
+    "itemId": [
+     "jn"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"marketGuide\",itemId:jn})"
+   ]
+  },
+  "marketList": {
+   "fields": {
+    "itemId": [
+     "jn"
+    ],
+    "qty": [
+     "g"
+    ],
+    "price": [
+     "g*w"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"marketList\",itemId:jn,qty:g,price:g*w})"
+   ]
+  },
+  "repair": {
+   "fields": {
+    "itemId": [
+     "v",
+     "l.packed"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"repair\",itemId:v})",
+    "T.send({type:\"repair\",itemId:l.packed})"
+   ]
+  },
+  "infuse": {
+   "fields": {
+    "itemId": [
+     "e"
+    ],
+    "element": [
+     "o",
+     "\"\""
+    ]
+   },
+   "examples": [
+    "T.send({type:\"infuse\",itemId:e,element:o})",
+    "T.send({type:\"infuse\",itemId:e,element:\"\"})"
+   ]
+  },
+  "inscribe": {
+   "fields": {
+    "itemId": [
+     "i"
+    ],
+    "ins": [
+     "Ui"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"inscribe\",itemId:i,ins:Ui})"
+   ]
+  },
+  "reforge": {
+   "fields": {
+    "itemId": [
+     "e"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"reforge\",itemId:e})"
+   ]
+  },
+  "masterwork": {
+   "fields": {
+    "itemId": [
+     "i.id"
+    ],
+    "affix": [
+     "ea"
+    ],
+    "grade": [
+     "L0"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"masterwork\",itemId:i.id,affix:ea,grade:L0})"
+   ]
+  },
+  "pact": {
+   "fields": {
+    "itemId": [
+     "e"
+    ],
+    "pact": [
+     "y"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"pact\",itemId:e,pact:y})"
+   ]
+  },
+  "affixReroll": {
+   "fields": {
+    "itemId": [
+     "ot"
+    ],
+    "line": [
+     "O"
+    ],
+    "...spread": "...ct?{essence:ct}:{}"
+   },
+   "examples": [
+    "T.send({type:\"affixReroll\",itemId:ot,line:O,...ct?{essence:ct}:{}})"
+   ]
+  },
+  "affixHone": {
+   "fields": {
+    "itemId": [
+     "W"
+    ],
+    "line": [
+     "y"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"affixHone\",itemId:W,line:y})"
+   ]
+  },
+  "refine": {
+   "fields": {
+    "itemId": [
+     "_a"
+    ],
+    "protect": [
+     "q_&&v>0"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"refine\",itemId:_a,protect:q_&&v>0})"
+   ]
+  },
+  "channelQuery": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"channelQuery\"})",
+    "T.send({type:\"channelQuery\"})"
+   ]
+  },
+  "switchChannel": {
+   "fields": {
+    "channel": [
+     "a",
+     "q"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"switchChannel\",channel:a})",
+    "T.send({type:\"switchChannel\",channel:q})"
+   ]
+  },
+  "mapFullChoice": {
+   "fields": {
+    "choice": [
+     "\"switch\"",
+     "\"wait\"",
+     "\"cancel\""
+    ]
+   },
+   "examples": [
+    "T.send({type:\"mapFullChoice\",choice:\"switch\"})",
+    "T.send({type:\"mapFullChoice\",choice:\"wait\"})",
+    "T.send({type:\"mapFullChoice\",choice:\"wait\"})"
+   ]
+  },
+  "autoSell": {
+   "fields": {
+    "filter": [
+     "Ot.autoSell?Ot.sellFilter:null"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"autoSell\",filter:Ot.autoSell?Ot.sellFilter:null})"
+   ]
+  },
+  "vendorBuy": {
+   "fields": {
+    "itemId": [
+     "t.itemId"
+    ],
+    "qty": [
+     "Tr"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"vendorBuy\",itemId:t.itemId,qty:Tr})"
+   ]
+  },
+  "sellMany": {
+   "fields": {
+    "items": [
+     "e[s].map(([o,i])=>({itemId:o,qty:i}))"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"sellMany\",items:e[s].map(([o,i])=>({itemId:o,qty:i}))})"
+   ]
+  },
+  "buyback": {
+   "fields": {
+    "itemId": [
+     "r.ref"
+    ],
+    "qty": [
+     "d"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"buyback\",itemId:r.ref,qty:d})",
+    "T.send({type:\"buyback\",itemId:r.ref,qty:d})"
+   ]
+  },
+  "sellBulk": {
+   "fields": {
+    "filter": [
+     "Ot.sellFilter"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"sellBulk\",filter:Ot.sellFilter})"
+   ]
+  },
+  "buildSwitch": {
+   "fields": {
+    "slot": [
+     "s"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"buildSwitch\",slot:s})"
+   ]
+  },
+  "buildName": {
+   "fields": {
+    "slot": [
+     "n"
+    ],
+    "name": [
+     "l"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"buildName\",slot:n,name:l})"
+   ]
+  },
+  "jobPick": {
+   "fields": {
+    "jobId": [
+     "e.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"jobPick\",jobId:e.id})"
+   ]
+  },
+  "jobSwitch": {
+   "fields": {
+    "jobId": [
+     "e.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"jobSwitch\",jobId:e.id})"
+   ]
+  },
+  "statReset": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"statReset\"})"
+   ]
+  },
+  "statUp": {
+   "fields": {
+    "stat": [
+     "S"
+    ],
+    "n": [
+     "H"
+    ]
+   },
+   "examples": [
+    "Ws.send({type:\"statUp\",stat:S,n:H})"
+   ]
+  },
+  "skillReset": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"skillReset\"})"
+   ]
+  },
+  "clientError": {
+   "fields": {
+    "msg": [
+     "n.slice(0,300)",
+     "`build mismatch: client ${ic} < server ${t}`"
+    ],
+    "stack": [
+     "s==null?void 0:s.slice(0,1200)",
+     "\"\""
+    ]
+   },
+   "examples": [
+    "T.send({type:\"clientError\",msg:n.slice(0,300),stack:s==null?void 0:s.slice(0,1200)})",
+    "T.send({type:\"clientError\",msg:`build mismatch: client ${ic} < server ${t}`,stack:\"\"})"
+   ]
+  },
+  "ping": {
+   "fields": {
+    "t": [
+     "performance.now()",
+     "C"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"ping\",t:performance.now()})",
+    "T.send({type:\"ping\",t:C})"
+   ]
+  },
+  "clientPerf": {
+   "fields": {
+    "why": [
+     "i"
+    ],
+    "fps": [
+     "o"
+    ],
+    "cap": [
+     "Vt.ticker.maxFPS"
+    ],
+    "hz": [
+     "yG()"
+    ],
+    "js": [
+     "a(\"js\")"
+    ],
+    "render": [
+     "a(\"render\")"
+    ],
+    "draws": [
+     "a(\"draws\")"
+    ],
+    "gap95": [
+     "Math.max(...Ic.map(h=>h.gap95))"
+    ],
+    "long": [
+     "Ic.reduce((h,f)=>h+f.long,0)"
+    ],
+    "dom": [
+     "document.getElementsByTagName(\"*\").length"
+    ],
+    "heap": [
+     "u/1048576"
+    ],
+    "objs": [
+     "d(Vt.stage)"
+    ],
+    "players": [
+     "Me.size"
+    ],
+    "mobs": [
+     "Jn.size"
+    ],
+    "sess": [
+     "n/6e4"
+    ],
+    "detail": [
+     "Ys.prefs.detail"
+    ],
+    "dpr": [
+     "window.devicePixelRatio"
+    ],
+    "w": [
+     "Vt.canvas.width"
+    ],
+    "h": [
+     "Vt.canvas.height"
+    ],
+    "gpu": [
+     "Ak.slice(0,90)"
+    ],
+    "ua": [
+     "`${l} ${c?`${c[1]}${c[2]}`:\"?\"}`"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"clientPerf\",why:i,fps:o,cap:Vt.ticker.maxFPS,hz:yG(),js:a(\"js\"),render:a(\"render\"),draws:a(\"draws\"),gap95:Math.max(...Ic.map(h=>h.gap95)),long:Ic.reduce((h,f)=>h+f.long,0),dom:document.getElementsByTagName(\"*\").length,heap:u/1048576,objs:d(Vt.sta…"
+   ]
+  },
+  "debug": {
+   "fields": {
+    "cmd": [
+     "t",
+     "\"state\"",
+     "\"worldboss\""
+    ],
+    "value": [
+     "e",
+     "i||void 0"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"debug\",cmd:t,value:e})",
+    "T.send({type:\"debug\",cmd:\"state\"})",
+    "T.send({type:\"debug\",cmd:\"worldboss\",value:i||void 0})"
+   ]
+  },
+  "talk": {
+   "fields": {
+    "npcId": [
+     "t",
+     "E.id"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"talk\",npcId:t})",
+    "T.send({type:\"talk\",npcId:E.id})"
+   ]
+  },
+  "dir": {
+   "fields": {
+    "dx": [
+     "y",
+     "0",
+     "Math.cos(ot)"
+    ],
+    "dy": [
+     "g",
+     "0",
+     "Math.sin(ot)"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"dir\",dx:y,dy:g})",
+    "T.send({type:\"dir\",dx:0,dy:0})",
+    "T.send({type:\"dir\",dx:Math.cos(ot),dy:Math.sin(ot)})"
+   ]
+  },
+  "chatTyping": {
+   "fields": {
+    "typing": [
+     "f"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"chatTyping\",typing:f})"
+   ]
+  },
+  "chat": {
+   "fields": {
+    "...spread": "...wm(g)",
+    "channel": [
+     "$",
+     "\"whisper\"",
+     "\"map\"",
+     "Gu"
+    ],
+    "text": [
+     "w[2]"
+    ],
+    "to": [
+     "w[1]",
+     "Po"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"chat\",...wm(v[2].trim()),channel:$})",
+    "T.send({type:\"chat\",text:w[2],channel:\"whisper\",to:w[1]})",
+    "T.send({type:\"chat\",...wm(g),channel:\"whisper\",to:Po})"
+   ]
+  },
+  "worldBossWarp": {
+   "fields": {
+    "enter": [
+     "!1",
+     "!0"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"worldBossWarp\",enter:!1})",
+    "T.send({type:\"worldBossWarp\",enter:!0})",
+    "T.send({type:\"worldBossWarp\",enter:!0})"
+   ]
+  },
+  "tradeAnswer": {
+   "fields": {
+    "accept": [
+     "!0",
+     "!1"
+    ],
+    "fromId": [
+     "q"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"tradeAnswer\",accept:!0,fromId:q})",
+    "T.send({type:\"tradeAnswer\",accept:!1,fromId:q})"
+   ]
+  },
+  "partyRallyGo": {
+   "fields": {
+    "leader": [
+     "t.leader"
+    ],
+    "until": [
+     "t.until"
+    ],
+    "token": [
+     "t.token"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"partyRallyGo\",leader:t.leader,until:t.until,token:t.token})"
+   ]
+  },
+  "stillHere": {
+   "fields": {},
+   "examples": [
+    "T.send({type:\"stillHere\"})"
+   ]
+  },
+  "friendAnswer": {
+   "fields": {
+    "accept": [
+     "!0",
+     "!1"
+    ],
+    "inviteId": [
+     "q"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"friendAnswer\",accept:!0,inviteId:q})",
+    "T.send({type:\"friendAnswer\",accept:!1,inviteId:q})"
+   ]
+  },
+  "trainingWarp": {
+   "fields": {
+    "enter": [
+     "!0",
+     "!1"
+    ]
+   },
+   "examples": [
+    "T.send({type:\"trainingWarp\",enter:!0})",
+    "T.send({type:\"trainingWarp\",enter:!1})"
+   ]
+  }
+ },
+ "recv": {
+  "socialState": {
+   "fields": [
+    "state"
+   ],
+   "body": "case\"socialState\":{const q=!!ke.party!=!!t.state.party||!!ke.guild!=!!t.state.guild;ke=t.state,Py();const et=document.activeElement instanceof HTMLInputElement&&(wf.contains(document.activeElement)||jd.contains(document.activeElement));(!G0||t.state.guild)&&(q||!et)&&hM(),G0&&t.state.guild&&(G0=!1,F…"
+  },
+  "socialParty": {
+   "fields": [
+    "party"
+   ],
+   "body": "case\"socialParty\":{const q=!!ke.party!=!!t.party;ke={...ke,party:t.party},Py();const et=document.activeElement instanceof HTMLInputElement&&wf.contains(document.activeElement);(q||j2.style.display===\"block\"&&!et)&&hM();break}"
+  },
+  "notice": {
+   "fields": [
+    "text"
+   ],
+   "body": "case\"notice\":pt.ui(\"deny\"),ft(t.text);break;"
+  },
+  "partyBoard": {
+   "fields": [
+    "map",
+    "maps",
+    "parties"
+   ],
+   "body": "case\"partyBoard\":OS=t.parties,Mo=t.map??\"\",x0=t.maps??{},EK();break;"
+  },
+  "guildList": {
+   "fields": [
+    "guilds"
+   ],
+   "body": "case\"guildList\":Ag=t.guilds,V3();break;"
+  },
+  "tradeInvite": {
+   "fields": [
+    "from",
+    "fromId",
+    "fromUid"
+   ],
+   "body": "case\"tradeInvite\":{const q=t.fromId;rg({key:`trade:${q}`,title:\"คำขอเทรด\",who:t.from,line:\"ขอเปิดหน้าต่างเทรดกับคุณ\",detail:t.fromUid?`UID ${t.fromUid}`:\"\",until:Date.now()+3e4,yes:\"เปิดเทรด\",accept:()=>T.send({type:\"tradeAnswer\",accept:!0,fromId:q}),decline:()=>T.send({type:\"tradeAnswer\",accept:!1,…"
+  },
+  "tradeState": {
+   "fields": [
+    "state"
+   ],
+   "body": "case\"tradeState\":{const q=((e=document.activeElement)==null?void 0:e.id)===\"trgold\";pd=t.state,q?bM.style.display=\"block\":Tgt();break}"
+  },
+  "tradeEnd": {
+   "fields": [
+    "done",
+    "reason"
+   ],
+   "body": "case\"tradeEnd\":pd=null,bM.style.display=\"none\",ft(t.reason),t.done&&pt.ui(\"buy\");break;"
+  },
+  "joinRequest": {
+   "fields": [
+    "request"
+   ],
+   "body": "case\"joinRequest\":{const q=t.request;rg({key:`join:${q.kind}:${q.id}`,title:q.kind===\"party\"?\"คำขอเข้าร่วม Party\":\"คำขอเข้าร่วม Guild\",who:q.name,line:`ขอเข้าร่วม ${q.kind===\"party\"?\"Party\":\"Guild\"} ของคุณ`,detail:[q.level?`Lv ${q.level}`:\"\",q.uid?`UID ${q.uid}`:\"\"].filter(Boolean).join(\" · \"),until…"
+  },
+  "socialNotice": {
+   "fields": [
+    "text"
+   ],
+   "body": "case\"socialNotice\":if(G0){G0=!1;const q=jd.querySelector('[data-social=\"guildCreate\"]');q&&(q.disabled=!1,q.textContent=\"สร้าง Guild\")}ft(t.text);break;"
+  },
+  "ranking": {
+   "fields": [
+    "board",
+    "job"
+   ],
+   "body": "case\"ranking\":e9.set(n9(t.board,t.job),t),X2.style.display===\"block\"&&t.board===Pl&&t.job===jo&&k$();break;"
+  },
+  "mail": {
+   "fields": [
+    "list"
+   ],
+   "body": "case\"mail\":{const q=$H?[]:t.list.filter(et=>!xH.has(et.id)&&!et.read);if(bi=t.list,xH=new Set(bi.map(et=>et.id)),$H=!1,q.length){pt.ui(\"notify\");for(const ht of q.filter(jt=>jt.kind===\"market\"&&jt.gold>0).slice(0,3))ft(`💰 ${ht.title} — เงินอยู่ในจดหมาย`);const et=q.filter(ht=>!(ht.kind===\"market\"&&…"
+  },
+  "mailClaimed": {
+   "fields": [
+    "count",
+    "crystals",
+    "gold",
+    "items"
+   ],
+   "body": "case\"mailClaimed\":{pt.ui(\"claim\");const q=[t.gold?Tt(t.gold):\"\",t.crystals?`เพชร ${lf(t.crystals)}`:\"\",...t.items.slice(0,3).map(et=>`${ie(Q(et.item).id)} ×${et.qty}`)].filter(Boolean);ft(`รับของจากจดหมาย ${t.count} ฉบับ${q.length?` · ${q.join(\", \")}${t.items.length>3?\" …\":\"\"}`:\"\"}`);break}"
+  },
+  "zoneMove": {
+   "fields": [
+    "id",
+    "x",
+    "y"
+   ],
+   "body": "case\"zoneMove\":Bt.moveZone(t.id,t.x,t.y),(n=yv.get(t.id))==null||n.set(t.x,t.y);break;"
+  },
+  "soulGained": {
+   "fields": [
+    "n",
+    "x",
+    "y"
+   ],
+   "body": "case\"soulGained\":{t.n>0&&Gt.soulFly(t.x,t.y,()=>{const q=Me.get(T.sessionId);return q?{x:q.rx,y:q.ry}:void 0},t.n,()=>m5t()),kr.hidden||PX();break}"
+  },
+  "lantern": {
+   "fields": [
+    "cap",
+    "souls",
+    "thrallCap"
+   ],
+   "body": "case\"lantern\":Su={souls:t.souls,cap:t.cap,thrallCap:t.thrallCap},CX();break;"
+  },
+  "partyRally": {
+   "fields": [
+    "ch",
+    "from",
+    "leader",
+    "map",
+    "mapName",
+    "token",
+    "until"
+   ],
+   "body": "case\"partyRally\":{const q=t.map===T.mapId;rg({key:`rally:${t.leader}`,title:\"หัวหน้าเรียกรวมตัว\",who:t.from,line:`ไปที่ ${t.mapName} · Channel ${t.ch}${q?\"\":` · ข้ามแมพใช้ ${ts()?\"ค่าวาร์ปฟรี (Premium)\":Tt(Af)}`}`,detail:\"\",until:t.until,yes:\"ไปหาหัวหน้า\",accept:()=>T.send({type:\"partyRallyGo\",leade…"
+  },
+  "partyGotoCd": {
+   "fields": [
+    "leftMs"
+   ],
+   "body": "case\"partyGotoCd\":{t3=performance.now()+t.leftMs,Py();break}"
+  },
+  "potionCd": {
+   "fields": [
+    "hp",
+    "mp"
+   ],
+   "body": "case\"potionCd\":{const q=performance.now();t.hp!==void 0&&(H5.hp=q+t.hp),t.mp!==void 0&&(H5.mp=q+t.mp);break}"
+  },
+  "forgeResult": {
+   "fields": [
+    "itemId",
+    "kind",
+    "ok",
+    "reason"
+   ],
+   "body": "case\"forgeResult\":{t.kind===\"reforge\"?t.ok?(t2=\"\",Ml=t.itemId,pt.ui(\"claim\"),Tk(\"reforge\",`สำเร็จ! T${((s=vr[Q(t.itemId).id])==null?void 0:s.tier)??\"\"}`),ft(`Reforge · ${xe(Q(t.itemId))}`)):(t2=t.reason??\"Reforge ไม่สำเร็จ\",pt.ui(\"deny\")):t.ok?(td=\"\",pt.ui(\"claim\"),ft(`Masterwork · ${xe(Q(t.itemId))…"
+  },
+  "pactResult": {
+   "fields": [
+    "itemId",
+    "ok",
+    "pact",
+    "reason"
+   ],
+   "body": "case\"pactResult\":{t.ok?(hp=\"\",xl=t.itemId,$l=\"\",pt.ui(\"claim\"),Tk(\"pact\",t.pact?`☠ ${((a=or[t.pact])==null?void 0:a.name)??\"\"}`:\"ถอดแล้ว\"),ft(t.pact?`Pact · ${((o=or[t.pact])==null?void 0:o.name)??t.pact}`:\"ถอด Pact แล้ว\")):(hp=t.reason??\"Pact ไม่สำเร็จ\",pt.ui(\"deny\")),Ea.style.display===\"block\"&&f3…"
+  },
+  "inscribeResult": {
+   "fields": [
+    "ins",
+    "itemId",
+    "ok",
+    "reason"
+   ],
+   "body": "case\"inscribeResult\":{t.ok?(up=\"\",wl=t.itemId,Ui=\"\",pt.ui(\"claim\"),t.ins&&rh(t.ins)&&Tk(\"inscribe\",`✒ ${fr[t.ins].name}`),t.ins&&rh(t.ins)&&ft(`Inscription · ${fr[t.ins].name}`)):(up=t.reason??\"สลัก Inscription ไม่สำเร็จ\",pt.ui(\"deny\")),Ea.style.display===\"block\"&&p3();break}"
+  },
+  "infuseResult": {
+   "fields": [
+    "element",
+    "ok",
+    "reason"
+   ],
+   "body": "case\"infuseResult\":{t.ok?(dp=\"\",Eu=\"\",pt.ui(\"claim\"),Tk(\"infuse\",t.element?Ya[t.element]??String(t.element):\"ถอดธาตุแล้ว\"),t.element&&ft(`Infusion · ${Ya[t.element]??t.element}`)):(dp=t.reason??\"Infusion ไม่สำเร็จ\",pt.ui(\"deny\")),Ea.style.display===\"block\"&&h3();break}"
+  },
+  "rerollResult": {
+   "fields": [
+    "itemId",
+    "line",
+    "newTok",
+    "ok",
+    "oldTok",
+    "reason"
+   ],
+   "body": "case\"rerollResult\":{t.ok?(oa=t.itemId,fi={line:t.line,oldTok:t.oldTok,newTok:t.newTok},J2=\"\",pt.ui(\"claim\")):(J2=t.reason??\"Reroll ไม่สำเร็จ\",pt.ui(\"deny\")),Ea.style.display===\"block\"&&Gd();break}"
+  },
+  "bossMeter": {
+   "fields": [],
+   "body": "case\"bossMeter\":hL.onMessage(t,performance.now());break;"
+  },
+  "census": {
+   "fields": [
+    "m",
+    "n",
+    "p",
+    "t"
+   ],
+   "body": "case\"census\":{const q=[];for(let ht=0;ht+4<t.m.length;ht+=5)q.push({x:t.m[ht],y:t.m[ht+1],type:t.t[t.m[ht+2]]??\"\",level:t.m[ht+3],returning:t.m[ht+4]===1});const et=[];for(let ht=0;ht+1<t.p.length;ht+=2)et.push([t.p[ht],t.p[ht+1]]);ur={mobs:q,players:et,n:t.n,map:T.mapId};break}"
+  },
+  "idleWarn": {
+   "fields": [
+    "leftMs"
+   ],
+   "body": "case\"idleWarn\":Ff({head:\"ยืนนิ่งนานเกินไป\",text:`จะตัดการเชื่อมต่อใน ${Math.max(1,Math.round(t.leftMs/6e4))} นาที ถ้าไม่ขยับ`,action:{label:\"ยังเล่นอยู่\",run:()=>T.send({type:\"stillHere\"})}});break;"
+  },
+  "pong": {
+   "fields": [
+    "build",
+    "online",
+    "t"
+   ],
+   "body": "case\"pong\":{Z3t(t.t),typeof t.online==\"number\"&&(v9=t.online),t.build&&cvt(t.build);break}"
+  },
+  "cdSync": {
+   "fields": [
+    "charges",
+    "readyInMs",
+    "skillId"
+   ],
+   "body": "case\"cdSync\":{if(t.skillId===\"dodge\"){B5=performance.now()-R5+t.readyInMs;break}const q=t.skillId,et=performance.now();dm[q]=t.charges,Yu[q]=et+t.readyInMs;break}"
+  },
+  "gemex": {
+   "fields": [
+    "view"
+   ],
+   "body": "case\"gemex\":Sd=t.view,IX(),l3.style.display===\"block\"&&TX();break;"
+  },
+  "mapFull": {
+   "fields": [],
+   "body": "case\"mapFull\":_3t(t);break;"
+  },
+  "mapQueue": {
+   "fields": [],
+   "body": "case\"mapQueue\":S3t(t);break;"
+  },
+  "channels": {
+   "fields": [
+    "counts",
+    "lock",
+    "totals"
+   ],
+   "body": "case\"channels\":if(sh=t.counts,NM=t.totals??[],t.lock&&(tY=performance.now()+t.lock.ms,eY=t.lock.why),Ns.style.display===\"block\")if(Qr&&!m3()){const q=Qr;Qr=0,T.send({type:\"switchChannel\",channel:q}),Ns.style.display=\"none\"}else sY();break;"
+  },
+  "marketGuide": {
+   "fields": [
+    "itemId",
+    "listed",
+    "sales"
+   ],
+   "body": "case\"marketGuide\":Hc={itemId:t.itemId,sales:t.sales,listed:t.listed},Vs.style.display===\"block\"&&jn===t.itemId&&(vl(Vs,Up),WX());break;"
+  },
+  "topupHistory": {
+   "fields": [],
+   "body": "case\"topupHistory\":t5t(t);break;"
+  },
+  "intlOrder": {
+   "fields": [
+    "order"
+   ],
+   "body": "case\"intlOrder\":lp=0,Sa=t.order,Ti=\"intl\",Ul.style.display!==\"block\"?Fh():_d(),T.send({type:\"topupHistory\"});break;"
+  },
+  "payOrder": {
+   "fields": [
+    "order"
+   ],
+   "body": "case\"payOrder\":lp=0,Mn=I1=t.order,r3=\"\",Ti=\"th\",Ul.style.display!==\"block\"?Fh():_f();break;"
+  },
+  "slipResult": {
+   "fields": [],
+   "body": "case\"slipResult\":KL(t);break;"
+  },
+  "slipClaimToken": {
+   "fields": [
+    "token"
+   ],
+   "body": "case\"slipClaimToken\":qy==null||qy(t.token);break;"
+  },
+  "history": {
+   "fields": [
+    "kind"
+   ],
+   "body": "case\"history\":Hs=t,g$.style.display===\"block\"&&t.kind===Ou&&QL();break;"
+  },
+  "gemexResult": {
+   "fields": [
+    "crystals",
+    "gold",
+    "ok",
+    "reason",
+    "side"
+   ],
+   "body": "case\"gemexResult\":t.ok?ft(t.side===\"buy\"?`ได้ ${(i=t.crystals)==null?void 0:i.toLocaleString(\"en-US\")} เพชร · จ่าย ${(r=t.gold)==null?void 0:r.toLocaleString(\"en-US\")} G`:`ขาย ${(l=t.crystals)==null?void 0:l.toLocaleString(\"en-US\")} เพชร · ได้ ${(c=t.gold)==null?void 0:c.toLocaleString(\"en-US\")} G`)…"
+  },
+  "loginReward": {
+   "fields": [],
+   "body": "case\"loginReward\":md.has(\"name\")||Ph(\"daily\",()=>y$());break;"
+  },
+  "pets": {
+   "fields": [
+    "view"
+   ],
+   "body": "case\"pets\":fh=t.view,jp.setView(t.view),eh.setView(t.view),zd();break;"
+  },
+  "petPulled": {
+   "fields": [
+    "banner",
+    "pulls"
+   ],
+   "body": "case\"petPulled\":jp.onPulled(t.banner,t.pulls),eh.onPulled(t.banner,t.pulls),t.banner!==\"tokens\"&&Uut(t.pulls,{sfx:q=>pt.ui(q),tokenHtml:fl});break;"
+  },
+  "hunt": {
+   "fields": [
+    "view"
+   ],
+   "body": "case\"hunt\":ks=t.view,GL(),xf.style.display===\"block\"&&zL(),qp();break;"
+  },
+  "accountState": {
+   "fields": [
+    "freeLook",
+    "linked"
+   ],
+   "body": "case\"accountState\":if(kf=t.linked,oK=t.freeLook,jbt(),t.freeLook){let q=\"\";try{q=localStorage.getItem(\"oat.freeLookHint\")??\"\",localStorage.setItem(\"oat.freeLookHint\",\"1\")}catch{}q||window.setTimeout(()=>ft(\"เลือกเพศ สีผม และสีเสื้อใหม่ได้ฟรี 1 ครั้ง — ตั้งค่า → บัญชี\"),4e3)}break;"
+  },
+  "linkRequired": {
+   "fields": [
+    "what"
+   ],
+   "body": "case\"linkRequired\":vf(t.what);break;"
+  },
+  "appearanceResult": {
+   "fields": [
+    "text"
+   ],
+   "body": "case\"appearanceResult\":ft(t.text);break;"
+  },
+  "nameRequired": {
+   "fields": [
+    "current",
+    "optional",
+    "reason"
+   ],
+   "body": "case\"nameRequired\":t.current!==xo&&(xo=t.current,k7(Le,t.current)),TL(t.reason,t.optional);break;"
+  },
+  "nameResult": {
+   "fields": [
+    "name",
+    "ok",
+    "reason"
+   ],
+   "body": "case\"nameResult\":t.ok&&t.name?(cM.hidden=!0,xo=t.name,k7(Le,t.name),zd(),ft(`ตั้งชื่อเป็น ${t.name} แล้ว`)):(uM.textContent=t.reason??\"ใช้ชื่อนี้ไม่ได้\",cM.hidden&&ft(t.reason??\"ใช้ชื่อนี้ไม่ได้\"));break;"
+  },
+  "socialInvite": {
+   "fields": [
+    "from",
+    "fromUid",
+    "guildName",
+    "inviteId",
+    "kind",
+    "partyName",
+    "ttlMs"
+   ],
+   "body": "case\"socialInvite\":{const q=t.inviteId,et=Date.now()+(t.ttlMs??6e4),ht=t.fromUid?`UID ${t.fromUid}`:\"\";if(t.kind===\"friend\"){rg({key:`friend:${q??t.from}`,title:\"คำขอเป็นเพื่อน\",who:t.from,line:\"อยากเป็นเพื่อนกับคุณ\",detail:ht,until:et,yes:\"รับเป็นเพื่อน\",accept:()=>T.send({type:\"friendAnswer\",accep…"
+  },
+  "debugState": {
+   "fields": [
+    "enabled"
+   ],
+   "body": "case\"debugState\":D9!==t.enabled&&(D9=t.enabled,hV()&&Kh());break;"
+  },
+  "profile": {
+   "fields": [
+    "profile"
+   ],
+   "body": "case\"profile\":Rgt(t.profile);break;"
+  },
+  "myLikes": {
+   "fields": [
+    "likes"
+   ],
+   "body": "case\"myLikes\":DS=t.likes,g3=\"\";break;"
+  },
+  "ach": {
+   "fields": [
+    "view"
+   ],
+   "body": "case\"ach\":sM=t.view,QW(),yL(),g3=\"\";break;"
+  },
+  "achUnlocked": {
+   "fields": [
+    "id"
+   ],
+   "body": "case\"achUnlocked\":{const q=pb[t.id];if(!q)break;Abt(q.id),vn(`🏆 ปลดความสำเร็จ \"${q.name}\" — ได้ฉายา 「${q.title}」`,\"gold\");break}"
+  },
+  "promoState": {
+   "fields": [
+    "claimed"
+   ],
+   "body": "case\"promoState\":Sf=new Set(t.claimed),dK=!0,XM(),pc.style.display===\"block\"&&eb();break;"
+  },
+  "promoResult": {
+   "fields": [
+    "id",
+    "ok",
+    "reason"
+   ],
+   "body": "case\"promoResult\":{const q=hC(t.id)?nl[t.id].title:\"ของขวัญ\",et=hC(t.id)&&!!nl[t.id].grant;t.ok?ft(et?`ได้รับ ${q} แล้ว — เริ่มนับตั้งแต่ตอนนี้`:\"ได้รับของขวัญติดตามเพจแล้ว — เปิดจดหมายเพื่อรับของ\"):t.reason===\"taken\"?ft(`บัญชีนี้รับ ${q} ไปแล้ว`):t.reason===\"ended\"?ft(`หมดเวลากดรับ ${q} แล้ว`):t.re…"
+  },
+  "likeResult": {
+   "fields": [
+    "liked",
+    "likes",
+    "uid"
+   ],
+   "body": "case\"likeResult\":{const q=_u.querySelector(`.prlike[data-uid=\"${t.uid}\"]`);if(q){q.classList.toggle(\"on\",t.liked),q.querySelector(\"span\").textContent=t.likes.toLocaleString(\"en-US\");const et=q.querySelector(\"button\");et&&(et.disabled=t.liked,et.textContent=t.liked?\"ถูกใจแล้ว\":\"♥ ถูกใจ\")}e9.delete(n9…"
+  },
+  "killGain": {
+   "fields": [
+    "gold",
+    "job",
+    "xp"
+   ],
+   "body": "case\"killGain\":Oy.xp+=t.xp[1]-t.xp[0],Oy.job+=t.job[1]-t.job[0],Oy.gold+=t.gold[1]-t.gold[0];break;"
+  },
+  "worldBossTop": {
+   "fields": [],
+   "body": "case\"worldBossTop\":Nkt(t);break;"
+  },
+  "worldBossLast": {
+   "fields": [
+    "at",
+    "fighters",
+    "seconds",
+    "top"
+   ],
+   "body": "case\"worldBossLast\":MI={at:t.at,seconds:t.seconds,fighters:t.fighters,top:t.top};break;"
+  },
+  "motherLode": {
+   "fields": [],
+   "body": "case\"motherLode\":Ybt(t);break;"
+  },
+  "worldBoss": {
+   "fields": [
+    "mine",
+    "need",
+    "view"
+   ],
+   "body": "case\"worldBoss\":N9=(t.view.guardLeft??0)>0?performance.now()+t.view.guardLeft:0,Gkt(t.view,t.mine,t.need);break;"
+  },
+  "randomEvent": {
+   "fields": [
+    "fresh",
+    "id",
+    "leftMs"
+   ],
+   "body": "case\"randomEvent\":{const q=t.id?Y0.find(ht=>ht.id===t.id):void 0,et=vs==null?void 0:vs.def;if(vs=q?{def:q,endAt:Date.now()+t.leftMs}:null,q&&t.fresh)vI(q,t.leftMs),vn(`📢 Event เริ่มแล้ว: ${q.title} — ${q.perks.join(\" · \")} (${Math.round(t.leftMs/6e4)} นาที)`,\"announcement\",\"announcement\");else if(!…"
+  },
+  "econ": {
+   "fields": [
+    "state"
+   ],
+   "body": "case\"econ\":TZ(t.state),uY(),si.style.display===\"block\"&&oi(),Ea.style.display===\"block\"&&Wl();break;"
+  },
+  "gatherResult": {
+   "fields": [
+    "items",
+    "line",
+    "lineXp",
+    "nodeId",
+    "nodeType",
+    "rich",
+    "x",
+    "y"
+   ],
+   "body": "case\"gatherResult\":{vh(),t.nodeType===\"fish\"&&((u=(d=Me.get(T.sessionId))==null?void 0:d.rig)==null||u.catchFish());{const q=(h=(p=T.state)==null?void 0:p.nodes)==null?void 0:h.get(t.nodeId),et=Me.get(T.sessionId),ht=q?{x:q.x+.5,y:q.y+.5}:t.x!=null&&t.y!=null?{x:t.x,y:t.y}:null;ht&&et&&(Bt.poof(ht.x…"
+  },
+  "life": {
+   "fields": [
+    "exp",
+    "gg",
+    "secrets",
+    "tools",
+    "xp"
+   ],
+   "body": "case\"life\":Oa={...t.xp},t.tools&&(Ii={...t.tools}),t.exp&&(oM=het(t.exp)),t.gg&&(G5={...t.gg}),t.secrets&&(O2=new Set(t.secrets)),qp();{const q=JSON.stringify([t.exp??null,t.secrets??null]);q!==Lq&&(Lq=q,eo.style.display===\"block\"&&zl())}{const q=Nl.find(et=>tf.some((ht,jt)=>{var Re;return ef(Oa[et]…"
+  },
+  "craftTryResult": {
+   "fields": [
+    "crafted",
+    "ok",
+    "reason",
+    "recipeId"
+   ],
+   "body": "case\"craftTryResult\":if(t.ok&&t.recipeId){const q=cb.find(et=>et.id===t.recipeId);ft(`ค้นพบสูตรลับ: ${(q==null?void 0:q.name)??t.recipeId}${t.crafted?\" · ทำสำเร็จ 1 ครั้ง\":` · ยังทำไม่ได้: ${t.reason??\"วัตถุดิบยังไม่พอ\"}`}`),zi.clear()}else ft(t.reason??\"ไม่เกิดอะไรขึ้น\");eo.style.display===\"block\"&…"
+  },
+  "lifeLevel": {
+   "fields": [
+    "level",
+    "line"
+   ],
+   "body": "case\"lifeLevel\":{Jc.note(`${Se[t.line]??t.line} Lv ${t.level} — เก็บเร็วขึ้น`),tf.includes(t.level)&&kn(`expertise${t.level}`,`Expertise ${Se[t.line]??t.line} Lv ${t.level} เปิดแล้ว`,`<p>${Zt(\"expertise\",\"what\")}</p><p>${Zt(\"expertise\",\"recipes\")}</p>`,{label:\"เลือก Expertise\",run:()=>{Ju=t.line,$d(…"
+  },
+  "craftResult": {
+   "fields": [
+    "bonus",
+    "ok",
+    "qty",
+    "reason",
+    "result"
+   ],
+   "body": "case\"craftResult\":if(eo.style.display===\"block\"&&zl(),vv>0){vv--,t.ok&&Pg++,t.bonus&&wv++,vv===0&&(pt.ui(Pg?\"craftOk\":\"deny\"),ft(Pg?`คราฟต์สำเร็จ ${Pg} ครั้ง${t.result?` · ${ie(t.result)}`:\"\"}${wv?` · ของแถม ${wv} ครั้ง!`:\"\"}`:`คราฟต์ไม่ได้ — ${t.reason}`));break}pt.ui(t.ok?\"craftOk\":\"deny\"),ft(t.ok…"
+  },
+  "salvaged": {
+   "fields": [],
+   "body": "case\"salvaged\":Um==null||Um(t);break;"
+  },
+  "autoSold": {
+   "fields": [
+    "itemId",
+    "qty"
+   ],
+   "body": "case\"autoSold\":{const q=Q(t.itemId);Jc.add(`asold:${q.id}`,t.qty,`${xe(q,!1)} · ขายอัตโนมัติ`,\"item\",xt(q)),wt==null||wt.noteItems(t.qty);break}"
+  },
+  "sold": {
+   "fields": [
+    "itemId",
+    "qty",
+    "silver"
+   ],
+   "body": "case\"sold\":{if(tr){tr.gold+=t.silver,tr.units+=t.qty,(f=tr.wake)==null||f.call(tr),tr.wake=null;break}ft(t.itemId===\"*\"?`ขาย ${t.qty.toLocaleString(\"en-US\")} ชิ้น ได้ ${Tt(t.silver)}`:`ขาย ${ie(t.itemId)} ×${t.qty} ได้ ${Tt(t.silver)}`),pt.ui(\"coins\"),si.style.display===\"block\"&&oi();break}"
+  },
+  "bought": {
+   "fields": [
+    "itemId",
+    "ok",
+    "qty",
+    "reason"
+   ],
+   "body": "case\"bought\":{t.ok?ft(`แลกได้ ${ie(t.itemId)} ×${t.qty}`):ft(t.reason??\"แลกไม่ได้\"),pt.ui(t.ok?\"buy\":\"deny\");break}"
+  },
+  "bond": {
+   "fields": [
+    "bond"
+   ],
+   "body": "case\"bond\":{xy=t.bond,Vr.style.display===\"block\"&&sH();break}"
+  },
+  "bindResult": {
+   "fields": [
+    "bond",
+    "cardRef",
+    "ok",
+    "reason"
+   ],
+   "body": "case\"bindResult\":{t.ok?ft(t.cardRef?`${t.bond?\"Bond! \":\"\"}${ae(Q(t.cardRef).affixes[0]??\"\")} Card ★${Q(t.cardRef).refine+1}${t.bond?\" — โตจากการล่า\":\"\"}`:\"อัปเดต Spirit Album แล้ว\"):ft(t.reason??\"แลกไม่สำเร็จ\"),Vr.style.display===\"block\"&&Qi();break}"
+  },
+  "market": {
+   "fields": [
+    "listings",
+    "mine",
+    "pending",
+    "subCounts",
+    "total"
+   ],
+   "body": "case\"market\":{ap=t.listings,Ay=new Set(t.mine),$v=t.pending,s9=t.total??0,Iv=t.subCounts??null,M$=!1,(m=document.getElementById(\"mkform\"))!=null&&m.contains(document.activeElement)?vl(Vs,Cs):Cs();break}"
+  },
+  "marketBoard": {
+   "fields": [],
+   "body": "case\"marketBoard\":oc.onBoard(t);break;"
+  },
+  "marketItem": {
+   "fields": [
+    "view"
+   ],
+   "body": "case\"marketItem\":oc.onItem(t.view);break;"
+  },
+  "commissions": {
+   "fields": [],
+   "body": "case\"commissions\":qM.onData(t);break;"
+  },
+  "commissionResult": {
+   "fields": [
+    "ok",
+    "reason"
+   ],
+   "body": "case\"commissionResult\":qM.onResult(t.ok,t.reason);break;"
+  },
+  "crafterNames": {
+   "fields": [
+    "names"
+   ],
+   "body": "case\"crafterNames\":Nut(t.names);break;"
+  },
+  "marketResult": {
+   "fields": [
+    "ok",
+    "reason"
+   ],
+   "body": "case\"marketResult\":{if(t.ok&&Vs.style.display===\"block\"&&oc.refresh(),U0){a3t(t.ok,t.reason);break}ft(t.reason??(t.ok?\"เรียบร้อย\":\"ตลาดทำรายการไม่สำเร็จ\"));break}"
+  },
+  "bank": {
+   "fields": [
+    "gold",
+    "vaults"
+   ],
+   "body": "case\"bank\":{fu=t.vaults,yK=t.gold,yh.style.display===\"block\"&&Xm();break}"
+  },
+  "bankResult": {
+   "fields": [
+    "ok",
+    "reason"
+   ],
+   "body": "case\"bankResult\":{t.ok||$u.clear(),ft(t.reason);break}"
+  },
+  "inv": {
+   "fields": [],
+   "body": "case\"inv\":{const q=s3t(t),et=new Set([...me.keys(),...Object.values(Nt)].map(ht=>ht?Q(ht).instance:void 0).filter(ht=>!!ht));if(OM=q.refineStacks??OM,gf=new Set(q.locks??[]),qW=Object.fromEntries(Object.entries(q.infuse??{}).filter(([,ht])=>ott(ht))),q.smithCodex){for(const[ht,jt]of Object.entries(q…"
+  },
+  "repairResult": {
+   "fields": [
+    "itemId",
+    "ok",
+    "reason"
+   ],
+   "body": "case\"repairResult\":{if(Cv>0)Cv--,t.ok&&Av++,Cv||ft(Av?`ซ่อมแล้ว ${Av} ชิ้น`:t.reason??\"ซ่อมไม่ได้\");else if(t.ok&&t.itemId){const q=Q(t.itemId);ft(`ซ่อมแล้ว: ${xe(q)}`)}else ft(t.reason??\"ซ่อมไม่ได้\");Ea.style.display===\"block\"&&Wl();break}"
+  },
+  "refineResult": {
+   "fields": [
+    "itemId",
+    "level",
+    "ok",
+    "reason"
+   ],
+   "body": "case\"refineResult\":{const q=_a?Q(_a).refine??0:0;if(_a=t.itemId,Wc=t.ok?\"ok\":\"fail\",pt.ui(t.ok?\"refineOk\":t.level<q?\"refineDrop\":\"refineFail\"),ft(t.ok?`ตีบวกสำเร็จ! ${ie(t.itemId)}`:t.reason??\"ตีบวกล้มเหลว\"),t.ok){const et=Me.get(T.sessionId);et&&Bt.poof(et.rx,et.ry,16765786)}Ea.style.display===\"blo…"
+  },
+  "pvpKill": {
+   "fields": [
+    "honor",
+    "streak",
+    "victim",
+    "victimJob",
+    "victimLevel",
+    "why"
+   ],
+   "body": "case\"pvpKill\":Agt(t.victim,t.victimLevel,t.victimJob,t.streak,t.honor,t.why);break;"
+  },
+  "pvpState": {
+   "fields": [
+    "honor",
+    "infamy",
+    "n"
+   ],
+   "body": "case\"pvpState\":{const q=$p(fm.infamy);fm={honor:t.honor,infamy:t.infamy,n:t.n},!q&&$p(t.infamy)?ft(`คุณกลายเป็นหัวแดง (Infamy ${t.infamy}) — ทุกคนเห็นตำแหน่งคุณบนมินิแมพ และตายใน PvP ของมีโอกาสพัง ${Math.round(Go.RED_BREAK_CHANCE*100)}%`):q&&!$p(t.infamy)&&ft(\"Infamy ลดลงแล้ว — ชื่อกลับเป็นปกติ\");br…"
+  },
+  "deathPenalty": {
+   "fields": [],
+   "body": "case\"deathPenalty\":break;"
+  },
+  "youDied": {
+   "fields": [],
+   "body": "case\"youDied\":vmt(t);{const q=nt();q&&[\"mage\",\"acolyte\",\"summoner\"].includes(q.job)&&(q.vit??0)<Math.max(10,q.level/3)&&kn(\"casterVit\",\"สายเวทลง VIT บ้างนะ\",`อัด INT อย่างเดียวตัวจะบางมาก โดนมอนรุมแป๊บเดียวก็ล้ม · ลอง <b>VIT</b> ราว 1 ใน 3 ของเลเวล (ตอนนี้ Lv ${q.level} ≈ VIT ${Math.round(q.level/3)…"
+  },
+  "cardFound": {
+   "fields": [
+    "level",
+    "mailed",
+    "mob"
+   ],
+   "body": "case\"cardFound\":byt(t.mob,t.level,!!t.mailed);break;"
+  },
+  "spiritGain": {
+   "fields": [
+    "mob",
+    "n",
+    "total"
+   ],
+   "body": "case\"spiritGain\":{n3[t.mob]=t.total;const q=Ol(t.mob);Jc.add(`spirit:${t.mob}`,t.n,`วิญญาณ ${ae(t.mob)} (${Math.min(t.total,q).toLocaleString(\"en-US\")}/${q.toLocaleString(\"en-US\")})`,\"item\",xt(WD(Zp,[t.mob]))),lyt(),t.total>=q&&t.total-t.n<q&&ft(`วิญญาณ ${ae(t.mob)} ครบ ${q.toLocaleString(\"en-US\")} …"
+  },
+  "gatherFailed": {
+   "fields": [
+    "nodeId",
+    "reason"
+   ],
+   "body": "case\"gatherFailed\":vh(),wt!=null&&wt.running?wt.gatherFailed(t.nodeId,t.reason):ft(t.reason);break;"
+  },
+  "pass": {
+   "fields": [
+    "bought",
+    "crystals",
+    "firstTopup",
+    "gems",
+    "premiumUntil",
+    "remoteBankUntil",
+    "state"
+   ],
+   "body": "case\"pass\":if(wn=t.state,Ba=t.gems,t.crystals,yr=t.bought,Ayt(),rX=t.firstTopup,go=t.premiumUntil??0,(t.remoteBankUntil??0)!==Dh&&(Dh=t.remoteBankUntil??0,MX(),yh.style.display===\"block\"&&Xm()),oX(),vX(),EM(),cX(),TM.style.display===\"block\"&&dX(),uc.style.display===\"block\"||Ul.style.display===\"block…"
+  },
+  "shopResult": {
+   "fields": [
+    "ok",
+    "reason"
+   ],
+   "body": "case\"shopResult\":lp=0,t.ok&&Ul.style.display===\"block\"&&T.send({type:\"topupHistory\"}),jh.style.display===\"block\"&&i3(),ft(t.reason??(t.ok?\"เรียบร้อย\":\"ซื้อไม่สำเร็จ\")),pt.ui(t.ok?\"buy\":\"deny\");break;"
+  },
+  "builds": {
+   "fields": [
+    "view"
+   ],
+   "body": "case\"builds\":j3t(t.view);break;"
+  },
+  "classes": {
+   "fields": [
+    "jobLevels"
+   ],
+   "body": "case\"classes\":Hv=t.jobLevels,mh.style.display===\"block\"&&Uh();break;"
+  },
+  "gfxNotice": {
+   "fields": [
+    "low"
+   ],
+   "body": "case\"gfxNotice\":E9(!!t.low);break;"
+  },
+  "promo": {
+   "fields": [
+    "hall"
+   ],
+   "body": "case\"promo\":H9=!0,t.hall?(od=a4,R$()):uK(IS(!0));break;"
+  },
+  "welcomeBack": {
+   "fields": [],
+   "body": "case\"welcomeBack\":Gct(t),pt.ui(\"welcome\");break;"
+  },
+  "hit": {
+   "fields": [
+    "actorId",
+    "amount",
+    "kind",
+    "skillId",
+    "targetId"
+   ],
+   "body": "case\"hit\":{const q=t.skillId===\"leap_slam\"&&t.actorId?(b=Me.get(t.actorId))==null?void 0:b.dashVisual:void 0;if((q==null?void 0:q.skillId)===\"leap_slam\"&&performance.now()<q.at+560){setTimeout(()=>tx(t),Math.max(1,q.at+560-performance.now()));break}const et=Me.get(t.targetId)??Jn.get(t.targetId);if(…"
+  },
+  "castStart": {
+   "fields": [
+    "durationMs",
+    "id",
+    "skillId",
+    "tx",
+    "ty"
+   ],
+   "body": "case\"castStart\":{if(na(t.skillId)){(At=Fc.get(t.id))==null||At.stop(!1),Fc.delete(t.id);const q=t.id,et=L1t(Gt,t.skillId,()=>{const ht=Me.get(q);return ht?{x:ht.rx,y:ht.ry}:void 0},t.durationMs,hl(q,t.skillId),Yb(q,t.skillId),t.tx!==void 0&&t.ty!==void 0?{x:t.tx,y:t.ty}:void 0);et&&Fc.set(q,et)}{con…"
+  },
+  "castCancel": {
+   "fields": [
+    "id",
+    "skillId"
+   ],
+   "body": "case\"castCancel\":{{const q=Fc.get(t.id);q&&(q.stop(!1),Fc.delete(t.id))}{const q=u1.get(t.id);if(q){q(),u1.delete(t.id);const et=Me.get(t.id);et&&pt.fizzle(et.rx,et.ry)}}if(t.id===T.sessionId){r_.delete(t.skillId);const q=t.skillId,et=d_[q];et&&(et.left===void 0?delete dm[q]:dm[q]=et.left,et.refill=…"
+  },
+  "cast": {
+   "fields": [
+    "fx",
+    "fy",
+    "id",
+    "skillId",
+    "x",
+    "y"
+   ],
+   "body": "case\"cast\":{const q=Me.get(t.id),et=(un=(ge=T.state)==null?void 0:ge.players)==null?void 0:un.get(t.id),ht=It[t.skillId]?Ra(t.skillId,Math.max(1,(et==null?void 0:et.skillLevels.get(t.skillId))??1),et==null?void 0:et.skillMods.get(t.skillId)):void 0;if(!ht)break;q&&et&&Gbt(q,ht.id,ht.name);const jt=p…"
+  },
+  "mobBolt": {
+   "fields": [
+    "color",
+    "dx",
+    "dy",
+    "id",
+    "size",
+    "speed",
+    "ttlMs",
+    "x",
+    "y"
+   ],
+   "body": "case\"mobBolt\":Vn().v2?Gt.mobBolt(t.id,t.x,t.y,t.dx,t.dy,t.speed,t.ttlMs,t.color,t.size):Bt.mobBolt(t.id,t.x,t.y,t.dx,t.dy,t.speed,t.ttlMs,t.color,t.size);break;"
+  },
+  "mobBoltEnd": {
+   "fields": [
+    "id",
+    "x",
+    "y"
+   ],
+   "body": "case\"mobBoltEnd\":Vn().v2?Gt.boltHit(t.id,t.x,t.y):Bt.mobBoltEnd(t.id,t.x,t.y);break;"
+  },
+  "mobSkill": {
+   "fields": [
+    "id",
+    "skillId",
+    "x",
+    "y"
+   ],
+   "body": "case\"mobSkill\":{const q=Btt[t.skillId];if(!q)break;if(Bt.floater(t.x,t.y,q.name,\"#ffd27a\"),q.use.kind!==\"move\"){const et=Jn.get(t.id),ht=et&&Vn().v2?Cp(et):void 0;ht&&Gt.bodyFlare(ht,ed(q.color),1,520),q.use.kind===\"heal\"&&Vn().v2&&Gt.heal(t.x,t.y,void 0,\"\",0),pt.mob(((Un=(ns=(Ln=T.state)==null?void…"
+  },
+  "bossMech": {
+   "fields": [
+    "id",
+    "mobType",
+    "players",
+    "step",
+    "x",
+    "y"
+   ],
+   "body": "case\"bossMech\":{const q=qE[t.mobType],et=Me.get(T.sessionId),ht=!!et&&Math.hypot(et.rx-t.x,et.ry-t.y)<20;if(!q||!ht)break;const jt=!!(($r=t.players)!=null&&$r.includes(T.sessionId)),Re={twinDown:\"ร่างวิญญาณแตก!\",podDown:\"ทำลาย Pod แล้ว!\",freed:\"หลุดจากใยแล้ว!\"};if(t.step===\"claim\"&&q.kind===\"feather…"
+  },
+  "classFx": {
+   "fields": [
+    "fx",
+    "id",
+    "n",
+    "owner",
+    "x",
+    "y"
+   ],
+   "body": "case\"classFx\":{if(t.fx===\"rage\")Gt.rageBurst(t.x,t.y,t.n??_m);else if(t.fx===\"combo\")Gt.comboFinish(t.x,t.y,t.n??bd);else if(t.fx===\"markpop\")Gt.markPop(t.x,t.y,t.n??1);else if(t.fx===\"freeze\")Gt.iceBurst(t.x,t.y,1.1,Z9);else if(t.fx===\"shatter\")Gt.shatter(t.x,t.y);else if(t.fx===\"bulwark\")Gt.bulwar…"
+  },
+  "ccFx": {
+   "fields": [
+    "cc",
+    "id",
+    "x",
+    "y"
+   ],
+   "body": "case\"ccFx\":{const q={stun:[\"STUN!\",\"#ffd34a\"],root:[\"ROOT!\",\"#7fe3a9\"],fear:[\"FEAR!\",\"#c49bff\"],pull:[\"ถูกดึง!\",\"#8fd0ff\"],push:[\"กระเด็น!\",\"#8fd0ff\"],taunt:[\"TAUNT!\",\"#ff8a5a\"],tether:[\"TETHER\",\"#ff9bd0\"],slow:[\"SLOW\",\"#9ab8ff\"],interrupt:[\"ขัดร่าย!\",\"#ff6a5a\"]},[et,ht]=q[t.cc]??[t.cc.toUpperCase()…"
+  },
+  "bossPhase": {
+   "fields": [
+    "id",
+    "phase",
+    "x",
+    "y"
+   ],
+   "body": "case\"bossPhase\":{if(t.phase===10){Bt.floater(t.x,t.y,\"คลั่ง!\",\"#ff6a5a\");const q=Me.get(T.sessionId);q&&Math.hypot(q.rx-t.x,q.ry-t.y)<16&&Rk(\"Mini-boss คลั่ง!\",`ระวังวงแหวนใหญ่ (ชิดตัวมันไว้ถึงรอด) แล้วมันจะตีแรงขึ้น ${Math.round((ZD.enrageDmgMult-1)*100)}% ตีถี่ขึ้น ออกท่าถี่ขึ้น`,\"red\"),pt.mob(((a…"
+  },
+  "mobAttack": {
+   "fields": [
+    "durationMs",
+    "fx",
+    "fy",
+    "id",
+    "mobType",
+    "tx",
+    "ty",
+    "x",
+    "y"
+   ],
+   "body": "case\"mobAttack\":{const q=Jn.get(t.id);if(q&&(q.facingX=t.fx,q.facingY=t.fy,q.gestureUntil=performance.now()+t.durationMs,q.lungeAt=performance.now(),Eg(q,t.durationMs)),Vn().v2){const et=ee[zo(t.mobType)]??yp[zo(t.mobType)],ht=(et==null?void 0:et.color)??16747120;t.tx!==void 0&&t.ty!==void 0?Gt.mobS…"
+  },
+  "basicAttack": {
+   "fields": [
+    "a",
+    "d",
+    "id"
+   ],
+   "body": "case\"basicAttack\":{const q=(Gf=(di=T.state)==null?void 0:di.players)==null?void 0:Gf.get(t.id);if(!q)break;const et=t.a/256*Math.PI*2;vV(t.id,q,Math.cos(et),Math.sin(et),t.d);break}"
+  },
+  "levelUp": {
+   "fields": [
+    "id",
+    "level"
+   ],
+   "body": "case\"levelUp\":{const q=Me.get(t.id);t.id===T.sessionId?(AA(t.level,\"base\"),pt.ui(\"levelUp\")):q&&Bt.floater(q.rx,q.ry,\"LEVEL UP!\",\"#ffe08a\");break}"
+  },
+  "jobLevelUp": {
+   "fields": [
+    "id",
+    "level"
+   ],
+   "body": "case\"jobLevelUp\":{const q=Me.get(t.id);t.id===T.sessionId?(AA(t.level,\"job\"),pt.ui(\"jobUp\")):q&&Bt.floater(q.rx,q.ry,\"JOB UP!\",\"#8fd8ff\");break}"
+  },
+  "warps": {
+   "fields": [
+    "mapIds"
+   ],
+   "body": "case\"warps\":if(Vm){const q=Vm;Vm=null,syt(q,t.mapIds)}else ayt(t.mapIds);break;"
+  },
+  "dialog": {
+   "fields": [
+    "npcId"
+   ],
+   "body": "case\"dialog\":{const q=kt.npcs.find(ht=>ht.id===t.npcId);C2(`npc:${t.npcId}`),C2(`ring:npc:${t.npcId}`),Xs={id:t.npcId,until:performance.now()+260};const et=q!=null&&q.act&&q.act in Qs?q.act:null;if(et&&!$h(et,((kc=nt())==null?void 0:kc.level)??1)){ft(`${q.name}: \"กลับมาตอน Lv ${Qs[et].level} นะ — ${…"
+  },
+  "jobChanged": {
+   "fields": [
+    "id",
+    "job"
+   ],
+   "body": "case\"jobChanged\":{const q=Me.get(t.id),et=((Ee=re[t.job])==null?void 0:Ee.name)??t.job;if(q){Bt.floater(q.rx,q.ry,et.toUpperCase(),\"#9ec9ff\");const ht=Zx(t.job,q.gender);q.spriteId!==ht&&(A5(q,ht),cL(q))}if(t.id===T.sessionId){const ht=re[t.job];ft(`ตอนนี้คุณคือ${et}แล้ว — สกิลอยู่ปุ่ม 1-${(ht==null…"
+  },
+  "projectile": {
+   "fields": [
+    "dx",
+    "dy",
+    "id",
+    "owner",
+    "skillId",
+    "small",
+    "speed",
+    "target",
+    "x",
+    "y"
+   ],
+   "body": "case\"projectile\":t.small&&t.skillId&&na(t.skillId)?(H1t(Gt,t.skillId,t.id,t.x,t.y,t.dx,t.dy,t.speed,t.small),lk.set(t.id,Math.atan2(t.dy,t.dx))):na(t.skillId)&&R1t(Gt,t.id,t.skillId,t.x,t.y,t.dx,t.dy,t.speed,t.target?2200:((fs=It[t.skillId])==null?void 0:fs.projTtlMs)??1e3,hl(t.owner,t.skillId))?(dS…"
+  },
+  "projectileHit": {
+   "fields": [
+    "id",
+    "owner",
+    "skillId",
+    "x",
+    "y"
+   ],
+   "body": "case\"projectileHit\":$y.delete(t.id),lk.has(t.id)?(O1t(Gt,t.skillId??\"\",t.id,t.x,t.y,lk.get(t.id)),lk.delete(t.id)):dS.delete(t.id)?q1t(Gt,t.id,t.skillId,t.x,t.y,hl(t.owner,t.skillId)):Bt.projectileHit(t.id,t.x,t.y),t.skillId&&!t.skillId.startsWith(\"atk_\")&&pt.land(t.skillId,t.x,t.y,t.owner===T.sessi…"
+  },
+  "zone": {
+   "fields": [
+    "fuse",
+    "fx",
+    "fy",
+    "id",
+    "owner",
+    "radius",
+    "skillId",
+    "ttlMs",
+    "wave",
+    "x",
+    "y"
+   ],
+   "body": "case\"zone\":if(t.skillId===\"blast_arrow\"&&t.fuse!==void 0){na(t.skillId)&&uft(Gt.kit(),t.x,t.y,t.radius,t.fuse,j.fire);const q=t.owner===T.sessionId,et={...t},ht=(_r=(ms=Yb(t.owner,\"blast_arrow\"))==null?void 0:ms.clusterRain)==null?void 0:_r.ground;window.setTimeout(()=>{pt.land(et.skillId,et.x,et.y,…"
+  },
+  "died": {
+   "fields": [
+    "id"
+   ],
+   "body": "case\"died\":{if((t.id===T.sessionId||t.id===Pk)&&(wi.bossDown(),Pk=\"\"),So&&(t.id===So.id||t.id===T.sessionId)&&(So=null),t.id===T.sessionId)vn(\"คุณถูกสังหาร\",\"combat\");else{const q=(CI=(PI=T.state)==null?void 0:PI.mobs)==null?void 0:CI.get(t.id);(q==null?void 0:q.ownerId)===T.sessionId?vn(\"วิญญาณของค…"
+  },
+  "respawned": {
+   "fields": [
+    "id"
+   ],
+   "body": "case\"respawned\":t.id===T.sessionId&&(KU(),pt.ui(\"respawn\"));break;"
+  },
+  "chat": {
+   "fields": [],
+   "body": "case\"chat\":mI(t,!1);break;"
+  },
+  "chatBacklog": {
+   "fields": [
+    "lines"
+   ],
+   "body": "case\"chatBacklog\":jY(),FY(t.lines);break;"
+  },
+  "dashMove": {
+   "fields": [
+    "blink",
+    "fromX",
+    "fromY",
+    "hitIndex",
+    "id",
+    "ms",
+    "skillId",
+    "targetId",
+    "toX",
+    "toY"
+   ],
+   "body": "case\"dashMove\":{const q=Me.get(t.id);if(t.skillId.startsWith(\"dodge_\")){Vn().v2&&f2t(t.skillId.slice(6),t.fromX,t.fromY,t.toX,t.toY,t.ms??220,!!t.blink,q,t.id===T.sessionId);break}if(na(t.skillId)&&!t.blink&&B1t(Gt,t.skillId,t.fromX,t.fromY,t.toX,t.toY,hl(t.id,t.skillId)),q&&t.blink&&na(t.skillId)){…"
+  },
+  "maintenance": {
+   "fields": [
+    "inMs"
+   ],
+   "body": "case\"maintenance\":fvt(t.inMs);break;"
+  },
+  "drain": {
+   "fields": [
+    "inMs",
+    "version"
+   ],
+   "body": "case\"drain\":{const q=Date.now()+Math.max(0,t.inMs??0);(HI=t.version)!=null&&HI.build?ZM(t.version,q):o4().then(et=>ZM(et!=null&&et.build&&et.build!==ic?et:null,q));break}"
+  },
+  "announcement": {
+   "fields": [
+    "item",
+    "kind",
+    "level",
+    "map",
+    "members",
+    "mob",
+    "mobLevel",
+    "name",
+    "party",
+    "price",
+    "qty",
+    "ref",
+    "uid"
+   ],
+   "body": "case\"announcement\":{const q=ue=>ue.replace(/[&<>\"]/g,gn=>({\"&\":\"&amp;\",\"<\":\"&lt;\",\">\":\"&gt;\",'\"':\"&quot;\"})[gn]),et={name:t.name,uid:t.uid||void 0,after:\" \"},ht=t.ref?\"[[0]]\":t.item,jt=t.ref?[t.ref]:void 0,Re=(ue,gn)=>vn(ue,\"announcement\",\"announcement\",!1,jt,et,void 0,gn);if(t.kind===\"admin\"){vn(`[…"
+  },
+  "chatTyping": {
+   "fields": [
+    "id",
+    "typing"
+   ],
+   "body": "case\"chatTyping\":{const q=Me.get(t.id);q!=null&&q.chatBubble&&q.chatText&&(pa.bubbles||!t.typing)&&(q.typing=t.typing,t.typing?(q.chatText.text=\".\",dL(q),q.chatBubble.visible=!0,q.chatUntil=0):q.chatUntil||(q.chatBubble.visible=!1));break}"
+  },
+  "warp": {
+   "fields": [
+    "channel",
+    "mapId",
+    "token"
+   ],
+   "body": "case\"warp\":(OI=document.getElementById(\"mapqchip\"))==null||OI.remove(),$I(t.mapId,t.channel??1,t.token);break"
+  }
+ },
+ "endpoints": [
+  "/api/account/delete",
+  "/api/channel",
+  "/api/character",
+  "/api/guest",
+  "/api/intl/proof",
+  "/api/local/login",
+  "/api/local/password",
+  "/api/local/register",
+  "/api/logout",
+  "/api/me",
+  "/api/name",
+  "/api/queue",
+  "/api/topology"
+ ],
+ "rooms": [
+  "joinOrCreate(`map_${e}_ch${n}`"
+ ]
+}
