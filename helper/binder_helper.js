@@ -473,95 +473,141 @@
     } catch (e) { log('error: ' + e.message); } finally { busy = false; }
   }
 
-  // ---- small panel (same look as the web manager / Pelican Manager: dark navy glass, sky-blue accent) ----
-  const css = document.createElement('style');
-  css.id = 'bthcss';
-  css.textContent = `
-  .bthw { position: fixed; z-index: 99999; width: 268px; color: #eef3fc; font: 12.5px/1.45 'Plus Jakarta Sans', 'IBM Plex Sans Thai', Kanit, 'Segoe UI', sans-serif;
-    background: rgba(10, 16, 32, .95); border: 1px solid rgba(148, 163, 184, .22); border-radius: 14px; box-shadow: 0 12px 40px rgba(0, 0, 0, .5); backdrop-filter: blur(12px); overflow: hidden; }
-  .bthw * { box-sizing: border-box; font-family: inherit; letter-spacing: normal; text-transform: none; }
-  .bthw .hd { display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 12px; cursor: move; user-select: none; touch-action: none; background: rgba(14, 165, 233, .08); border-bottom: 1px solid rgba(148, 163, 184, .14); }
-  .bthw .hd b { font-size: 13px; font-weight: 800; white-space: nowrap; }
-  .bthw .dot { width: 8px; height: 8px; border-radius: 50%; background: #5d6983; flex: none; }
-  .bthw.on .dot { background: #34d399; box-shadow: 0 0 0 3px rgba(52, 211, 153, .2); }
-  .bthw .mini { flex: 1; min-width: 0; color: #8d9ab5; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bthw .hb { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: #8d9ab5; cursor: pointer; font-size: 14px; line-height: 1; text-decoration: none; }
-  .bthw .hb:hover { background: rgba(148, 163, 184, .16); color: #eef3fc; }
-  .bthw .bd { padding: 10px 12px 12px; display: grid; gap: 10px; max-height: calc(100vh - 160px); overflow: auto; }
-  .bthw .phase { padding: 8px 10px; border-radius: 10px; background: rgba(4, 8, 20, .55); border: 1px solid rgba(148, 163, 184, .12); color: #7dd3fc; font-weight: 600; min-height: 34px; }
-  .bthw .sec { display: grid; gap: 6px; }
-  .bthw .sec > h4 { margin: 0; font-size: 11.5px; font-weight: 700; color: #8d9ab5; }
-  .bthw .row { display: flex; align-items: center; gap: 6px; min-height: 28px; }
-  .bthw .row > span:first-child { flex: 1; color: #c7d0e2; }
-  .bthw .farm { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bthw input[type=number], .bthw select { height: 28px; padding: 0 6px; border-radius: 7px; border: 1px solid rgba(148, 163, 184, .22); background: rgba(4, 8, 20, .7); color: #eef3fc; font-size: 12.5px; outline: none; margin: 0; }
-  .bthw input[type=number] { width: 58px; text-align: right; font-family: 'JetBrains Mono', Consolas, monospace; }
-  .bthw select { width: 120px; }
-  .bthw input:focus, .bthw select:focus { border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14, 165, 233, .25); }
-  .bthw .pot { display: grid; gap: 6px; padding: 7px 8px; border-radius: 10px; background: rgba(4, 8, 20, .45); border: 1px solid rgba(148, 163, 184, .1); }
-  .bthw .pot select { width: 100%; }
-  .bthw .pot .r { display: flex; align-items: center; gap: 5px; }
-  .bthw .pot .r small { color: #8d9ab5; font-size: 11px; }
-  .bthw .pot .r input { width: 52px; }
-  .bthw .hint { color: #5d6983; font-size: 11px; margin: 0; }
-  .bthw label.tg { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; color: #c7d0e2; padding: 3px 0; }
-  .bthw label.tg input { appearance: none; -webkit-appearance: none; flex: none; width: 30px; height: 17px; margin: 1px 0 0; border-radius: 99px; background: rgba(148, 163, 184, .25); position: relative; cursor: pointer; transition: background .15s; }
-  .bthw label.tg input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #eef3fc; transition: transform .15s; }
-  .bthw label.tg input:checked { background: #0ea5e9; }
-  .bthw label.tg input:checked::after { transform: translateX(13px); }
-  .bthw button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 10px; margin: 0; border-radius: 8px; cursor: pointer;
-    border: 1px solid rgba(148, 163, 184, .25); background: rgba(148, 163, 184, .1); color: #eef3fc; font-size: 12.5px; font-weight: 600; transition: background .15s; }
-  .bthw button:hover { background: rgba(148, 163, 184, .2); }
-  .bthw button:focus-visible, .bthw input:focus-visible { outline: 2px solid #0ea5e9; outline-offset: 1px; }
-  .bthw button.big { width: 100%; height: 38px; font-size: 14px; font-weight: 700; color: #fff; border-color: rgba(52, 211, 153, .6); background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 14px rgba(16, 185, 129, .25); }
-  .bthw.on button.big { border-color: rgba(248, 113, 113, .5); background: rgba(248, 113, 113, .14); color: #fecaca; box-shadow: none; }
-  .bthw button.wide { width: 100%; }
-  .bthw button.pri { border-color: rgba(56, 189, 248, .6); background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; }
-  .bthw details { border-top: 1px solid rgba(148, 163, 184, .12); padding-top: 8px; }
-  .bthw summary { cursor: pointer; color: #8d9ab5; font-size: 11.5px; font-weight: 700; }
-  .bthw .log { margin-top: 6px; max-height: 110px; overflow: auto; color: #8d9ab5; font: 11px/1.55 'JetBrains Mono', Consolas, monospace; }
-  .bthw .qlist { max-height: 230px; overflow: auto; display: grid; gap: 4px; }
-  .bthw .qlist label { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: 9px; background: rgba(4, 8, 20, .45); border: 1px solid rgba(148, 163, 184, .1); cursor: pointer; }
-  .bthw .qlist small { color: #8d9ab5; }
-  .bthw input[type=checkbox]:not(.tgi) { accent-color: #0ea5e9; margin: 2px 0 0; }
-  @media (prefers-reduced-motion: reduce) { .bthw * { transition: none !important; } }`;
-  document.head.appendChild(css);
+  // ---- small panel ----
+  const uiStyle = document.createElement('style');
+  uiStyle.id = 'bth-style';
+  uiStyle.textContent = `
+    #bth { box-sizing:border-box; width:320px!important; max-width:calc(100vw - 16px); max-height:82vh; padding:0!important; overflow:hidden; border:1px solid rgba(157,186,216,.24); border-radius:14px!important; background:linear-gradient(155deg,rgba(22,31,44,.98),rgba(12,18,28,.98))!important; color:#eaf1fb!important; font:13px/1.45 "Kanit",system-ui,sans-serif!important; box-shadow:0 18px 48px rgba(0,0,0,.5),inset 0 1px rgba(255,255,255,.06)!important; backdrop-filter:blur(14px); }
+    #bthbar { box-sizing:border-box; display:flex; align-items:center; gap:9px; min-height:48px; margin:0!important; padding:9px 12px!important; border-radius:0!important; border-bottom:1px solid rgba(180,205,232,.12); background:linear-gradient(110deg,#233c50,#202b3b)!important; color:#f5f8ff; }
+    #bthbar b { flex:1; font-size:14px; letter-spacing:.25px; }
+    #bthbar::before { content:"BT"; display:grid; place-items:center; width:27px; height:27px; border:1px solid rgba(127,216,174,.42); border-radius:8px; background:rgba(127,216,174,.12); color:#a9edcd; font:700 10px "Kanit",sans-serif; }
+    #bthmini { box-sizing:border-box; display:flex; flex:none; align-items:center; justify-content:flex-end; width:92px; height:29px; min-width:0; margin-left:auto; overflow:hidden; color:#b9f0d5!important; font-size:12px; font-weight:700; line-height:1; text-align:right; text-overflow:ellipsis; white-space:nowrap; transform:translateY(2px); }
+    #bthbody { display:grid; gap:9px; max-height:calc(82vh - 48px); overflow:auto; padding:11px; scrollbar-width:thin; scrollbar-color:#52647a transparent; }
+    #bth #bthbody { display:grid; gap:0; max-height:calc(82vh - 48px); overflow:auto; padding:0; }
+    #bth-tabs { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; padding:8px 10px 0; }
+    #bth .bth-tab { min-height:30px; padding:4px 3px; border-color:transparent; background:transparent; color:#9eafc1; font-size:10px; }
+    #bth .bth-tab[aria-selected="true"] { border-color:rgba(127,216,174,.23); background:rgba(127,216,174,.12); color:#b8f0d3; }
+    #bth-pages { padding:8px 10px; }
+    #bth .bth-page { display:none; }
+    #bth .bth-page.active { display:grid; }
+    #bth button { box-sizing:border-box; min-height:32px; border:1px solid rgba(155,185,217,.2); border-radius:8px; padding:6px 10px; background:#26374a; color:#edf4ff; font:600 12px "Kanit",system-ui,sans-serif; cursor:pointer; transition:background .15s,border-color .15s,transform .12s,filter .15s; }
+    #bth button:hover { background:#334961; border-color:rgba(127,216,174,.58); }
+    #bth button:active { transform:translateY(1px); }
+    #bth #bthrun, #bth #bthqgo { min-height:38px; background:linear-gradient(120deg,#28765b,#23634e); border-color:#53a680; color:#effff6; font-size:13px; }
+    #bth #bthrun:hover, #bth #bthqgo:hover { background:linear-gradient(120deg,#32906d,#2a755d); }
+    #bth select, #bth input:not([type=checkbox]) { box-sizing:border-box; min-height:31px; border:1px solid rgba(155,185,217,.25); border-radius:7px; padding:5px 8px; background:#101a27; color:#f0f5fc; font:12px "Kanit",system-ui,sans-serif; }
+    #bth select { max-width:100%; }
+    #bth input:focus, #bth select:focus { outline:2px solid rgba(127,216,174,.65); outline-offset:1px; }
+    .bth-section { display:grid; gap:7px; padding:10px; border:1px solid rgba(155,185,217,.13); border-radius:10px; background:rgba(255,255,255,.025); }
+    .bth-section-title { display:flex; align-items:center; gap:7px; color:#eff5fc; font-weight:700; }
+    .bth-section-title small { color:#8fb8ab; font:700 9px "Kanit",sans-serif; letter-spacing:1px; }
+    .bth-map { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; min-height:38px; }
+    #bthmap { min-width:0; overflow-wrap:anywhere; color:#b8d4f0; }
+    .bth-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; color:#b9c8d8; }
+    .bth-field select { width:150px; }
+    .bth-inline { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#b9c8d8; }
+    .bth-inline span:last-child { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+    .bth-inline input { width:64px; text-align:right; }
+    .bth-potions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .bth-potion { display:grid; gap:6px; min-width:0; padding:8px; border:1px solid rgba(155,185,217,.14); border-radius:9px; background:rgba(5,12,20,.28); }
+    .bth-potion-title { color:#dbe9f6; font-size:12px; font-weight:700; }
+    .bth-potion select { width:100%; }
+    .bth-potion-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+    .bth-potion-grid label { display:grid; gap:3px; color:#91a5b8; font-size:10px; }
+    .bth-potion-grid input { width:100%; }
+    .bth-switch { display:flex; align-items:center; gap:8px; color:#d9e4ef; cursor:pointer; }
+    .bth-switch input { position:absolute; width:1px!important; height:1px!important; opacity:0; }
+    .bth-switch-ui { position:relative; flex:none; width:32px; height:18px; border:1px solid rgba(155,185,217,.26); border-radius:99px; background:#263444; transition:.15s; }
+    .bth-switch-ui::after { content:""; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#9aabba; transition:.15s; }
+    .bth-switch input:checked + .bth-switch-ui { background:rgba(77,173,131,.42); border-color:#58b58c; }
+    .bth-switch input:checked + .bth-switch-ui::after { transform:translateX(14px); background:#9af0c4; }
+    .bth-switch input:focus-visible + .bth-switch-ui { outline:2px solid #7fd8ae; outline-offset:2px; }
+    .bth-note { color:#899bad; font-size:10px; }
+    #bthqnote { padding:8px 10px; border:1px solid rgba(127,216,174,.16); border-radius:8px; background:rgba(127,216,174,.07); color:#bcebd5!important; }
+    #bthqlist { max-height:min(38vh,300px)!important; overflow:auto; scrollbar-width:thin; scrollbar-color:#52647a transparent; }
+    #bthqlist > div, #bthqlist label { padding:7px 8px!important; border-bottom:1px solid rgba(155,185,217,.1); border-radius:6px; }
+    #bthbar button { flex:none; width:29px; height:29px; min-height:29px; padding:0!important; border-radius:8px!important; background:rgba(9,15,23,.4)!important; color:#d9e9f8!important; font:700 18px/1 "Kanit",system-ui,sans-serif!important; }
+    #bthbar button:hover { background:rgba(127,216,174,.18)!important; }
+    @media(max-width:420px) { #bth { width:min(320px,calc(100vw - 16px))!important; } .bth-potions { grid-template-columns:1fr; } }
+  `;
+  document.head.appendChild(uiStyle);
   const box = document.createElement('div');
   box.id = 'bth';
-  box.className = 'bthw';
-  box.innerHTML = `<div id="bthbar" class="hd"><span class="dot"></span><b>Binder Helper</b><span id="bthmini" class="mini"></span>
-     <a id="bthmin" class="hb" title="ย่อ / ขยาย">−</a><a id="bthx" class="hb" title="ซ่อน (เปิดใหม่จากเว็บ manager)">✕</a></div>
-   <div id="bthbody" class="bd">
-   <div id="bthphase" class="phase"></div>
-   <button id="bthrun" class="big"></button>
-   <div class="sec"><h4>จุดฟาร์ม</h4>
-     <div class="row"><span id="bthmap" class="farm"></span><button id="bthset" title="จำแมพและพิกัดที่ยืนอยู่ตอนนี้">จำจุดนี้</button></div></div>
-   <div class="sec"><h4>ขายของ / ตาย</h4>
-     <div class="row"><span>เมืองขาย</span><select id="bthtown">${Object.keys(TOWN_IDS).map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>
-     <div class="row"><span>ขายเมื่อน้ำหนักถึง (%)</span><input id="bthpct" type="number" min="10" max="100"></div>
-     <div class="row"><span>ตายแล้วรอก่อนเกิด (วิ)</span><input id="bthwait" type="number" min="0" max="60"></div></div>
-   <div class="sec"><h4>ซื้อยา</h4>
-     ${['hp', 'mp'].map(k => `<div class="pot"><select id="bth_${k}_item" aria-label="ยา ${k.toUpperCase()}">${Object.entries(POTIONS[k]).map(([id, n]) => `<option value="${id}">${k.toUpperCase()} · ${n}</option>`).join('')}</select>
-       <div class="r"><small>ต่ำกว่า</small><input id="bth_${k}_min" type="number" min="0" max="9999" aria-label="ต่ำกว่า"><small>ซื้อให้ครบ</small><input id="bth_${k}_to" type="number" min="0" max="9999" aria-label="ซื้อให้ครบ"></div></div>`).join('')}
-     <p class="hint">ใส่ 0 ที่ "ต่ำกว่า" = ไม่กลับไปซื้อ · ยาต้องอยู่ในช่องยา Q/E</p></div>
-   <div class="sec"><h4>ตัวเลือก</h4>
-     <label class="tg"><input id="bthlead" class="tgi" type="checkbox"><span>ไป CH เดียวกับหัวตี้ก่อน</span></label>
-     <label class="tg"><input id="bthquiet" class="tgi" type="checkbox"><span>ไม่งั้นไป CH คนน้อยสุด (ไม่เข้า PvP)</span></label>
-     <label class="tg"><input id="bthboss" class="tgi" type="checkbox"><span>เจอ Boss / Mini-boss ในแมพ ไปตีก่อน</span></label></div>
-   <button id="bthbq" class="wide">🎯 ค่าหัววันนี้</button>
-   <details><summary>บันทึก</summary><div id="bthlog" class="log"></div></details>
+  box.style.cssText = 'position:fixed;z-index:99999;background:rgba(20,24,34,.92);color:#e8ecf4;font:12px/1.4 Kanit,sans-serif;padding:8px 10px;border-radius:8px;width:230px;box-shadow:0 2px 10px #0008';
+  box.innerHTML = `<div id="bthbar" style="cursor:move;user-select:none;touch-action:none">
+     <b>Binder Helper</b> <span id="bthmini" style="color:#9fd"></span>
+     <button id="bthmin" type="button" title="ย่อแผง" aria-label="ย่อแผง">−</button></div>
+   <div id="bthbody">
+   <div id="bth-tabs" role="tablist" aria-label="หมวดตั้งค่า">
+     <button class="bth-tab" type="button" role="tab" data-bth-tab="farm" aria-selected="true">ฟาร์ม</button>
+     <button class="bth-tab" type="button" role="tab" data-bth-tab="return" aria-selected="false">ขายของ</button>
+     <button class="bth-tab" type="button" role="tab" data-bth-tab="supply" aria-selected="false">เติมยา</button>
+     <button class="bth-tab" type="button" role="tab" data-bth-tab="travel" aria-selected="false">Channel</button>
+     <button class="bth-tab" type="button" role="tab" data-bth-tab="bounty" aria-selected="false">ค่าหัว</button>
+   </div>
+   <div id="bth-pages">
+     <section class="bth-section bth-page active" role="tabpanel" data-bth-page="farm">
+       <div class="bth-section-title"><small>FARM</small><span>จุดฟาร์ม</span></div>
+       <div class="bth-map"><b id="bthmap"></b><button id="bthset" type="button">⌖ จำจุดนี้</button></div>
+       <label class="bth-inline" for="bthwait"><span>รอก่อนกลับมาเกิด</span><span><input id="bthwait" type="number" min="0" max="60"> วินาที</span></label>
+       <label class="bth-switch"><input id="bthboss" type="checkbox"><span class="bth-switch-ui"></span><span>เจอ Boss / Mini-boss ในแมพ ไปตีก่อน</span></label>
+       <button id="bthrun" type="button" style="width:100%"></button>
+     </section>
+     <section class="bth-section bth-page" role="tabpanel" data-bth-page="return" hidden>
+       <div class="bth-section-title"><small>RETURN</small><span>กลับเมืองและจัดกระเป๋า</span></div>
+       <label class="bth-field" for="bthtown"><span>เมืองที่จะกลับไป</span><select id="bthtown">${Object.keys(TOWN_IDS).map(t => `<option value="${t}">${t}</option>`).join('')}</select></label>
+       <label class="bth-inline" for="bthpct"><span>ขายของเมื่อน้ำหนักถึง</span><span><input id="bthpct" type="number" min="10" max="100"> %</span></label>
+     </section>
+     <section class="bth-section bth-page" role="tabpanel" data-bth-page="supply" hidden>
+       <div class="bth-section-title"><small>SUPPLY</small><span>เติมยาอัตโนมัติ</span></div>
+       <div class="bth-potions">${['hp', 'mp'].map(k => `<div class="bth-potion"><div class="bth-potion-title">${k === 'hp' ? '♥ ยา HP' : '✦ ยา MP'}</div><select id="bth_${k}_item">${Object.entries(POTIONS[k]).map(([id, n]) => `<option value="${id}">${n}</option>`).join('')}</select><div class="bth-potion-grid"><label>ซื้อเมื่อ<input id="bth_${k}_min" type="number" min="0" max="9999"></label><label>เติมถึง<input id="bth_${k}_to" type="number" min="0" max="9999"></label></div></div>`).join('')}</div>
+       <div class="bth-note">ตั้งค่า 0 เพื่อปิด · ยาต้องอยู่ในช่อง Q/E</div>
+     </section>
+     <section class="bth-section bth-page" role="tabpanel" data-bth-page="travel" hidden>
+       <div class="bth-section-title"><small>TRAVEL</small><span>การเลือก Channel</span></div>
+       <label class="bth-switch"><input id="bthlead" type="checkbox"><span class="bth-switch-ui"></span><span>ตาม Channel ของหัวตี้ก่อน</span></label>
+       <label class="bth-switch"><input id="bthquiet" type="checkbox"><span class="bth-switch-ui"></span><span>ถ้าไม่เจอ ให้เลือก Channel คนน้อยสุด</span></label>
+       <div class="bth-note">ระบบจะไม่เลือก Channel PvP</div>
+     </section>
+     <section class="bth-section bth-page" role="tabpanel" data-bth-page="bounty" hidden>
+       <div class="bth-section-title"><small>DAILY</small><span>ค่าหัววันนี้</span></div>
+       <label class="bth-inline" for="bthqabove"><span>เลเวลคุณ <b id="bthqlv">?</b></span><span>เผื่อเลเวล <input id="bthqabove" type="number" min="0" max="30" style="width:48px"></span></label>
+       <div id="bthqlist" style="margin:2px 0;max-height:220px;overflow:auto"></div>
+       <div id="bthqnote" style="color:#889;font-size:11px"></div>
+       <div style="display:flex;gap:7px;margin-top:2px"><button id="bthqgo" type="button" style="flex:2"></button><button id="bthqref" type="button" style="flex:1">↻ รีเฟรช</button></div>
+       <div class="bth-note">Auto จะล่ามอนค่าหัวในทั้งแมพ เมื่อครบจะคืนค่าตั้งเดิมและกลับไปจุดฟาร์ม</div>
+     </section>
+   </div>
    </div>`;
   document.body.appendChild(box);
+  const bthTabButtons = [...box.querySelectorAll('[data-bth-tab]')];
+  const bthPages = [...box.querySelectorAll('[data-bth-page]')];
+  let bqAll = [], bqPick = new Set(), bqLoaded = false;
+  const selectBthTab = name => {
+    for (const button of bthTabButtons) button.setAttribute('aria-selected', String(button.dataset.bthTab === name));
+    for (const page of bthPages) { const active = page.dataset.bthPage === name; page.hidden = !active; page.classList.toggle('active', active); }
+  };
+  for (const button of bthTabButtons) button.onclick = () => {
+    const tab = button.dataset.bthTab;
+    selectBthTab(tab);
+    if (tab === 'bounty') {
+      if (!bqLoaded) { bqLoaded = true; refreshBq(); }
+      else renderBq();
+    }
+  };
+  selectBthTab('farm');
   // drag by the title bar (position kept), "−" collapses to the title bar
   const place = () => {
     const p = cfg.panel || DEF.panel;
-    const x = Math.max(0, Math.min(innerWidth - 60, p.x)), y = Math.max(0, Math.min(innerHeight - 30, p.y));
+    const x = Math.max(8, Math.min(innerWidth - box.offsetWidth - 8, p.x)), y = Math.max(8, Math.min(innerHeight - box.offsetHeight - 8, p.y));
     box.style.left = x + 'px'; box.style.top = y + 'px';
-    $('#bthbody').style.display = p.min ? 'none' : ''; $('#bthmin').textContent = p.min ? '+' : '−';
-    $('#bthmini').textContent = p.min ? '· ' + phase.slice(0, 24) : '';
+    $('#bthbody').style.display = p.min ? 'none' : 'grid'; $('#bthmin').textContent = p.min ? '+' : '−';
+    $('#bthmin').setAttribute('aria-label', p.min ? 'ขยายแผง' : 'ย่อแผง');
+    $('#bthmin').title = p.min ? 'ขยายแผง' : 'ย่อแผง';
+    $('#bthmini').textContent = p.min && phase !== 'หยุดอยู่' ? miniPhaseText(phase) : '';
   };
   $('#bthbar').addEventListener('pointerdown', e => {
-    if (e.target.closest('a')) return;
+    if (e.target.closest('button')) return;
     e.preventDefault(); e.stopPropagation();
     const sx = e.clientX, sy = e.clientY, ox = box.offsetLeft, oy = box.offsetTop;
     const move = ev => { cfg.panel = { ...(cfg.panel || DEF.panel), x: ox + ev.clientX - sx, y: oy + ev.clientY - sy }; place(); };
@@ -573,14 +619,24 @@
   $('#bthmin').onclick = () => { cfg.panel = { ...(cfg.panel || DEF.panel), min: !(cfg.panel || DEF.panel).min }; save(); place(); };
   addEventListener('resize', place);
   place();
+  let stoppedLogged = false;
   const logs = [];
-  function log(t) { logs.unshift(new Date().toLocaleTimeString() + ' ' + t); logs.length = Math.min(logs.length, 30); $('#bthlog').innerHTML = logs.map(x => `<div>${x.replace(/</g, '&lt;')}</div>`).join(''); }
-  function setPhase(t) { phase = t; $('#bthphase').textContent = t; $('#bthmini').textContent = (cfg.panel || {}).min ? '· ' + t.slice(0, 24) : ''; }
+  function log(t) { logs.unshift(new Date().toLocaleTimeString() + ' ' + t); logs.length = Math.min(logs.length, 30); console.info('[Binder Helper]', t); }
+  function miniPhaseText(t) {
+    const farmWeight = t.match(/^ฟาร์ม\s*[·-]\s*น้ำหนัก\s*([^·]*)/);
+    return farmWeight ? 'น้ำหนัก ' + farmWeight[1].trim() : t.slice(0, 24);
+  }
+  function setPhase(t) {
+    phase = t;
+    $('#bthmini').textContent = (cfg.panel || {}).min && t !== 'หยุดอยู่' ? miniPhaseText(t) : '';
+    if (t === 'หยุดอยู่' && !stoppedLogged) { console.info('[Binder Helper]', t); stoppedLogged = true; }
+    else if (t !== 'หยุดอยู่') stoppedLogged = false;
+  }
   function render() {
     $('#bthmap').textContent = cfg.farmMap ? cfg.farmMap + (cfg.farmSpot ? ` (${cfg.farmSpot.x.toFixed(0)}, ${cfg.farmSpot.y.toFixed(0)})` : '') : '(ยังไม่ตั้ง)';
     $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthboss').checked = !!cfg.bossHunt;
     for (const k of ['hp', 'mp']) { const b = (cfg.buy || {})[k] || {}; $(`#bth_${k}_item`).value = b.item; $(`#bth_${k}_min`).value = b.min || 0; $(`#bth_${k}_to`).value = b.to || 0; }
-    $('#bthrun').textContent = cfg.running ? '■ หยุด' : '▶ เริ่มฟาร์ม'; box.classList.toggle('on', !!cfg.running);
+    $('#bthrun').textContent = cfg.running ? '■ หยุด' : '▶ เริ่ม';
     if (!cfg.running) setPhase('หยุดอยู่');
   }
   const remember = () => {
@@ -605,52 +661,25 @@
     // first start: remember where we stand (never a town); later starts keep the saved spot
     if (!cfg.running && (!cfg.farmMap || (!cfg.farmSpot && mapName() === cfg.farmMap))) remember();
     if (!cfg.running && !cfg.farmMap) return;
-    cfg.running = !cfg.running; startCheck = cfg.running; save(); render(); log(cfg.running ? 'เริ่ม' : 'หยุด');
+    cfg.running = !cfg.running; startCheck = cfg.running; if (cfg.running) stoppedLogged = false; save(); render(); log(cfg.running ? 'เริ่ม' : 'หยุด');
   };
-  $('#bthx').onclick = () => { box.style.display = 'none'; };
 
-  // ---- bounty window (separate, draggable) ----
-  const qbox = document.createElement('div');
-  qbox.id = 'bthq';
-  qbox.className = 'bthw';
-  qbox.style.cssText = 'width:310px;display:none';
-  qbox.innerHTML = `<div id="bthqbar" class="hd"><b>🎯 ค่าหัววันนี้</b><span class="mini"></span><a id="bthqx" class="hb" title="ปิด">✕</a></div>
-   <div class="bd">
-   <div class="row"><span>Lv คุณ <b id="bthqlv">?</b> · แสดงแมพที่ Lv ต่ำสุดไม่เกิน Lv คุณ +</span><input id="bthqabove" type="number" min="0" max="30" style="width:48px"></div>
-   <div id="bthqlist" class="qlist"></div>
-   <p id="bthqnote" class="hint"></p>
-   <div class="row"><button id="bthqref">↻ รีเฟรช</button><button id="bthqgo" class="pri" style="flex:1"></button></div>
-   <p class="hint">ระหว่างทำ: Auto ตีเฉพาะมอนค่าหัวทั้งแมพ ครบแล้วรับรางวัลเอง ทำครบทุกตัวแล้วคืนค่า Auto และกลับไปฟาร์มแมพปกติ</p>
-   </div>`;
-  document.body.appendChild(qbox);
-  for (const ev of ['pointerdown', 'mousedown', 'click', 'keydown', 'wheel']) qbox.addEventListener(ev, e => e.stopPropagation());
-  const qplace = () => { const p = cfg.bqPanel || { x: 250, y: 120 }; qbox.style.left = Math.max(0, Math.min(innerWidth - 60, p.x)) + 'px'; qbox.style.top = Math.max(0, Math.min(innerHeight - 30, p.y)) + 'px'; };
-  $('#bthqbar').addEventListener('pointerdown', e => {
-    if (e.target.closest('a')) return;
-    e.preventDefault(); e.stopPropagation();
-    const sx = e.clientX, sy = e.clientY, ox = qbox.offsetLeft, oy = qbox.offsetTop;
-    const move = ev => { cfg.bqPanel = { x: ox + ev.clientX - sx, y: oy + ev.clientY - sy }; qplace(); };
-    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); save(); };
-    addEventListener('pointermove', move); addEventListener('pointerup', up);
-  });
-  qplace();
-  let bqAll = [], bqPick = new Set();
   const reachable = b => !b.claimed && b.lo <= myLevel() + (+bq.maxAbove || 0);
   function renderBq() {
     $('#bthqlv').textContent = myLevel() || '?';
     $('#bthqabove').value = bq.maxAbove;
     const cur = curBounty();
     if (bq.active) {
-      $('#bthqlist').innerHTML = bq.list.map((b, i) => `<div style="padding:6px 8px;border-radius:9px;background:rgba(4,8,20,.45);${i === bq.i ? 'color:#7dd3fc;font-weight:700;border:1px solid rgba(14,165,233,.4)' : b.claimed ? 'color:#34d399' : ''}">${i < bq.i || b.claimed ? '✓' : i === bq.i ? '▶' : '·'} ${b.mob} ${b.prog}/${b.need} <small style="color:#8d9ab5">${b.mapName}</small></div>`).join('');
+      $('#bthqlist').innerHTML = bq.list.map((b, i) => `<div style="padding:3px 0;${i === bq.i ? 'color:#9fd;font-weight:bold' : b.claimed ? 'color:#7a7' : ''}">${i < bq.i || b.claimed ? '✓' : i === bq.i ? '▶' : '·'} ${b.mob} ${b.prog}/${b.need} <small style="color:#99a">${b.mapName}</small></div>`).join('');
       $('#bthqnote').textContent = cur ? `กำลังทำ ${cur.mob} ที่ ${cur.mapName}` : '';
       $('#bthqgo').textContent = '■ หยุดค่าหัว';
       return;
     }
     const show = bqAll.filter(reachable), hidden = bqAll.filter(b => !reachable(b));
-    $('#bthqlist').innerHTML = show.length ? show.map(b => `<label><input type="checkbox" data-bq="${b.id}" ${bqPick.has(b.id) ? 'checked' : ''}><span><b>${b.mob}</b> ${b.prog}/${b.need}<br><small>${b.mapName} · Lv ${b.lo}–${b.hi}</small></span></label>`).join('')
-      : '<p class="hint">ไม่มีค่าหัวที่ไปได้ กด ↻ รีเฟรช</p>';
+    $('#bthqlist').innerHTML = show.length ? show.map(b => `<label style="display:block;padding:3px 0"><input type="checkbox" data-bq="${b.id}" ${bqPick.has(b.id) ? 'checked' : ''}> <b>${b.mob}</b> ${b.prog}/${b.need} <small style="color:#99a">${b.mapName} · Lv ${b.lo}–${b.hi}</small></label>`).join('')
+      : '<div style="color:#99a">ไม่มีค่าหัวที่ไปได้ (กด ↻ รีเฟรช)</div>';
     $('#bthqnote').textContent = hidden.length ? `ซ่อน ${hidden.length} ตัว: ${hidden.map(b => b.claimed ? b.mob + ' (รับแล้ว)' : `${b.mob} (Lv ${b.lo}+)`).join(', ')}` : '';
-    $('#bthqgo').textContent = '▶ เริ่มค่าหัว';
+    $('#bthqgo').textContent = '▶ เริ่มล่าค่าหัว';
     for (const c of document.querySelectorAll('#bthqlist [data-bq]')) c.onchange = e => { e.target.checked ? bqPick.add(e.target.dataset.bq) : bqPick.delete(e.target.dataset.bq); };
   }
   async function refreshBq() {
@@ -659,8 +688,6 @@
     bqPick = new Set(bqAll.filter(reachable).map(b => b.id));
     renderBq();
   }
-  $('#bthbq').onclick = () => { qbox.style.display = qbox.style.display === 'none' ? 'block' : 'none'; if (qbox.style.display === 'block' && !bq.active) refreshBq(); else renderBq(); };
-  $('#bthqx').onclick = () => { qbox.style.display = 'none'; };
   $('#bthqref').onclick = () => { if (!bq.active) refreshBq(); else renderBq(); };
   $('#bthqabove').onchange = e => { bq.maxAbove = Math.max(0, +e.target.value || 0); saveBq(); if (!bq.active) { bqPick = new Set(bqAll.filter(reachable).map(b => b.id)); renderBq(); } };
   $('#bthqgo').onclick = () => {
@@ -679,7 +706,7 @@
   const timer = setInterval(tick, 1000);
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); box.remove(); qbox.remove(); css.remove(); delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); box.remove(); uiStyle.remove(); delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
