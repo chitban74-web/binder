@@ -4,7 +4,9 @@
 //  • died → wait deathWaitMs → respawn in town → (sell if weight >= sellAfterDeathPct) → back to farm map → saved spot → AUTO on
 //  • potion on the belt below its minimum → town → walk to the merchant → buy up to the target (vendorBuy, max 99 each)
 //  • on ▶ and on every return to the farm map: the party leader's channel if the leader is on this map,
-//    else the safe channel with the fewest players (never PvP CH10)
+//    else the safe channel with the fewest players (never PvP CH10); re-checked every 5 min while farming
+//  • the game's channel menu shows the player count of each channel on the right of its row
+//  • channel switches and town warps wait until combat is over (the game refuses both in combat)
 //  • bounty window (🎯 ค่าหัว): today's bounties you can reach → each one: its map, AUTO targets = that mob only,
 //    farm area = whole map, claim when done → next; at the end AUTO settings go back and you return to the farm spot
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
@@ -95,6 +97,60 @@
     log('เดินไปจุดฟาร์มไม่ถึงใน 90 วิ — เปิด AUTO ตรงนี้');
     return false;
   }
+
+  // The game considers the local player in combat for 5 seconds after a hit, cast, or basic attack, and refuses
+  // channel changes and warps meanwhile. Track the same server events so those can wait for combat to finish.
+  let combatUntil = 0, combatRoom = null, combatOff = null;
+  const watchCombat = () => {
+    const r = room();
+    if (r === combatRoom) return;
+    if (combatOff) { try { combatOff(); } catch { } }
+    combatRoom = r; combatOff = null;
+    if (!r || typeof r.onMessage !== 'function') return;
+    try {
+      combatOff = r.onMessage('server', message => {
+        for (const e of Array.isArray(message) ? message : [message]) {
+          if (!e || !e.type) continue;
+          const mine = e.type === 'hit'
+            ? e.actorId === r.sessionId || e.targetId === r.sessionId
+            : (e.type === 'cast' || e.type === 'basicAttack') && e.id === r.sessionId;
+          if (mine) combatUntil = performance.now() + 5000;
+        }
+      });
+    } catch { }
+  };
+  const combatTimer = setInterval(watchCombat, 250);
+  const inCombat = () => { watchCombat(); return performance.now() < combatUntil; };
+  // what = what has to wait ('ย้าย CH', 'วาร์ป'): AUTO on to finish the fight, AUTO off again once it is over
+  async function waitForCombatToFinish(what = 'ย้าย CH') {
+    let announced = false;
+    while (cfg.running && inCombat()) {
+      if (!announced) {
+        announced = true;
+        setPhase(`ต่อสู้ก่อน${what}`);
+        log(`กำลังต่อสู้ — เปิด AUTO และรอให้จบก่อน${what}`);
+        setAuto(true);
+      }
+      await sleep(300);
+    }
+    if (announced && cfg.running) { log(`พ้นสถานะต่อสู้แล้ว — เตรียม${what}`); setAuto(false); }
+    return cfg.running;
+  }
+
+  // player counts of each channel, read from the tooltip of the game's signal bars on that row
+  // ("แมพนี้ 1/40 คน · ทั้ง Channel 236/300 คน") -> written into the empty right side of the row
+  const paintChCounts = () => {
+    for (const row of document.querySelectorAll('#chmenu .chrow')) {
+      const m = ((row.querySelector('.chsig') || {}).title || '').match(/แมพนี้\s*(\d+)\/\d+.*?Channel\s*(\d+)\//); if (!m) continue;
+      let s = row.querySelector('.bthcnt');
+      if (!s) { s = document.createElement('span'); s.className = 'bthcnt'; row.appendChild(s); }
+      const t = `แมพ ${m[1]} · รวม ${m[2]}`;
+      if (s.textContent !== t) s.textContent = t;
+    }
+  };
+  const chObs = new MutationObserver(paintChCounts);
+  paintChCounts(); // menu may already be open when the helper loads
+  { const menu = document.getElementById('chmenu'); if (menu) chObs.observe(menu, { childList: true, subtree: true }); }
   // ---- channel: move to the least crowded safe channel of this map (same rules as the game's channel menu) ----
   const PVP_CH = 10, BASE_CH = 10, MAP_FULL = 40, SERVER_FULL = 300;
   const chOf = r => +(((r && r.name) || '').match(/_ch(\d+)$/) || [])[1] || 0;
@@ -115,19 +171,24 @@
   const queryParty = async () => { const s = await request({ type: 'socialQuery' }, m => m.type === 'socialState'); return s && s.state ? s.state.party : undefined; };
 
   // party leader's channel when the leader is online on this map (and it isn't PvP); 0 = none
-  async function leaderChannel(r) {
+  async function leaderChannel(r, quiet) {
+    const say = quiet ? () => { } : log;
     const party = await queryParty();
-    if (party === undefined) { log('อ่านข้อมูลตี้ไม่ได้'); return 0; }
+    if (party === undefined) { say('อ่านข้อมูลตี้ไม่ได้'); return 0; }
     if (!party) return 0;
-    if (party.leaderId === r.sessionId) { log('เราเป็นหัวตี้ → ใช้ CH คนน้อยสุด'); return 0; }
+    if (party.leaderId === r.sessionId) { say('เราเป็นหัวตี้ → ใช้ CH คนน้อยสุด'); return 0; }
     const L = (party.members || []).find(m => m.id === party.leaderId);
-    if (!L || !L.online) { log('หัวตี้ออฟไลน์ → ใช้ CH คนน้อยสุด'); return 0; }
-    if (L.mapId !== r.state.mapId) { log(`หัวตี้อยู่แมพอื่น (${L.mapId}) → ใช้ CH คนน้อยสุด`); return 0; }
-    if (L.channel === PVP_CH) { log('หัวตี้อยู่ CH PvP → ไม่ตาม ใช้ CH คนน้อยสุด'); return 0; }
+    if (!L || !L.online) { say('หัวตี้ออฟไลน์ → ใช้ CH คนน้อยสุด'); return 0; }
+    if (L.mapId !== r.state.mapId) { say(`หัวตี้อยู่แมพอื่น (${L.mapId}) → ใช้ CH คนน้อยสุด`); return 0; }
+    if (L.channel === PVP_CH) { say('หัวตี้อยู่ CH PvP → ไม่ตาม ใช้ CH คนน้อยสุด'); return 0; }
     return L.channel || 0;
   }
   async function switchTo(r, cur, ch, lock, why) {
     if (lock && lock.ms > 0) { log(`รอ ${Math.ceil(lock.ms / 1000)} วิ (ล็อกเพราะ ${lock.why})`); await sleep(lock.ms + 500); }
+    if (!await waitForCombatToFinish()) return false;
+    // the room may have changed while waiting
+    r = room(); cur = chOf(r);
+    if (!r || !cur || cur === ch) return cur === ch;
     log(`ย้าย CH${cur} → CH${ch} (${why})`);
     r.send('input', { type: 'switchChannel', channel: ch });
     for (let i = 0; i < 20 && cfg.running; i++) {
@@ -138,19 +199,20 @@
     log('ย้าย CH ไม่สำเร็จ — อยู่ CH เดิม');
     return false;
   }
-  async function moveToQuietChannel() {
-    if (!cfg.quietCh && !cfg.followLeader) return;
-    const r = room(); const cur = chOf(r); if (!r || !cur) return;
+  // the channel to switch to: { ch, why, lock }, or null to stay (quiet = no log when staying; used by the 5-min check)
+  async function pickChannel(quiet) {
+    const say = quiet ? () => { } : log;
+    const r = room(); const cur = chOf(r); if (!r || !cur) return null;
     const info = await queryChannels();
     if (cfg.followLeader) {
-      const lc = await leaderChannel(r);
+      const lc = await leaderChannel(r, quiet);
       if (lc) {
-        if (lc === cur) { log(`อยู่ CH เดียวกับหัวตี้แล้ว (CH${cur})`); return; }
-        await switchTo(r, cur, lc, info && info.lock, 'ตามหัวตี้'); return;
+        if (lc === cur) { say(`อยู่ CH เดียวกับหัวตี้แล้ว (CH${cur})`); return null; }
+        return { ch: lc, why: 'ตามหัวตี้', lock: info && info.lock };
       }
     }
-    if (!cfg.quietCh) return;
-    if (!info) { log('อ่านจำนวนคนแต่ละ CH ไม่ได้ — อยู่ CH เดิม'); return; }
+    if (!cfg.quietCh) return null;
+    if (!info) { say('อ่านจำนวนคนแต่ละ CH ไม่ได้ — อยู่ CH เดิม'); return null; }
     const counts = info.counts || [], totals = info.totals || [];
     const n = ch => counts[ch - 1] || 0, tot = ch => totals[ch - 1] || 0;
     const others = ch => ch === cur ? Math.max(0, n(ch) - 1) : n(ch); // players besides me
@@ -163,8 +225,17 @@
     }
     cands.sort((a, b) => others(a) - others(b) || tot(a) - tot(b));
     const best = cands[0];
-    if (!best || best === cur || (cur !== PVP_CH && others(best) >= others(cur))) { log(`CH${cur} คนน้อยสุดแล้ว (${others(cur)} คน)`); return; }
-    await switchTo(r, cur, best, info.lock, `คนน้อยสุด: ${others(cur)} → ${others(best)} คน`);
+    if (!best || best === cur || (cur !== PVP_CH && others(best) >= others(cur))) { say(`CH${cur} คนน้อยสุดแล้ว (${others(cur)} คน)`); return null; }
+    return { ch: best, why: `คนน้อยสุด: ${others(cur)} → ${others(best)} คน`, lock: info.lock };
+  }
+  const CH_CHECK_MS = 5 * 60 * 1000;
+  let chCheckAt = 0;
+  async function moveToQuietChannel() {
+    if (!cfg.quietCh && !cfg.followLeader) return;
+    chCheckAt = Date.now();
+    const p = await pickChannel();
+    const r = room();
+    if (p && r) await switchTo(r, chOf(r), p.ch, p.lock, p.why);
   }
 
   // where to farm right now: the bounty's map (whole map) while a bounty runs, else the saved farm map + spot
@@ -400,6 +471,7 @@
     if (mapName() === name) return true;
     const id = TOWN_IDS[name];
     if (!id) return false;
+    if (!await waitForCombatToFinish('วาร์ป')) return false; // the game does not warp while in combat
     click($('button[data-svc="warp"]'), 'เปิดเมนูวาร์ป'); await sleep(1200);
     const go = $(`.wp2go[data-warp="${id}"]`);
     if (!go || go.disabled) { log(`วาร์ปไป ${name} ไม่ได้ (${go ? go.textContent.trim() : 'ยังไม่ปลดล็อก'})`); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return false; }
@@ -553,6 +625,16 @@
         if (g === farmGen) setAuto(true); // new spot picked meanwhile -> the next tick walks there
       } else if (cfg.bossHunt && (boss = findBoss())) {
         await fightBoss(boss);
+      } else if ((cfg.quietCh || cfg.followLeader) && Date.now() - chCheckAt >= CH_CHECK_MS) {
+        // every 5 min while farming: re-check the channels, switch only if a quieter one (or the leader's) is found
+        chCheckAt = Date.now();
+        const p = await pickChannel(true);
+        if (p) {
+          setAuto(false); setPhase('ย้าย CH');
+          const r = room(), g = farmGen;
+          if (r && await switchTo(r, chOf(r), p.ch, p.lock, p.why)) { setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(cfg.farmSpot, () => g === farmGen); await sleep(500); }
+          setAuto(true);
+        }
       } else {
         const pots = potionPlans().filter(p => p.have !== null).map(p => `${potName(p.item)} ${p.have}`).join(' · ');
         setPhase(`ฟาร์ม · น้ำหนัก ${weightPct()}%${pots ? ' · ' + pots : ''}`);
@@ -625,6 +707,8 @@
     @keyframes bthpick { to { box-shadow:0 0 0 4px rgba(229,72,77,.35); } }
     #bthbar button { flex:none; width:24px; height:24px; min-height:24px; padding:0!important; border:1px solid rgba(255,255,255,.2)!important; border-radius:6px!important; background:rgba(42,53,80,.8)!important; color:#fff!important; font:600 12px/1 Kanit,system-ui,sans-serif!important; }
     #bthbar button:hover { background:rgba(62,78,115,.95)!important; }
+    #chmenu .chrow { position:relative; padding-right:104px; }
+    #chmenu .chrow .bthcnt { position:absolute; right:10px; top:7px; color:#000; font:700 11px var(--sans); }
     @media(max-width:420px) { #bth { width:min(300px,calc(100vw - 16px))!important; } .bth-potions { grid-template-columns:1fr; } }
   `;
   document.head.appendChild(uiStyle);
@@ -909,7 +993,7 @@
   const timer = setInterval(tick, 1000);
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); delete window.__bthSendHook; delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
