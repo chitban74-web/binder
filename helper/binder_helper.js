@@ -482,7 +482,7 @@
     #bthbar { box-sizing:border-box; display:flex; align-items:center; gap:7px; min-height:38px; margin:0!important; padding:6px 8px 6px 10px!important; border-radius:0!important; border-bottom:1px solid rgba(255,255,255,.1); background:transparent!important; color:#fff; }
     #bthbar::before { content:"⠿"; color:#8fa2bb; font-size:12px; }
     #bthbar b { flex:1; color:#ffd27a; font-size:12.5px; font-weight:600; }
-    #bthmini { box-sizing:border-box; display:flex; flex:none; align-items:center; justify-content:flex-end; max-width:110px; min-width:0; margin-left:auto; overflow:hidden; color:#9fd0ff!important; font-size:11.5px; font-weight:600; line-height:1; text-overflow:ellipsis; white-space:nowrap; }
+    #bthmini { box-sizing:border-box; display:flex; flex:none; align-items:center; justify-content:flex-end; max-width:150px; min-width:0; margin-left:auto; overflow:hidden; color:#9fd0ff!important; font-size:11.5px; font-weight:600; line-height:1.6; text-overflow:ellipsis; white-space:nowrap; }
     #bthbody { display:grid; gap:8px; max-height:calc(82vh - 38px); overflow:auto; padding:8px; scrollbar-width:thin; scrollbar-color:rgba(143,162,187,.4) transparent; }
     #bth #bthbody { display:grid; gap:0; max-height:calc(82vh - 38px); overflow:auto; padding:0; }
     #bth-tabs { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; padding:8px 8px 0; }
@@ -607,7 +607,7 @@
     $('#bthbody').style.display = p.min ? 'none' : 'grid'; $('#bthmin').textContent = p.min ? '+' : '−';
     $('#bthmin').setAttribute('aria-label', p.min ? 'ขยายแผง' : 'ย่อแผง');
     $('#bthmin').title = p.min ? 'ขยายแผง' : 'ย่อแผง';
-    $('#bthmini').textContent = p.min && phase !== 'หยุดอยู่' ? miniPhaseText(phase) : '';
+    showMini();
   };
   $('#bthbar').addEventListener('pointerdown', e => {
     if (e.target.closest('button')) return;
@@ -625,13 +625,16 @@
   let stoppedLogged = false;
   const logs = [];
   function log(t) { logs.unshift(new Date().toLocaleTimeString() + ' ' + t); logs.length = Math.min(logs.length, 30); console.info('[Binder Helper]', t); }
+  // minimized: the title bar shows the bag weight (refreshed every 2 s)
+  function showMini() { const m = $('#bthmini'); if (m) m.textContent = (cfg.panel || {}).min ? `น้ำหนัก ${weightPct()}%` : ''; }
+  const miniTimer = setInterval(showMini, 2000);
   function miniPhaseText(t) {
     const farmWeight = t.match(/^ฟาร์ม\s*[·-]\s*น้ำหนัก\s*([^·]*)/);
     return farmWeight ? 'น้ำหนัก ' + farmWeight[1].trim() : t.slice(0, 24);
   }
   function setPhase(t) {
     phase = t;
-    $('#bthmini').textContent = (cfg.panel || {}).min && t !== 'หยุดอยู่' ? miniPhaseText(t) : '';
+    showMini();
     if (t === 'หยุดอยู่' && !stoppedLogged) { console.info('[Binder Helper]', t); stoppedLogged = true; }
     else if (t !== 'หยุดอยู่') stoppedLogged = false;
   }
@@ -709,7 +712,7 @@
   const timer = setInterval(tick, 1000);
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); box.remove(); uiStyle.remove(); delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); box.remove(); uiStyle.remove(); delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
