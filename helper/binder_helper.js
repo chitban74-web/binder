@@ -202,14 +202,14 @@
   }
   // the channel to switch to: { ch, why, lock }, or null to stay (quiet = no log when staying; used by the 5-min check)
   async function pickChannel(quiet) {
-    const say = quiet ? () => { } : log;
+    const say = t => { chLast = t; if (!quiet) log(t); };
     const r = room(); const cur = chOf(r); if (!r || !cur) return null;
     const info = await queryChannels();
     if (cfg.followLeader) {
       const lc = await leaderChannel(r, quiet);
       if (lc) {
         if (lc === cur) { say(`อยู่ CH เดียวกับหัวตี้แล้ว (CH${cur})`); return null; }
-        return { ch: lc, why: 'ตามหัวตี้', lock: info && info.lock };
+        chLast = `ย้ายไป CH${lc} (ตามหัวตี้)`; return { ch: lc, why: 'ตามหัวตี้', lock: info && info.lock };
       }
     }
     if (!cfg.quietCh) return null;
@@ -227,10 +227,11 @@
     cands.sort((a, b) => others(a) - others(b) || tot(a) - tot(b));
     const best = cands[0];
     if (!best || best === cur || (cur !== PVP_CH && others(best) >= others(cur))) { say(`CH${cur} คนน้อยสุดแล้ว (${others(cur)} คน)`); return null; }
+    chLast = `ย้ายไป CH${best} (คนน้อยกว่า: ${others(cur)} → ${others(best)} คน)`;
     return { ch: best, why: `คนน้อยสุด: ${others(cur)} → ${others(best)} คน`, lock: info.lock };
   }
   const CH_CHECK_MS = 5 * 60 * 1000;
-  let chCheckAt = 0;
+  let chCheckAt = 0, chLast = '';
   async function moveToQuietChannel() {
     if (!cfg.quietCh && !cfg.followLeader) return;
     chCheckAt = Date.now();
@@ -697,6 +698,9 @@
     .bth-switch input:checked + .bth-switch-ui::after { transform:translateX(13px); background:#fff; }
     .bth-switch input:focus-visible + .bth-switch-ui { outline:2px solid #9fd0ff; outline-offset:2px; }
     .bth-note { color:#8fa2bb; font-size:10.5px; }
+    .bth-note b { color:#cfdcec; font-weight:600; }
+    .bth-subnote { margin:-4px 0 4px 40px; }
+    .bth-chinfo { padding:6px 8px; border-radius:6px; background:rgba(255,255,255,.06); font-size:11px; }
     #bthqnote { padding:7px 9px; border:1px solid rgba(255,210,122,.25); border-radius:6px; background:rgba(255,210,122,.07); color:#ffd27a!important; }
     #bthqlist { max-height:min(38vh,300px)!important; overflow:auto; scrollbar-width:thin; scrollbar-color:rgba(143,162,187,.4) transparent; }
     #bthqlist > div, #bthqlist label { padding:6px 8px!important; margin-bottom:3px; border-radius:6px; background:linear-gradient(90deg,rgba(90,140,255,.32),rgba(90,140,255,.08)); }
@@ -751,9 +755,14 @@
      </section>
      <section class="bth-section bth-page" role="tabpanel" data-bth-page="travel" hidden>
        <div class="bth-section-title"><small>TRAVEL</small><span>การเลือก Channel</span></div>
+       <div id="bthchinfo" class="bth-chinfo"></div>
        <label class="bth-switch"><input id="bthlead" type="checkbox"><span class="bth-switch-ui"></span><span>ตาม Channel ของหัวตี้ก่อน</span></label>
+       <div class="bth-note bth-subnote">หัวตี้ออนไลน์และอยู่แมพเดียวกัน → ย้ายไป CH เดียวกับหัวตี้ · ถ้าหัวตี้อยู่ CH PvP จะไม่ตาม</div>
        <label class="bth-switch"><input id="bthquiet" type="checkbox"><span class="bth-switch-ui"></span><span>ถ้าไม่เจอ ให้เลือก Channel คนน้อยสุด</span></label>
-       <div class="bth-note">ระบบจะไม่เลือก Channel PvP</div>
+       <div class="bth-note bth-subnote">นับคนอื่นในแมพนี้ของแต่ละ CH · ย้ายเมื่อเจอ CH ที่คนน้อยกว่าจริง · คนเท่ากันเลือก CH ที่ทั้ง CH คนน้อยกว่า · ข้าม CH เต็ม (แมพ 40 / ทั้ง CH 300 คน)</div>
+       <div class="bth-note"><b>เลือก CH เมื่อ</b> กด ▶ · กลับมาแมพฟาร์ม (หลังตาย / เข้าเมือง / ค่าหัว) · ทุก 5 นาทีระหว่างฟาร์ม (ย้ายแล้วเดินกลับจุดฟาร์ม)</div>
+       <div class="bth-note"><b>ติดต่อสู้</b> รอให้หลุดก่อนย้าย CH และก่อนวาป (AUTO สู้กลับเฉพาะตอนโดนตี) · เกิน 60 วิ: ข้ามย้าย CH รอบนั้น / วาปไม่ได้ก็เดินเข้าเมือง</div>
+       <div class="bth-note">ไม่เลือก CH PvP (CH10) · เมนู Channel ของเกมแสดงจำนวนคนในแมพทางขวาของแต่ละแถว</div>
      </section>
      <section class="bth-section bth-page" role="tabpanel" data-bth-page="bounty" hidden>
        <div class="bth-section-title"><small>DAILY</small><span>ค่าหัววันนี้</span></div>
@@ -992,9 +1001,20 @@
   };
   render();
   const timer = setInterval(tick, 1000);
+  // Channel tab: current channel, when the next 5-min check runs, and what the last check decided
+  const showChInfo = () => {
+    const el = $('#bthchinfo'); if (!el) return;
+    const ch = chOf(room());
+    const left = Math.max(0, CH_CHECK_MS - (Date.now() - chCheckAt));
+    const next = !cfg.running ? 'helper หยุดอยู่' : !(cfg.quietCh || cfg.followLeader) ? 'ปิดการเลือก CH'
+      : inCombat() ? 'ติดต่อสู้' : `เช็คอีก ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}`;
+    const html = `<b>CH ${ch || '?'}</b> · ${next}${chLast ? `<br><small>ล่าสุด: ${chLast}</small>` : ''}`;
+    if (el.innerHTML !== html) el.innerHTML = html;
+  };
+  const chInfoTimer = setInterval(showChInfo, 1000);
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
