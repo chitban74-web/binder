@@ -478,7 +478,7 @@
   uiStyle.id = 'bth-style';
   uiStyle.textContent = `
     /* colours and font taken from the game's own windows (boss DPS meter): Kanit, navy glass, gold title, blue active tab */
-    #bth { box-sizing:border-box; width:300px!important; max-width:calc(100vw - 16px); max-height:82vh; padding:0!important; overflow:hidden; border:1px solid rgba(255,255,255,.14); border-radius:10px!important; background:rgba(12,20,32,.86)!important; color:#fff!important; font:500 11.5px/1.45 Kanit,"Noto Sans Thai",system-ui,sans-serif!important; box-shadow:0 10px 30px rgba(0,0,0,.45)!important; backdrop-filter:blur(8px); }
+    #bth { box-sizing:border-box; width:300px!important; max-width:calc(100vw - 16px); max-height:82vh; padding:0!important; overflow:hidden; border:1px solid rgba(255,255,255,.14); border-radius:10px!important; background:rgba(12,20,32,.5)!important; color:#fff!important; font:500 11.5px/1.45 Kanit,"Noto Sans Thai",system-ui,sans-serif!important; box-shadow:none!important; text-shadow:0 1px 2px rgba(0,0,0,.6); }
     #bthbar { box-sizing:border-box; display:flex; align-items:center; gap:7px; min-height:38px; margin:0!important; padding:6px 8px 6px 10px!important; border-radius:0!important; border-bottom:1px solid rgba(255,255,255,.1); background:transparent!important; color:#fff; }
     #bthbar::before { content:"⠿"; color:#8fa2bb; font-size:12px; }
     #bthbar b { flex:1; color:#ffd27a; font-size:12.5px; font-weight:600; }
@@ -512,7 +512,7 @@
     .bth-inline span:last-child { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
     .bth-inline input { width:60px; text-align:right; }
     .bth-potions { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-    .bth-potion { display:grid; gap:5px; min-width:0; padding:7px; border:1px solid rgba(255,255,255,.1); border-radius:7px; background:rgba(5,10,18,.4); }
+    .bth-potion { display:grid; gap:5px; min-width:0; padding:7px; border:1px solid rgba(255,255,255,.1); border-radius:7px; background:rgba(5,10,18,.25); }
     .bth-potion-title { color:#fff; font-size:11.5px; font-weight:600; }
     .bth-potion select { width:100%; }
     .bth-potion-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
