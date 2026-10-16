@@ -7,6 +7,7 @@
 //    else the safe channel with the fewest players (never PvP CH10)
 //  • bounty window (🎯 ค่าหัว): today's bounties you can reach → each one: its map, AUTO targets = that mob only,
 //    farm area = whole map, claim when done → next; at the end AUTO settings go back and you return to the farm spot
+//  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
 // It presses the game's own buttons (warp, world map "go", respawn, sell, AUTO). The messages it sends itself go
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
 // socialQuery, vendorBuy, huntQuery, bountyClaim.
@@ -15,7 +16,7 @@
   const KEY = 'bth_cfg';
   const DEF = {
     farmMap: '', farmSpot: null, town: '', sellPct: 95, sellAfterDeathPct: 40, deathWaitMs: 3000,
-    quietCh: true, followLeader: true,
+    quietCh: true, followLeader: true, bossHunt: true,
     // potions: below `min` (0 = off) -> trip to town; in town always top up to `to`
     buy: { hp: { item: 'hi_potion', min: 50, to: 200 }, mp: { item: 'mana_potion', min: 30, to: 150 } },
     panel: { x: 8, y: 120, min: false }, running: false,
@@ -250,6 +251,78 @@
     if (!autoOn()) setAuto(true);
   }
 
+  // ===== boss / mini-boss on the farm map: stop farming, walk to it, AUTO on there, back to the farm spot when it dies =====
+  // mob ids with role "boss" / "mini-boss" in the game's mob table (data/bot/mobs.json; bosses = world_boss_spawns)
+  const BOSS_IDS = new Set(['vale_warden', 'bloom_crowned_stag', 'prism_shell_sovereign', 'cinder_plume_roc', 'lotus_maw_matriarch',
+    'aurora_antler_regent', 'tempest_kite_empress', 'opal_weaver_queen']);
+  const MINIBOSS_IDS = new Set(['vale_keeper', 'dusk_herald', 'sky_sentinel']);
+  const bossSkip = new Map(); // mob key -> ignore until (gave up on it)
+  const mobAlive = m => !!m && m.state !== 'dead' && m.state !== 'return' && m.hp > 0 && !m.ownerId;
+  const getMob = key => { const r = room(); const m = r && r.state.mobs && r.state.mobs.get(key); return mobAlive(m) ? m : null; };
+  function findBoss() {
+    const r = room(), me = myPos(); if (!r || !r.state.mobs || !me) return null;
+    let best = null;
+    r.state.mobs.forEach((m, key) => {
+      if (!mobAlive(m) || !(BOSS_IDS.has(m.mobType) || MINIBOSS_IDS.has(m.mobType)) || (bossSkip.get(key) || 0) > Date.now()) return;
+      const d = dist(me, m);
+      if (!best || d < best.d) best = { key, type: m.mobType, boss: BOSS_IDS.has(m.mobType), d };
+    });
+    return best;
+  }
+  // AUTO target chip of this mob (#au-targets .autg with <img data-mob="id">); bosses are opt-in (bossesOn) in the game's AUTO
+  async function allowInAuto(type) {
+    refreshAutoUi(); await sleep(400);
+    const c = chips().find(x => x.b.querySelector(`img[data-mob="${type}"]`));
+    if (!c) { log(`ไม่เจอ ${type} ในเป้าหมาย Auto — เปิด AUTO ตามเดิม`); return false; }
+    if (c.on) return false;
+    click(c.b, 'เปิดเป้าหมาย ' + c.name); await sleep(200);
+    return true;
+  }
+  async function walkToMob(key, near) {
+    const deadline = Date.now() + 120e3;
+    let lastSend = 0;
+    while (Date.now() < deadline && cfg.running && !isDead()) {
+      const m = getMob(key), p = myPos(), r = room();
+      if (!m) return false;
+      if (p && dist(p, m) <= near) return true;
+      if (r && Date.now() - lastSend > 2500) { lastSend = Date.now(); r.send('input', { type: 'moveTo', x: m.x, y: m.y }); }
+      await sleep(500);
+    }
+    return false;
+  }
+  async function fightBoss(b) {
+    const label = `${b.boss ? 'Boss' : 'Mini-boss'} ${b.type}`;
+    log(`เจอ ${label} ห่าง ${b.d.toFixed(0)} ช่อง — หยุดฟาร์มไปตีก่อน`);
+    setPhase('ไปตี ' + label);
+    setAuto(false); await sleep(500);
+    const toggled = await allowInAuto(b.type);
+    const deadline = Date.now() + 10 * 60e3;
+    let killed = false;
+    while (Date.now() < deadline && cfg.running && !isDead()) {
+      if (!getMob(b.key)) { killed = true; break; }
+      const p = myPos(), m = getMob(b.key);
+      // AUTO only fights inside its area around where it was switched on -> (re)start it next to the boss
+      if (!autoOn() || (p && m && dist(p, m) > 10)) {
+        setAuto(false);
+        if (!await walkToMob(b.key, 4)) { killed = !getMob(b.key); break; }
+        setAuto(true);
+      }
+      setPhase(`ตี ${label} · HP ${m ? Math.round(m.hp) : 0}`);
+      await sleep(1000);
+    }
+    if (toggled) { // put the chip back the way you had it
+      setAuto(false); refreshAutoUi(); await sleep(400);
+      const c = chips().find(x => x.b.querySelector(`img[data-mob="${b.type}"]`));
+      if (c && c.on) click(c.b, 'ปิดเป้าหมาย ' + c.name + ' (คืนค่าเดิม)');
+    }
+    if (isDead() || !cfg.running) return;
+    if (killed) log(`${label} ตายแล้ว — กลับจุดฟาร์ม`);
+    else { bossSkip.set(b.key, Date.now() + 5 * 60e3); log(`ตี ${label} ไม่จบใน 10 นาที — ข้ามตัวนี้ 5 นาที แล้วกลับจุดฟาร์ม`); }
+    setAuto(false);
+    if (mapName() === cfg.farmMap) { setPhase('กลับจุดฟาร์ม'); await walkToSpot(cfg.farmSpot); await sleep(500); }
+    setAuto(true);
+  }
+
   // ---- pressing the game's buttons ----
   const click = (e, why) => { if (!e) return false; e.click(); log('กด: ' + why); return true; };
   const setAuto = on => { if (autoOn() !== on) click($('#autobig'), on ? 'เปิด AUTO' : 'ปิด AUTO'); };
@@ -349,6 +422,7 @@
   async function tick() {
     if (!cfg.running || busy) return;
     busy = true;
+    let boss = null;
     try {
       if (isDead()) {
         setPhase('ตาย — รอ ' + cfg.deathWaitMs / 1000 + ' วิ');
@@ -389,6 +463,8 @@
         if (cfg.quietCh || cfg.followLeader) { setPhase('เลือก CH'); await moveToQuietChannel(); }
         setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(cfg.farmSpot); await sleep(500);
         setAuto(true);
+      } else if (cfg.bossHunt && (boss = findBoss())) {
+        await fightBoss(boss);
       } else {
         const pots = potionPlans().filter(p => p.have !== null).map(p => `${potName(p.item)} ${p.have}`).join(' · ');
         setPhase(`ฟาร์ม · น้ำหนัก ${weightPct()}%${pots ? ' · ' + pots : ''}`);
@@ -413,7 +489,8 @@
      <br>&nbsp;ต่ำกว่า <input id="bth_${k}_min" type="number" min="0" max="9999" style="width:46px"> ซื้อให้ครบ <input id="bth_${k}_to" type="number" min="0" max="9999" style="width:46px"></div>`).join('')}
    <div style="color:#889;font-size:11px">ต่ำกว่า 0 = ไม่กลับไปซื้อ · ยาต้องอยู่ในช่องยา Q/E</div>
    <label><input id="bthlead" type="checkbox"> ไป CH ของหัวตี้ก่อน</label><br>
-   <label><input id="bthquiet" type="checkbox"> ไม่งั้น CH คนน้อยสุด (ไม่เข้า PvP)</label>
+   <label><input id="bthquiet" type="checkbox"> ไม่งั้น CH คนน้อยสุด (ไม่เข้า PvP)</label><br>
+   <label><input id="bthboss" type="checkbox"> เจอ Boss / Mini-boss ในแมพ → ไปตีก่อน</label>
    <button id="bthrun" style="margin-top:4px;width:100%"></button>
    <button id="bthbq" style="margin-top:4px;width:100%">🎯 ค่าหัว</button>
    <div id="bthphase" style="margin-top:4px;color:#9fd"></div>
@@ -446,7 +523,7 @@
   function setPhase(t) { phase = t; $('#bthphase').textContent = t; $('#bthmini').textContent = (cfg.panel || {}).min ? '· ' + t.slice(0, 24) : ''; }
   function render() {
     $('#bthmap').textContent = cfg.farmMap ? cfg.farmMap + (cfg.farmSpot ? ` (${cfg.farmSpot.x.toFixed(0)}, ${cfg.farmSpot.y.toFixed(0)})` : '') : '(ยังไม่ตั้ง)';
-    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader;
+    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthboss').checked = !!cfg.bossHunt;
     for (const k of ['hp', 'mp']) { const b = (cfg.buy || {})[k] || {}; $(`#bth_${k}_item`).value = b.item; $(`#bth_${k}_min`).value = b.min || 0; $(`#bth_${k}_to`).value = b.to || 0; }
     $('#bthrun').textContent = cfg.running ? '■ หยุด' : '▶ เริ่ม';
     if (!cfg.running) setPhase('หยุดอยู่');
@@ -460,6 +537,7 @@
   $('#bthwait').onchange = e => { cfg.deathWaitMs = Math.max(0, +e.target.value || 0) * 1000; save(); };
   $('#bthquiet').onchange = e => { cfg.quietCh = e.target.checked; save(); };
   $('#bthlead').onchange = e => { cfg.followLeader = e.target.checked; save(); };
+  $('#bthboss').onchange = e => { cfg.bossHunt = e.target.checked; save(); };
   for (const k of ['hp', 'mp']) {
     const upd = () => {
       const min = Math.max(0, +$(`#bth_${k}_min`).value || 0), to = Math.max(min, +$(`#bth_${k}_to`).value || 0);
