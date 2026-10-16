@@ -100,7 +100,7 @@
 
   // The game considers the local player in combat for 5 seconds after a hit, cast, or basic attack, and refuses
   // channel changes and warps meanwhile. Track the same server events so those can wait for combat to finish.
-  let combatUntil = 0, combatRoom = null, combatOff = null;
+  let combatUntil = 0, hitMeAt = 0, combatRoom = null, combatOff = null;
   const watchCombat = () => {
     const r = room();
     if (r === combatRoom) return;
@@ -115,25 +115,26 @@
             ? e.actorId === r.sessionId || e.targetId === r.sessionId
             : (e.type === 'cast' || e.type === 'basicAttack') && e.id === r.sessionId;
           if (mine) combatUntil = performance.now() + 5000;
+          if (e.type === 'hit' && e.targetId === r.sessionId) hitMeAt = performance.now();
         }
       });
     } catch { }
   };
   const combatTimer = setInterval(watchCombat, 250);
   const inCombat = () => { watchCombat(); return performance.now() < combatUntil; };
-  // what = what has to wait ('ย้าย CH', 'วาร์ป'): AUTO on to finish the fight, AUTO off again once it is over
+  // what = what has to wait ('ย้าย CH', 'วาร์ป'). AUTO on only while a mob is hitting us (fight back); otherwise
+  // AUTO off, so it doesn't pull the next mob and keep us in combat forever. false = stopped, or still in combat after 60 s
   async function waitForCombatToFinish(what = 'ย้าย CH') {
-    let announced = false;
+    if (!inCombat()) return cfg.running;
+    setPhase(`ต่อสู้ก่อน${what}`);
+    log(`กำลังต่อสู้ — รอให้จบก่อน${what} (AUTO สู้กลับเฉพาะตอนโดนตี)`);
+    const giveUpAt = Date.now() + 60e3;
     while (cfg.running && inCombat()) {
-      if (!announced) {
-        announced = true;
-        setPhase(`ต่อสู้ก่อน${what}`);
-        log(`กำลังต่อสู้ — เปิด AUTO และรอให้จบก่อน${what}`);
-        setAuto(true);
-      }
+      if (Date.now() > giveUpAt) { log(`ต่อสู้ไม่จบใน 60 วิ — ข้าม${what}`); return false; }
+      setAuto(performance.now() - hitMeAt < 2000);
       await sleep(300);
     }
-    if (announced && cfg.running) { log(`พ้นสถานะต่อสู้แล้ว — เตรียม${what}`); setAuto(false); }
+    if (cfg.running) { log(`พ้นสถานะต่อสู้แล้ว — เตรียม${what}`); setAuto(false); }
     return cfg.running;
   }
 
