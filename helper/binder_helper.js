@@ -16,7 +16,7 @@
   const KEY = 'bth_cfg';
   const DEF = {
     farmMap: '', farmSpot: null, town: '', sellPct: 95, sellAfterDeathPct: 40, deathWaitMs: 3000,
-    quietCh: true, followLeader: true, bossHunt: true,
+    quietCh: true, followLeader: true, bossHunt: true, mobIcons: true,
     // potions: below `min` (0 = off) -> trip to town; in town always top up to `to`
     buy: { hp: { item: 'hi_potion', min: 50, to: 200 }, mp: { item: 'mana_potion', min: 30, to: 150 } },
     panel: { x: 8, y: 120, min: false }, running: false,
@@ -61,7 +61,8 @@
       const src = [...document.querySelectorAll('script[src],link[rel=modulepreload]')].map(e => e.src || e.href).find(u => /\/assets\/vendor-/.test(u));
       const { c } = await import(src);
       const RP = c && c.Room && c.Room.prototype;
-      if (RP && !RP.__bthSend) { const orig = RP.send; RP.__bthSend = orig; RP.send = function () { window.__bthRoom = this; return orig.apply(this, arguments); }; }
+      // re-wrap from the original send on every load, so a reloaded helper gets the outgoing messages too (window.__bthSendHook)
+      if (RP) { const orig = RP.__bthSend || RP.send; RP.__bthSend = orig; RP.send = function () { window.__bthRoom = this; try { if (window.__bthSendHook) window.__bthSendHook(arguments[0], arguments[1]); } catch { } return orig.apply(this, arguments); }; }
     } catch (e) { console.warn('bth: room hook failed', e); }
   })();
   const room = () => { const r = window.__bthRoom; return r && r.state && r.connection && r.connection.isOpen !== false ? r : null; };
@@ -561,6 +562,12 @@
     #bthqnote { padding:7px 9px; border:1px solid rgba(255,210,122,.25); border-radius:6px; background:rgba(255,210,122,.07); color:#ffd27a!important; }
     #bthqlist { max-height:min(38vh,300px)!important; overflow:auto; scrollbar-width:thin; scrollbar-color:rgba(143,162,187,.4) transparent; }
     #bthqlist > div, #bthqlist label { padding:6px 8px!important; margin-bottom:3px; border-radius:6px; background:linear-gradient(90deg,rgba(90,140,255,.32),rgba(90,140,255,.08)); }
+    #bth #bthset { display:grid; place-items:center; width:32px; min-height:32px; height:32px; padding:0; border-color:rgba(229,72,77,.65); background:rgba(229,72,77,.16); }
+    #bth #bthset svg { width:20px; height:20px; fill:#e5484d; }
+    #bth #bthset:hover { background:rgba(229,72,77,.3); }
+    #bth #bthset.pick { background:#e5484d; border-color:#e5484d; animation:bthpick 1s ease-in-out infinite alternate; }
+    #bth #bthset.pick svg { fill:#fff; }
+    @keyframes bthpick { to { box-shadow:0 0 0 4px rgba(229,72,77,.35); } }
     #bthbar button { flex:none; width:24px; height:24px; min-height:24px; padding:0!important; border:1px solid rgba(255,255,255,.2)!important; border-radius:6px!important; background:rgba(42,53,80,.8)!important; color:#fff!important; font:600 12px/1 Kanit,system-ui,sans-serif!important; }
     #bthbar button:hover { background:rgba(62,78,115,.95)!important; }
     @media(max-width:420px) { #bth { width:min(300px,calc(100vw - 16px))!important; } .bth-potions { grid-template-columns:1fr; } }
@@ -583,9 +590,10 @@
    <div id="bth-pages">
      <section class="bth-section bth-page active" role="tabpanel" data-bth-page="farm">
        <div class="bth-section-title"><small>FARM</small><span>จุดฟาร์ม</span></div>
-       <div class="bth-map"><b id="bthmap"></b><button id="bthset" type="button">⌖ จำจุดนี้</button></div>
+       <div class="bth-map"><b id="bthmap"></b><button id="bthset" type="button" title="เลือกจุดฟาร์ม: เปิดแผนที่ใหญ่ แล้วแตะจุดที่จะฟาร์ม" aria-label="เลือกจุดฟาร์มบนแผนที่"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mob"/></svg></button></div>
        <label class="bth-inline" for="bthwait"><span>รอก่อนกลับมาเกิด</span><span><input id="bthwait" type="number" min="0" max="60"> วินาที</span></label>
        <label class="bth-switch"><input id="bthboss" type="checkbox"><span class="bth-switch-ui"></span><span>เจอ Boss / Mini-boss ในแมพ ไปตีก่อน</span></label>
+       <label class="bth-switch"><input id="bthmobicon" type="checkbox"><span class="bth-switch-ui"></span><span>แสดงรูปมอนบนมินิแมพ</span></label>
        <button id="bthrun" type="button" style="width:100%"></button>
      </section>
      <section class="bth-section bth-page" role="tabpanel" data-bth-page="return" hidden>
@@ -660,6 +668,80 @@
   // minimized: the title bar shows the bag weight (refreshed every 2 s)
   function showMini() { const m = $('#bthmini'); if (m) m.textContent = (cfg.panel || {}).min ? `น้ำหนัก ${weightPct()}%` : ''; }
   const miniTimer = setInterval(showMini, 2000);
+
+  // ---- monster pictures on the game's minimap (#minimap) and big map (#mmbigcv) instead of the red dots ----
+  // The game draws each live mob as a red circle (fillStyle #e85a4a) in the order of state.mobs. We record those
+  // circles per frame, fit tile -> canvas pixel from them, and draw the mob's own sprite on a canvas laid on top.
+  const MOB_DOT = '#e85a4a';
+  const hooked = [];
+  function hookMap(cv) {
+    const ctx = cv && cv.getContext('2d');
+    if (!ctx || ctx.__bthArc) return ctx;
+    const arc = ctx.arc, clear = ctx.clearRect;
+    ctx.__bthArc = arc; ctx.__bthClear = clear; ctx.__bthPts = []; ctx.__bthDraw = [];
+    ctx.arc = function (x, y) { if (this.fillStyle === MOB_DOT) this.__bthDraw.push([x, y]); return arc.apply(this, arguments); };
+    ctx.clearRect = function (x, y, w, h) { if (!x && !y && w === this.canvas.width) { this.__bthPts = this.__bthDraw; this.__bthDraw = []; } return clear.apply(this, arguments); };
+    hooked.push(ctx);
+    return ctx;
+  }
+  const unhookMaps = () => { for (const ctx of hooked.splice(0)) { ctx.arc = ctx.__bthArc; ctx.clearRect = ctx.__bthClear; delete ctx.__bthArc; } };
+  // least squares px = a*x + b over pairs
+  const fit = pairs => {
+    const n = pairs.length; if (n < 2) return null;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0;
+    for (const [x, y] of pairs) { sx += x; sy += y; sxx += x * x; sxy += x * y; }
+    const d = n * sxx - sx * sx; if (Math.abs(d) < 1e-6) return null;
+    const a = (n * sxy - sx * sy) / d; return { a, b: (sy - a * sx) / n };
+  };
+  const sprites = new Map(); // mobType -> Image (null while loading / missing)
+  function mobSprite(type) {
+    if (sprites.has(type)) return sprites.get(type);
+    sprites.set(type, null);
+    const tries = [`sprites/mob/${type}/idle/0.png`, `sprites/mob/${type}/walk/0.png`];
+    const img = new Image();
+    img.onload = () => sprites.set(type, img);
+    img.onerror = () => { const next = tries.shift(); if (next) img.src = next; };
+    img.src = tries.shift();
+    return null;
+  }
+  const overlays = new Map(); // game canvas -> our canvas
+  function overlayFor(cv) {
+    let o = overlays.get(cv);
+    if (!o) { o = document.createElement('canvas'); o.className = 'bth-mobmap'; o.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483000'; document.body.appendChild(o); overlays.set(cv, o); }
+    return o;
+  }
+  function drawMobIcons(cv, size) {
+    const o = overlayFor(cv), r = room(), ctx = hookMap(cv);
+    const rect = cv.getBoundingClientRect(), shown = cfg.mobIcons !== false && rect.width > 0 && cv.offsetParent !== null && r && r.state.mobs;
+    o.style.display = shown ? '' : 'none';
+    if (!shown || !ctx) return;
+    const live = []; r.state.mobs.forEach(m => { if (m.state !== 'dead') live.push(m); });
+    const pts = ctx.__bthPts.slice(0, live.length);
+    const fx = fit(pts.map((p, i) => [live[i].x, p[0]])), fy = fit(pts.map((p, i) => [live[i].y, p[1]]));
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    o.style.left = rect.left + 'px'; o.style.top = rect.top + 'px'; o.style.width = rect.width + 'px'; o.style.height = rect.height + 'px';
+    const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
+    if (o.width !== W || o.height !== H) { o.width = W; o.height = H; }
+    const g = o.getContext('2d');
+    g.clearRect(0, 0, W, H);
+    if (!fx || !fy) return;
+    g.imageSmoothingEnabled = false;
+    const kx = W / cv.width, ky = H / cv.height;
+    for (const m of live) {
+      const img = mobSprite(m.mobType); if (!img) continue;
+      const boss = BOSS_IDS.has(m.mobType) || MINIBOSS_IDS.has(m.mobType), s = (boss ? size * 1.6 : size) * dpr;
+      const x = (fx.a * m.x + fx.b) * kx, y = (fy.a * m.y + fy.b) * ky;
+      if (boss) { g.beginPath(); g.arc(x, y, s * 0.55, 0, Math.PI * 2); g.fillStyle = 'rgba(255,210,122,.35)'; g.fill(); g.lineWidth = 1.5 * dpr; g.strokeStyle = '#ffd27a'; g.stroke(); }
+      g.drawImage(img, Math.round(x - s / 2), Math.round(y - s / 2), s, s);
+    }
+  }
+  const mobMapTimer = setInterval(() => {
+    try {
+      const mm = $('#minimap'), big = $('#mmbigcv');
+      if (mm) drawMobIcons(mm, 13);
+      if (big) drawMobIcons(big, 24);
+    } catch (e) { /* map not ready */ }
+  }, 150);
   function miniPhaseText(t) {
     const farmWeight = t.match(/^ฟาร์ม\s*[·-]\s*น้ำหนัก\s*([^·]*)/);
     return farmWeight ? 'น้ำหนัก ' + farmWeight[1].trim() : t.slice(0, 24);
@@ -672,7 +754,7 @@
   }
   function render() {
     $('#bthmap').textContent = cfg.farmMap ? cfg.farmMap + (cfg.farmSpot ? ` (${cfg.farmSpot.x.toFixed(0)}, ${cfg.farmSpot.y.toFixed(0)})` : '') : '(ยังไม่ตั้ง)';
-    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthboss').checked = !!cfg.bossHunt;
+    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthboss').checked = !!cfg.bossHunt; $('#bthmobicon').checked = cfg.mobIcons !== false;
     for (const k of ['hp', 'mp']) { const b = (cfg.buy || {})[k] || {}; $(`#bth_${k}_item`).value = b.item; $(`#bth_${k}_min`).value = b.min || 0; $(`#bth_${k}_to`).value = b.to || 0; }
     $('#bthrun').textContent = cfg.running ? '■ หยุด' : '▶ เริ่ม';
     if (!cfg.running) setPhase('หยุดอยู่');
@@ -680,13 +762,33 @@
   const remember = () => {
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปยืนที่จุดฟาร์มก่อนแล้วกด "จำจุดนี้"`); return; }
     cfg.farmMap = mapName(); cfg.farmSpot = myPos(); save(); render(); log(cfg.farmSpot ? `จำจุดฟาร์ม ${cfg.farmMap} (${cfg.farmSpot.x.toFixed(1)}, ${cfg.farmSpot.y.toFixed(1)})` : 'จำแมพแล้ว แต่ยังอ่านพิกัดไม่ได้ — ขยับตัวแล้วกดใหม่'); };
-  $('#bthset').onclick = remember;
+  // pick the farm spot on the game's big map: a tap there makes the game send moveTo {x, y} -> that is the new spot
+  const bigMapOpen = () => { const m = $('#mmbig'); return !!m && !m.hidden; };
+  let pickUntil = 0;
+  const setPick = on => { pickUntil = on ? Date.now() + 60e3 : 0; $('#bthset').classList.toggle('pick', on); };
+  window.__bthSendHook = (type, msg) => {
+    if (!pickUntil || type !== 'input' || !msg || msg.type !== 'moveTo' || !bigMapOpen()) return;
+    setPick(false);
+    if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปแมพฟาร์มก่อนแล้วเลือกจุดใหม่`); return; }
+    cfg.farmMap = mapName(); cfg.farmSpot = { x: +(+msg.x).toFixed(2), y: +(+msg.y).toFixed(2) };
+    log(`ตั้งจุดฟาร์ม ${cfg.farmMap} (${cfg.farmSpot.x.toFixed(1)}, ${cfg.farmSpot.y.toFixed(1)}) — เดินไปฟาร์ม`);
+    cfg.running = true; startCheck = true; stoppedLogged = false; save(); render();
+  };
+  setInterval(() => { if (pickUntil && Date.now() > pickUntil) { setPick(false); log('ยกเลิกเลือกจุดฟาร์ม (เกิน 60 วิ)'); } }, 1000);
+  $('#bthset').onclick = () => {
+    if (pickUntil) { setPick(false); if (bigMapOpen()) click($('#mmbigx'), 'ปิดแผนที่ใหญ่'); log('ยกเลิกเลือกจุดฟาร์ม'); return; }
+    if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปแมพฟาร์มก่อนแล้วเลือกจุด`); return; }
+    setPick(true);
+    if (!bigMapOpen()) { const mm = $('#minimap'); if (mm) mm.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse', button: 0 })); }
+    log('แตะจุดบนแผนที่ใหญ่ที่จะฟาร์ม');
+  };
   $('#bthtown').onchange = e => { cfg.town = e.target.value; save(); log('เมืองขาย: ' + cfg.town); };
   $('#bthpct').onchange = e => { cfg.sellPct = Math.max(10, Math.min(100, +e.target.value || 95)); save(); };
   $('#bthwait').onchange = e => { cfg.deathWaitMs = Math.max(0, +e.target.value || 0) * 1000; save(); };
   $('#bthquiet').onchange = e => { cfg.quietCh = e.target.checked; save(); };
   $('#bthlead').onchange = e => { cfg.followLeader = e.target.checked; save(); };
   $('#bthboss').onchange = e => { cfg.bossHunt = e.target.checked; save(); };
+  $('#bthmobicon').onchange = e => { cfg.mobIcons = e.target.checked; save(); };
   for (const k of ['hp', 'mp']) {
     const upd = () => {
       const min = Math.max(0, +$(`#bth_${k}_min`).value || 0), to = Math.max(min, +$(`#bth_${k}_to`).value || 0);
@@ -744,7 +846,7 @@
   const timer = setInterval(tick, 1000);
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); box.remove(); uiStyle.remove(); delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); delete window.__bthSendHook; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
