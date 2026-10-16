@@ -1007,7 +1007,8 @@
     const ch = chOf(room());
     const left = Math.max(0, CH_CHECK_MS - (Date.now() - chCheckAt));
     const next = !cfg.running ? 'helper หยุดอยู่' : !(cfg.quietCh || cfg.followLeader) ? 'ปิดการเลือก CH'
-      : inCombat() ? 'ติดต่อสู้' : `เช็คอีก ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}`;
+      // farming with AUTO = in combat most of the time; that's normal, a switch only waits for a gap in the fight
+      : `เช็คอีก ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}${inCombat() ? ' · ⚔ กำลังสู้ (ย้าย CH จะรอจังหวะว่าง)' : ''}`;
     const html = `<b>CH ${ch || '?'}</b> · ${next}${chLast ? `<br><small>ล่าสุด: ${chLast}</small>` : ''}`;
     if (el.innerHTML !== html) el.innerHTML = html;
   };
