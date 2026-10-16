@@ -6,7 +6,8 @@
 //  • on ▶ and on every return to the farm map: the party leader's channel if the leader is on this map,
 //    else the safe channel with the fewest players (never PvP CH10); re-checked every 5 min while farming
 //  • the game's channel menu shows the player count of each channel on the right of its row
-//  • channel switches and town warps wait until combat is over (the game refuses both in combat)
+//  • the game refuses channel switches and warps in combat: the 5-min check only switches in a natural gap of the fight
+//    (AUTO stays on); town warps wait for combat to end (AUTO fights back only while hit, 60 s max)
 //  • bounty window (🎯 ค่าหัว): today's bounties you can reach → each one: its map, AUTO targets = that mob only,
 //    farm area = whole map, claim when done → next; at the end AUTO settings go back and you return to the farm spot
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
@@ -627,11 +628,14 @@
         if (g === farmGen) setAuto(true); // new spot picked meanwhile -> the next tick walks there
       } else if (cfg.bossHunt && (boss = findBoss())) {
         await fightBoss(boss);
-      } else if ((cfg.quietCh || cfg.followLeader) && Date.now() - chCheckAt >= CH_CHECK_MS) {
-        // every 5 min while farming: re-check the channels, switch only if a quieter one (or the leader's) is found
-        chCheckAt = Date.now();
+      } else if ((cfg.quietCh || cfg.followLeader) && Date.now() - chCheckAt >= CH_CHECK_MS && !inCombat()) {
+        // every 5 min while farming, in a natural gap of the fight (nothing hit for 5 s, e.g. AUTO walking to the
+        // next mob): re-check the channels, switch only if a quieter one (or the leader's) is found. AUTO is never
+        // turned off to force a gap (mobs attack anyway); without a gap the channel is re-picked after the next town trip.
         const p = await pickChannel(true);
-        if (p) {
+        if (!p) chCheckAt = Date.now();
+        else if (!inCombat() && !(p.lock && p.lock.ms > 0)) {
+          chCheckAt = Date.now();
           setAuto(false); setPhase('ย้าย CH');
           const r = room(), g = farmGen;
           if (r && await switchTo(r, chOf(r), p.ch, p.lock, p.why)) { setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(cfg.farmSpot, () => g === farmGen); await sleep(500); }
@@ -760,8 +764,8 @@
        <div class="bth-note bth-subnote">หัวตี้ออนไลน์และอยู่แมพเดียวกัน → ย้ายไป CH เดียวกับหัวตี้ · ถ้าหัวตี้อยู่ CH PvP จะไม่ตาม</div>
        <label class="bth-switch"><input id="bthquiet" type="checkbox"><span class="bth-switch-ui"></span><span>ถ้าไม่เจอ ให้เลือก Channel คนน้อยสุด</span></label>
        <div class="bth-note bth-subnote">นับคนอื่นในแมพนี้ของแต่ละ CH · ย้ายเมื่อเจอ CH ที่คนน้อยกว่าจริง · คนเท่ากันเลือก CH ที่ทั้ง CH คนน้อยกว่า · ข้าม CH เต็ม (แมพ 40 / ทั้ง CH 300 คน)</div>
-       <div class="bth-note"><b>เลือก CH เมื่อ</b> กด ▶ · กลับมาแมพฟาร์ม (หลังตาย / เข้าเมือง / ค่าหัว) · ทุก 5 นาทีระหว่างฟาร์ม (ย้ายแล้วเดินกลับจุดฟาร์ม)</div>
-       <div class="bth-note"><b>ติดต่อสู้</b> รอให้หลุดก่อนย้าย CH และก่อนวาป (AUTO สู้กลับเฉพาะตอนโดนตี) · เกิน 60 วิ: ข้ามย้าย CH รอบนั้น / วาปไม่ได้ก็เดินเข้าเมือง</div>
+       <div class="bth-note"><b>เลือก CH เมื่อ</b> กด ▶ · กลับมาแมพฟาร์ม (หลังตาย / เข้าเมือง / ค่าหัว) · ทุก 5 นาทีระหว่างฟาร์ม ตอนว่างจากการต่อสู้ ≥5 วิ (ย้ายแล้วเดินกลับจุดฟาร์ม)</div>
+       <div class="bth-note"><b>ติดต่อสู้</b> เช็ค 5 นาทีไม่ปิด AUTO — ฟาร์มต่อจนมีจังหวะว่าง ไม่มีก็เลือกใหม่ตอนกลับจากเมือง · ก่อนวาป: รอให้หลุด (AUTO สู้กลับเฉพาะตอนโดนตี) เกิน 60 วิเดินเข้าเมืองแทน</div>
        <div class="bth-note">ไม่เลือก CH PvP (CH10) · เมนู Channel ของเกมแสดงจำนวนคนในแมพทางขวาของแต่ละแถว</div>
      </section>
      <section class="bth-section bth-page" role="tabpanel" data-bth-page="bounty" hidden>
@@ -1008,7 +1012,8 @@
     const left = Math.max(0, CH_CHECK_MS - (Date.now() - chCheckAt));
     const next = !cfg.running ? 'helper หยุดอยู่' : !(cfg.quietCh || cfg.followLeader) ? 'ปิดการเลือก CH'
       // farming with AUTO = in combat most of the time; that's normal, a switch only waits for a gap in the fight
-      : `เช็คอีก ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}${inCombat() ? ' · ⚔ กำลังสู้ (ย้าย CH จะรอจังหวะว่าง)' : ''}`;
+      : left === 0 ? '⚔ ถึงรอบเช็คแล้ว — รอจังหวะว่างจากการต่อสู้ (หรือเลือกใหม่ตอนกลับจากเมือง)'
+      : `เช็คอีก ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}${inCombat() ? ' · ⚔ กำลังสู้' : ''}`;
     const html = `<b>CH ${ch || '?'}</b> · ${next}${chLast ? `<br><small>ล่าสุด: ${chLast}</small>` : ''}`;
     if (el.innerHTML !== html) el.innerHTML = html;
   };
