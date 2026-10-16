@@ -257,13 +257,15 @@
     'aurora_antler_regent', 'tempest_kite_empress', 'opal_weaver_queen']);
   const MINIBOSS_IDS = new Set(['vale_keeper', 'dusk_herald', 'sky_sentinel']);
   const bossSkip = new Map(); // mob key -> ignore until (gave up on it)
-  const mobAlive = m => !!m && m.state !== 'dead' && m.state !== 'return' && m.hp > 0 && !m.ownerId;
-  const getMob = key => { const r = room(); const m = r && r.state.mobs && r.state.mobs.get(key); return mobAlive(m) ? m : null; };
+  // the server only sends mobs within ~30 tiles; a boss that leashes back has state "return" (still alive, AUTO skips it)
+  const mobAlive = m => !!m && m.state !== 'dead' && m.hp > 0 && !m.ownerId;
+  const rawMob = key => { const r = room(); return (r && r.state.mobs && r.state.mobs.get(key)) || null; };
+  const getMob = key => { const m = rawMob(key); return mobAlive(m) ? m : null; };
   function findBoss() {
     const r = room(), me = myPos(); if (!r || !r.state.mobs || !me) return null;
     let best = null;
     r.state.mobs.forEach((m, key) => {
-      if (!mobAlive(m) || !(BOSS_IDS.has(m.mobType) || MINIBOSS_IDS.has(m.mobType)) || (bossSkip.get(key) || 0) > Date.now()) return;
+      if (!mobAlive(m) || m.state === 'return' || !(BOSS_IDS.has(m.mobType) || MINIBOSS_IDS.has(m.mobType)) || (bossSkip.get(key) || 0) > Date.now()) return;
       const d = dist(me, m);
       if (!best || d < best.d) best = { key, type: m.mobType, boss: BOSS_IDS.has(m.mobType), d };
     });
@@ -278,37 +280,67 @@
     click(c.b, 'เปิดเป้าหมาย ' + c.name); await sleep(200);
     return true;
   }
-  async function walkToMob(key, near) {
+  // press AUTO until the game shows it on (a press right after moving can be swallowed)
+  async function autoOnSure() {
+    for (let i = 0; i < 4 && cfg.running && !isDead(); i++) {
+      if (autoOn()) return true;
+      setAuto(true); await sleep(1200);
+    }
+    if (!autoOn()) log('เปิด AUTO ไม่ติด');
+    return autoOn();
+  }
+  // walk next to the boss; target = live position, or the last one seen while it is out of view
+  async function walkToMob(key, near, last) {
     const deadline = Date.now() + 120e3;
     let lastSend = 0;
     while (Date.now() < deadline && cfg.running && !isDead()) {
       const m = getMob(key), p = myPos(), r = room();
-      if (!m) return false;
-      if (p && dist(p, m) <= near) return true;
-      if (r && Date.now() - lastSend > 2500) { lastSend = Date.now(); r.send('input', { type: 'moveTo', x: m.x, y: m.y }); }
+      if (m) { last.x = m.x; last.y = m.y; }
+      else if (rawMob(key)) return false; // seen dead
+      if (p && dist(p, last) <= near) return true;
+      if (r && Date.now() - lastSend > 2500) { lastSend = Date.now(); r.send('input', { type: 'moveTo', x: last.x, y: last.y }); }
       await sleep(500);
     }
     return false;
   }
   async function fightBoss(b) {
     const label = `${b.boss ? 'Boss' : 'Mini-boss'} ${b.type}`;
+    const m0 = getMob(b.key), last = { x: m0 ? m0.x : 0, y: m0 ? m0.y : 0 };
     log(`เจอ ${label} ห่าง ${b.d.toFixed(0)} ช่อง — หยุดฟาร์มไปตีก่อน`);
     setPhase('ไปตี ' + label);
     setAuto(false); await sleep(500);
     const toggled = await allowInAuto(b.type);
     const deadline = Date.now() + 10 * 60e3;
-    let killed = false;
+    let killed = false, goneAt = 0, hpSeen = Infinity, hpDropAt = Date.now(), lastHit = 0;
     while (Date.now() < deadline && cfg.running && !isDead()) {
-      if (!getMob(b.key)) { killed = true; break; }
-      const p = myPos(), m = getMob(b.key);
-      // AUTO only fights inside its area around where it was switched on -> (re)start it next to the boss
-      if (!autoOn() || (p && m && dist(p, m) > 10)) {
-        setAuto(false);
-        if (!await walkToMob(b.key, 4)) { killed = !getMob(b.key); break; }
-        setAuto(true);
+      const m = getMob(b.key), p = myPos(), r = room();
+      if (!m) {
+        if (rawMob(b.key)) { killed = true; break; }        // still listed but dead
+        // not in view: died and was removed, or left our ~30 tile view -> go to where it was last seen
+        if (p && dist(p, last) > 8) { setAuto(false); setPhase(`ตาม ${label} (หลุดระยะ)`); await walkToMob(b.key, 6, last); goneAt = 0; continue; }
+        if (!goneAt) goneAt = Date.now();
+        if (Date.now() - goneAt > 4000) { killed = true; break; } // standing where it was and it is gone
+        await sleep(500); continue;
       }
-      setPhase(`ตี ${label} · HP ${m ? Math.round(m.hp) : 0}`);
-      await sleep(1000);
+      goneAt = 0; last.x = m.x; last.y = m.y;
+      if (m.hp < hpSeen) { hpSeen = m.hp; hpDropAt = Date.now(); }
+      const d = p ? dist(p, m) : 0;
+      if (d > 10) { // AUTO only fights inside its area around where it was switched on -> (re)start it next to the boss
+        setAuto(false); setPhase('เดินไปหา ' + label);
+        await walkToMob(b.key, 4, last);
+        hpDropAt = Date.now();
+        continue;
+      }
+      if (m.state === 'return') { setPhase(`${label} กำลังวิ่งกลับ — รอ`); await sleep(1000); continue; }
+      if (!autoOn()) await autoOnSure();
+      // AUTO is on but the boss is not losing HP (AUTO busy with other mobs or skipping it) -> attack it ourselves
+      if (r && Date.now() - hpDropAt > 6000 && d <= 8 && Date.now() - lastHit > 900) {
+        if (!lastHit || Date.now() - lastHit > 10000) log(`AUTO ไม่ตี ${label} — สั่งตีบอสเอง`);
+        lastHit = Date.now();
+        r.send('input', { type: 'attack', x: m.x, y: m.y });
+      }
+      setPhase(`ตี ${label} · HP ${Math.round(m.hp)}/${Math.round(m.maxHp || m.hp)}`);
+      await sleep(500);
     }
     if (toggled) { // put the chip back the way you had it
       setAuto(false); refreshAutoUi(); await sleep(400);
@@ -320,7 +352,7 @@
     else { bossSkip.set(b.key, Date.now() + 5 * 60e3); log(`ตี ${label} ไม่จบใน 10 นาที — ข้ามตัวนี้ 5 นาที แล้วกลับจุดฟาร์ม`); }
     setAuto(false);
     if (mapName() === cfg.farmMap) { setPhase('กลับจุดฟาร์ม'); await walkToSpot(cfg.farmSpot); await sleep(500); }
-    setAuto(true);
+    await autoOnSure();
   }
 
   // ---- pressing the game's buttons ----
