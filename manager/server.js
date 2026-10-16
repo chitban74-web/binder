@@ -115,7 +115,7 @@ const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'appli
 
 function statusBody() {
   return {
-    update,
+    update: { ...update, main: IS_MAIN, autoPull: AUTO_PULL },
     browsers: Object.entries(BROWSERS).map(([key, b]) => ({
       key, name: b.name, port: b.port, installed: !!exeOf(key), running: !!browserUp[key],
       tabs: [...tabs.values()].filter(t => t.browser === key).map(t => ({ id: t.id, title: t.title, state: t.state, status: t.status })),
@@ -143,7 +143,7 @@ const server = http.createServer(async (req, res) => {
       if (m[2] === 'toggle') { await t.tab.eval(`window.__bth ? (window.__bth.toggle(), window.__bth.cfg.running) : null`); return json(res, 200, { ok: true }); }
       await reloadHelper(t); return json(res, 200, { ok: true, msg: 'โหลด helper ใหม่แล้ว' });
     }
-    if (url.pathname === '/api/update/check') return json(res, 200, { ok: true, update: await checkUpdate(true) });
+    if (url.pathname === '/api/update/check') return json(res, 200, { ok: true, update: { ...await checkUpdate(true), main: IS_MAIN, autoPull: AUTO_PULL } });
     if (url.pathname === '/api/update/pull') return json(res, 200, await pullUpdate());
     return json(res, 404, { error: 'not found' });
   } catch (e) { return json(res, 500, { ok: false, msg: e.message }); }
