@@ -11,9 +11,11 @@ const { GAME_URL, ROOT, BROWSERS, exeOf, targets, openBrowser, Tab } = require('
 const PORT = +process.env.BINDER_PORT || 3889;
 const HELPER = path.join(ROOT, 'helper', 'binder_helper.js');
 const PUBLIC = path.join(__dirname, 'public');
-const CHECK_MS = 3000, UPDATE_CHECK_MS = 10 * 60e3;
-// off: no git fetch at startup or on a timer; check / pull only from the web buttons
-const AUTO_UPDATE_CHECK = process.env.BINDER_AUTO_UPDATE === '1';
+const CHECK_MS = 3000, UPDATE_CHECK_MS = 3 * 60e3;
+// main machine (has the git-ignored file .binder-main): pushes, never fetches / pulls by itself.
+// every other machine follows it: fetch every 3 minutes and pull as soon as there is a new commit.
+const IS_MAIN = fs.existsSync(path.join(ROOT, '.binder-main'));
+const AUTO_PULL = !IS_MAIN && process.env.BINDER_AUTO_UPDATE !== '0';
 const RESTART_CODE = 3;
 
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
@@ -151,7 +153,14 @@ const server = http.createServer(async (req, res) => {
   if (typeof WebSocket !== 'function' || typeof fetch !== 'function') { log('Node รุ่นนี้เก่าเกินไป (ต้อง 22 ขึ้นไป)'); process.exit(1); }
   server.on('error', e => { log(e.code === 'EADDRINUSE' ? `port ${PORT} ถูกใช้อยู่ — เปิดตัวจัดการซ้ำอยู่หรือเปล่า?` : e.message); process.exit(1); });
   server.listen(PORT, '127.0.0.1', () => log(`ตัวจัดการ Binder Town: http://localhost:${PORT}`));
-  checkUpdate(AUTO_UPDATE_CHECK).then(u => { if (u.behind) log(`มีอัปเดตใหม่ ${u.behind} commit — กดอัปเดตในหน้าเว็บ`); });
-  if (AUTO_UPDATE_CHECK) setInterval(() => checkUpdate(true), UPDATE_CHECK_MS);
+  if (IS_MAIN) log('เครื่องหลัก (.binder-main) — ไม่ pull อัตโนมัติ');
+  const autoPull = async () => {
+    const u = await checkUpdate(true);
+    if (!u.behind) return;
+    const r = await pullUpdate();
+    log(r.ok ? 'อัปเดตอัตโนมัติ: ' + r.msg : 'อัปเดตอัตโนมัติไม่สำเร็จ: ' + r.msg);
+  };
+  if (AUTO_PULL) { autoPull(); setInterval(() => autoPull().catch(e => log('อัปเดตอัตโนมัติ error: ' + e.message)), UPDATE_CHECK_MS); }
+  else checkUpdate(false);
   loop();
 })();

@@ -7,3 +7,5 @@ data/
 node_modules/
 *.zip
 *.log
+# marks the main machine (pushes, never auto-pulls) - local only
+.binder-main
