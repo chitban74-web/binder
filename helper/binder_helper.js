@@ -4,10 +4,9 @@
 //  • died → wait deathWaitMs → respawn in town → (sell if weight >= sellAfterDeathPct) → back to farm map → saved spot → AUTO on
 //  • potion on the belt below its minimum → town → walk to the merchant → buy up to the target (vendorBuy, max 99 each)
 //  • on ▶ and on every return to the farm map: the party leader's channel if the leader is on this map,
-//    else the safe channel with the fewest players (never PvP CH10); re-checked every 5 min while farming
+//    else the safe channel with the fewest players (never PvP CH10)
 //  • the game's channel menu shows the player count of each channel on the right of its row
-//  • the game refuses channel switches and warps in combat: the 5-min check only switches in a natural gap of the fight
-//    (AUTO stays on); town warps wait for combat to end (AUTO fights back only while hit, 60 s max)
+//  • the game refuses channel switches and warps in combat: both wait for combat to end (AUTO fights back only while hit, 60 s max)
 //  • bounty window (🎯 ค่าหัว): today's bounties you can reach → each one: its map, AUTO targets = that mob only,
 //    farm area = whole map, claim when done → next; at the end AUTO settings go back and you return to the farm spot
 //  • elite spawn points (34 elites, 28 maps): purple skull on the minimap; skull + dashed area + name/level on the big map
@@ -202,7 +201,7 @@
     log('ย้าย CH ไม่สำเร็จ — อยู่ CH เดิม');
     return false;
   }
-  // the channel to switch to: { ch, why, lock }, or null to stay (quiet = no log when staying; used by the 5-min check)
+  // the channel to switch to: { ch, why, lock }, or null to stay (quiet = no log when staying)
   async function pickChannel(quiet) {
     const say = t => { chLast = t; if (!quiet) log(t); };
     const r = room(); const cur = chOf(r); if (!r || !cur) return null;
@@ -232,11 +231,9 @@
     chLast = `ย้ายไป CH${best} (คนน้อยกว่า: ${others(cur)} → ${others(best)} คน)`;
     return { ch: best, why: `คนน้อยสุด: ${others(cur)} → ${others(best)} คน`, lock: info.lock };
   }
-  const CH_CHECK_MS = 5 * 60 * 1000;
-  let chCheckAt = 0, chLast = '';
+  let chLast = '';
   async function moveToQuietChannel() {
     if (!cfg.quietCh && !cfg.followLeader) return;
-    chCheckAt = Date.now();
     const p = await pickChannel();
     const r = room();
     if (p && r) await switchTo(r, chOf(r), p.ch, p.lock, p.why);
@@ -629,19 +626,6 @@
         if (g === farmGen) setAuto(true); // new spot picked meanwhile -> the next tick walks there
       } else if (cfg.bossHunt && (boss = findBoss())) {
         await fightBoss(boss);
-      } else if ((cfg.quietCh || cfg.followLeader) && Date.now() - chCheckAt >= CH_CHECK_MS && !inCombat()) {
-        // every 5 min while farming, in a natural gap of the fight (nothing hit for 5 s, e.g. AUTO walking to the
-        // next mob): re-check the channels, switch only if a quieter one (or the leader's) is found. AUTO is never
-        // turned off to force a gap (mobs attack anyway); without a gap the channel is re-picked after the next town trip.
-        const p = await pickChannel(true);
-        if (!p) chCheckAt = Date.now();
-        else if (!inCombat() && !(p.lock && p.lock.ms > 0)) {
-          chCheckAt = Date.now();
-          setAuto(false); setPhase('ย้าย CH');
-          const r = room(), g = farmGen;
-          if (r && await switchTo(r, chOf(r), p.ch, p.lock, p.why)) { setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(cfg.farmSpot, () => g === farmGen); await sleep(500); }
-          setAuto(true);
-        }
       } else {
         const pots = potionPlans().filter(p => p.have !== null).map(p => `${potName(p.item)} ${p.have}`).join(' · ');
         setPhase(`ฟาร์ม · น้ำหนัก ${weightPct()}%${pots ? ' · ' + pots : ''}`);
@@ -765,8 +749,8 @@
        <div class="bth-note bth-subnote">หัวตี้ออนไลน์และอยู่แมพเดียวกัน → ย้ายไป CH เดียวกับหัวตี้ · ถ้าหัวตี้อยู่ CH PvP จะไม่ตาม</div>
        <label class="bth-switch"><input id="bthquiet" type="checkbox"><span class="bth-switch-ui"></span><span>ถ้าไม่เจอ ให้เลือก Channel คนน้อยสุด</span></label>
        <div class="bth-note bth-subnote">นับคนอื่นในแมพนี้ของแต่ละ CH · ย้ายเมื่อเจอ CH ที่คนน้อยกว่าจริง · คนเท่ากันเลือก CH ที่ทั้ง CH คนน้อยกว่า · ข้าม CH เต็ม (แมพ 40 / ทั้ง CH 300 คน)</div>
-       <div class="bth-note"><b>เลือก CH เมื่อ</b> กด ▶ · กลับมาแมพฟาร์ม (หลังตาย / เข้าเมือง / ค่าหัว) · ทุก 5 นาทีระหว่างฟาร์ม ตอนว่างจากการต่อสู้ ≥5 วิ (ย้ายแล้วเดินกลับจุดฟาร์ม)</div>
-       <div class="bth-note"><b>ติดต่อสู้</b> เช็ค 5 นาทีไม่ปิด AUTO — ฟาร์มต่อจนมีจังหวะว่าง ไม่มีก็เลือกใหม่ตอนกลับจากเมือง · ก่อนวาป: รอให้หลุด (AUTO สู้กลับเฉพาะตอนโดนตี) เกิน 60 วิเดินเข้าเมืองแทน</div>
+       <div class="bth-note"><b>เลือก CH เมื่อ</b> เข้าแมพฟาร์ม: กด ▶ · กลับมาแมพฟาร์ม (หลังตาย / เข้าเมือง / ค่าหัว) — ระหว่างฟาร์มไม่ย้าย CH</div>
+       <div class="bth-note"><b>ติดต่อสู้</b> รอให้หลุดก่อนย้าย CH และก่อนวาป (AUTO สู้กลับเฉพาะตอนโดนตี) · เกิน 60 วิ: ไม่ย้าย CH รอบนั้น / วาปไม่ได้ก็เดินเข้าเมือง</div>
        <div class="bth-note">ไม่เลือก CH PvP (CH10) · เมนู Channel ของเกมแสดงจำนวนคนในแมพทางขวาของแต่ละแถว</div>
      </section>
      <section class="bth-section bth-page" role="tabpanel" data-bth-page="bounty" hidden>
@@ -1050,15 +1034,11 @@
   };
   render();
   const timer = setInterval(tick, 1000);
-  // Channel tab: current channel, when the next 5-min check runs, and what the last check decided
+  // Channel tab: current channel and what the last channel pick decided
   const showChInfo = () => {
     const el = $('#bthchinfo'); if (!el) return;
     const ch = chOf(room());
-    const left = Math.max(0, CH_CHECK_MS - (Date.now() - chCheckAt));
-    const next = !cfg.running ? 'helper หยุดอยู่' : !(cfg.quietCh || cfg.followLeader) ? 'ปิดการเลือก CH'
-      // farming with AUTO = in combat most of the time; that's normal, a switch only waits for a gap in the fight
-      : left === 0 ? '⚔ ถึงรอบเช็คแล้ว — รอจังหวะว่างจากการต่อสู้ (หรือเลือกใหม่ตอนกลับจากเมือง)'
-      : `เช็คอีก ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}${inCombat() ? ' · ⚔ กำลังสู้' : ''}`;
+    const next = !cfg.running ? 'helper หยุดอยู่' : !(cfg.quietCh || cfg.followLeader) ? 'ปิดการเลือก CH' : 'เลือก CH ตอนเข้าแมพฟาร์ม';
     const html = `<b>CH ${ch || '?'}</b> · ${next}${chLast ? `<br><small>ล่าสุด: ${chLast}</small>` : ''}`;
     if (el.innerHTML !== html) el.innerHTML = html;
   };
