@@ -593,7 +593,7 @@
        <div class="bth-map"><b id="bthmap"></b><button id="bthset" type="button" title="เลือกจุดฟาร์ม: เปิดแผนที่ใหญ่ แล้วแตะจุดที่จะฟาร์ม" aria-label="เลือกจุดฟาร์มบนแผนที่"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mob"/></svg></button></div>
        <label class="bth-inline" for="bthwait"><span>รอก่อนกลับมาเกิด</span><span><input id="bthwait" type="number" min="0" max="60"> วินาที</span></label>
        <label class="bth-switch"><input id="bthboss" type="checkbox"><span class="bth-switch-ui"></span><span>เจอ Boss / Mini-boss ในแมพ ไปตีก่อน</span></label>
-       <label class="bth-switch"><input id="bthmobicon" type="checkbox"><span class="bth-switch-ui"></span><span>แสดงรูปมอนบนมินิแมพ</span></label>
+       <label class="bth-switch" id="bthmobiconrow"><input id="bthmobicon" type="checkbox"><span class="bth-switch-ui"></span><span>แสดงรูปมอนบนมินิแมพ</span></label>
        <button id="bthrun" type="button" style="width:100%"></button>
      </section>
      <section class="bth-section bth-page" role="tabpanel" data-bth-page="return" hidden>
@@ -672,6 +672,7 @@
   // ---- monster pictures on the game's minimap (#minimap) and big map (#mmbigcv) instead of the red dots ----
   // The game draws each live mob as a red circle (fillStyle #e85a4a) in the order of state.mobs. We record those
   // circles per frame, fit tile -> canvas pixel from them, and draw the mob's own sprite on a canvas laid on top.
+  const MOB_ICONS = false; // off for now: set true to turn the feature (and its switch on the farm tab) back on
   const MOB_DOT = '#e85a4a';
   const hooked = [];
   function hookMap(cv) {
@@ -735,7 +736,7 @@
       g.drawImage(img, Math.round(x - s / 2), Math.round(y - s / 2), s, s);
     }
   }
-  const mobMapTimer = setInterval(() => {
+  const mobMapTimer = MOB_ICONS && setInterval(() => {
     try {
       const mm = $('#minimap'), big = $('#mmbigcv');
       if (mm) drawMobIcons(mm, 13);
@@ -788,6 +789,7 @@
   $('#bthquiet').onchange = e => { cfg.quietCh = e.target.checked; save(); };
   $('#bthlead').onchange = e => { cfg.followLeader = e.target.checked; save(); };
   $('#bthboss').onchange = e => { cfg.bossHunt = e.target.checked; save(); };
+  if (!MOB_ICONS) $('#bthmobiconrow').style.display = 'none';
   $('#bthmobicon').onchange = e => { cfg.mobIcons = e.target.checked; save(); };
   for (const k of ['hp', 'mp']) {
     const upd = () => {
