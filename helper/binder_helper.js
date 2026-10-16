@@ -477,58 +477,61 @@
   const uiStyle = document.createElement('style');
   uiStyle.id = 'bth-style';
   uiStyle.textContent = `
-    #bth { box-sizing:border-box; width:320px!important; max-width:calc(100vw - 16px); max-height:82vh; padding:0!important; overflow:hidden; border:1px solid rgba(157,186,216,.24); border-radius:14px!important; background:linear-gradient(155deg,rgba(22,31,44,.98),rgba(12,18,28,.98))!important; color:#eaf1fb!important; font:13px/1.45 "Kanit",system-ui,sans-serif!important; box-shadow:0 18px 48px rgba(0,0,0,.5),inset 0 1px rgba(255,255,255,.06)!important; backdrop-filter:blur(14px); }
-    #bthbar { box-sizing:border-box; display:flex; align-items:center; gap:9px; min-height:48px; margin:0!important; padding:9px 12px!important; border-radius:0!important; border-bottom:1px solid rgba(180,205,232,.12); background:linear-gradient(110deg,#233c50,#202b3b)!important; color:#f5f8ff; }
-    #bthbar b { flex:1; font-size:14px; letter-spacing:.25px; }
-    #bthbar::before { content:"BT"; display:grid; place-items:center; width:27px; height:27px; border:1px solid rgba(127,216,174,.42); border-radius:8px; background:rgba(127,216,174,.12); color:#a9edcd; font:700 10px "Kanit",sans-serif; }
-    #bthmini { box-sizing:border-box; display:flex; flex:none; align-items:center; justify-content:flex-end; width:92px; height:29px; min-width:0; margin-left:auto; overflow:hidden; color:#b9f0d5!important; font-size:12px; font-weight:700; line-height:1; text-align:right; text-overflow:ellipsis; white-space:nowrap; transform:translateY(2px); }
-    #bthbody { display:grid; gap:9px; max-height:calc(82vh - 48px); overflow:auto; padding:11px; scrollbar-width:thin; scrollbar-color:#52647a transparent; }
-    #bth #bthbody { display:grid; gap:0; max-height:calc(82vh - 48px); overflow:auto; padding:0; }
-    #bth-tabs { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; padding:8px 10px 0; }
-    #bth .bth-tab { min-height:30px; padding:4px 3px; border-color:transparent; background:transparent; color:#9eafc1; font-size:10px; }
-    #bth .bth-tab[aria-selected="true"] { border-color:rgba(127,216,174,.23); background:rgba(127,216,174,.12); color:#b8f0d3; }
-    #bth-pages { padding:8px 10px; }
+    /* colours and font taken from the game's own windows (boss DPS meter): Kanit, navy glass, gold title, blue active tab */
+    #bth { box-sizing:border-box; width:300px!important; max-width:calc(100vw - 16px); max-height:82vh; padding:0!important; overflow:hidden; border:1px solid rgba(255,255,255,.14); border-radius:10px!important; background:rgba(12,20,32,.86)!important; color:#fff!important; font:500 11.5px/1.45 Kanit,"Noto Sans Thai",system-ui,sans-serif!important; box-shadow:0 10px 30px rgba(0,0,0,.45)!important; backdrop-filter:blur(8px); }
+    #bthbar { box-sizing:border-box; display:flex; align-items:center; gap:7px; min-height:38px; margin:0!important; padding:6px 8px 6px 10px!important; border-radius:0!important; border-bottom:1px solid rgba(255,255,255,.1); background:transparent!important; color:#fff; }
+    #bthbar::before { content:"⠿"; color:#8fa2bb; font-size:12px; }
+    #bthbar b { flex:1; color:#ffd27a; font-size:12.5px; font-weight:600; }
+    #bthmini { box-sizing:border-box; display:flex; flex:none; align-items:center; justify-content:flex-end; max-width:110px; min-width:0; margin-left:auto; overflow:hidden; color:#9fd0ff!important; font-size:11.5px; font-weight:600; line-height:1; text-overflow:ellipsis; white-space:nowrap; }
+    #bthbody { display:grid; gap:8px; max-height:calc(82vh - 38px); overflow:auto; padding:8px; scrollbar-width:thin; scrollbar-color:rgba(143,162,187,.4) transparent; }
+    #bth #bthbody { display:grid; gap:0; max-height:calc(82vh - 38px); overflow:auto; padding:0; }
+    #bth-tabs { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; padding:8px 8px 0; }
+    #bth .bth-tab { min-height:26px; padding:3px 2px; border:1px solid rgba(255,255,255,.14); border-radius:6px; background:rgba(255,255,255,.06); color:#b9c8da; font-size:11px; font-weight:600; }
+    #bth .bth-tab:hover { background:rgba(255,255,255,.12); color:#fff; }
+    #bth .bth-tab[aria-selected="true"] { border-color:#2f74e0; background:#2f74e0; color:#fff; }
+    #bth-pages { padding:8px; }
     #bth .bth-page { display:none; }
     #bth .bth-page.active { display:grid; }
-    #bth button { box-sizing:border-box; min-height:32px; border:1px solid rgba(155,185,217,.2); border-radius:8px; padding:6px 10px; background:#26374a; color:#edf4ff; font:600 12px "Kanit",system-ui,sans-serif; cursor:pointer; transition:background .15s,border-color .15s,transform .12s,filter .15s; }
-    #bth button:hover { background:#334961; border-color:rgba(127,216,174,.58); }
+    #bth button { box-sizing:border-box; min-height:28px; border:1px solid rgba(255,255,255,.2); border-radius:6px; padding:4px 10px; background:rgba(42,53,80,.8); color:#fff; font:600 11.5px Kanit,"Noto Sans Thai",system-ui,sans-serif; cursor:pointer; transition:background .15s,border-color .15s,transform .12s; }
+    #bth button:hover { background:rgba(62,78,115,.9); border-color:rgba(159,208,255,.5); }
     #bth button:active { transform:translateY(1px); }
-    #bth #bthrun, #bth #bthqgo { min-height:38px; background:linear-gradient(120deg,#28765b,#23634e); border-color:#53a680; color:#effff6; font-size:13px; }
-    #bth #bthrun:hover, #bth #bthqgo:hover { background:linear-gradient(120deg,#32906d,#2a755d); }
-    #bth select, #bth input:not([type=checkbox]) { box-sizing:border-box; min-height:31px; border:1px solid rgba(155,185,217,.25); border-radius:7px; padding:5px 8px; background:#101a27; color:#f0f5fc; font:12px "Kanit",system-ui,sans-serif; }
+    #bth #bthrun, #bth #bthqgo { min-height:34px; background:#2f74e0; border-color:#2f74e0; color:#fff; font-size:12.5px; }
+    #bth #bthrun:hover, #bth #bthqgo:hover { background:#3f84f0; border-color:#3f84f0; }
+    #bth select, #bth input:not([type=checkbox]) { box-sizing:border-box; min-height:28px; border:1px solid rgba(255,255,255,.18); border-radius:6px; padding:3px 7px; background:rgba(5,10,18,.7); color:#fff; font:500 11.5px Kanit,"Noto Sans Thai",system-ui,sans-serif; }
     #bth select { max-width:100%; }
-    #bth input:focus, #bth select:focus { outline:2px solid rgba(127,216,174,.65); outline-offset:1px; }
-    .bth-section { display:grid; gap:7px; padding:10px; border:1px solid rgba(155,185,217,.13); border-radius:10px; background:rgba(255,255,255,.025); }
-    .bth-section-title { display:flex; align-items:center; gap:7px; color:#eff5fc; font-weight:700; }
-    .bth-section-title small { color:#8fb8ab; font:700 9px "Kanit",sans-serif; letter-spacing:1px; }
-    .bth-map { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; min-height:38px; }
-    #bthmap { min-width:0; overflow-wrap:anywhere; color:#b8d4f0; }
-    .bth-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; color:#b9c8d8; }
-    .bth-field select { width:150px; }
-    .bth-inline { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#b9c8d8; }
+    #bth select option { background:#141c2b; color:#fff; }
+    #bth input:focus, #bth select:focus { outline:2px solid rgba(47,116,224,.8); outline-offset:1px; }
+    .bth-section { display:grid; gap:7px; padding:9px; border:1px solid rgba(255,255,255,.1); border-radius:8px; background:linear-gradient(90deg,rgba(90,140,255,.14),rgba(90,140,255,.04)); }
+    .bth-section-title { display:flex; align-items:center; gap:7px; color:#fff; font-weight:600; font-size:12px; }
+    .bth-section-title small { color:#8fa2bb; font:600 9.5px Kanit,sans-serif; letter-spacing:.8px; }
+    .bth-map { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; min-height:32px; }
+    #bthmap { min-width:0; overflow-wrap:anywhere; color:#ffd27a; font-weight:600; }
+    .bth-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; color:#b9c8da; }
+    .bth-field select { width:140px; }
+    .bth-inline { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#b9c8da; }
     .bth-inline span:last-child { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
-    .bth-inline input { width:64px; text-align:right; }
-    .bth-potions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-    .bth-potion { display:grid; gap:6px; min-width:0; padding:8px; border:1px solid rgba(155,185,217,.14); border-radius:9px; background:rgba(5,12,20,.28); }
-    .bth-potion-title { color:#dbe9f6; font-size:12px; font-weight:700; }
+    .bth-inline input { width:60px; text-align:right; }
+    .bth-potions { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .bth-potion { display:grid; gap:5px; min-width:0; padding:7px; border:1px solid rgba(255,255,255,.1); border-radius:7px; background:rgba(5,10,18,.4); }
+    .bth-potion-title { color:#fff; font-size:11.5px; font-weight:600; }
     .bth-potion select { width:100%; }
     .bth-potion-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
-    .bth-potion-grid label { display:grid; gap:3px; color:#91a5b8; font-size:10px; }
+    .bth-potion-grid label { display:grid; gap:2px; color:#8fa2bb; font-size:10.5px; }
     .bth-potion-grid input { width:100%; }
-    .bth-switch { display:flex; align-items:center; gap:8px; color:#d9e4ef; cursor:pointer; }
+    .bth-switch { display:flex; align-items:center; gap:8px; color:#e3ebf5; cursor:pointer; }
     .bth-switch input { position:absolute; width:1px!important; height:1px!important; opacity:0; }
-    .bth-switch-ui { position:relative; flex:none; width:32px; height:18px; border:1px solid rgba(155,185,217,.26); border-radius:99px; background:#263444; transition:.15s; }
-    .bth-switch-ui::after { content:""; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#9aabba; transition:.15s; }
-    .bth-switch input:checked + .bth-switch-ui { background:rgba(77,173,131,.42); border-color:#58b58c; }
-    .bth-switch input:checked + .bth-switch-ui::after { transform:translateX(14px); background:#9af0c4; }
-    .bth-switch input:focus-visible + .bth-switch-ui { outline:2px solid #7fd8ae; outline-offset:2px; }
-    .bth-note { color:#899bad; font-size:10px; }
-    #bthqnote { padding:8px 10px; border:1px solid rgba(127,216,174,.16); border-radius:8px; background:rgba(127,216,174,.07); color:#bcebd5!important; }
-    #bthqlist { max-height:min(38vh,300px)!important; overflow:auto; scrollbar-width:thin; scrollbar-color:#52647a transparent; }
-    #bthqlist > div, #bthqlist label { padding:7px 8px!important; border-bottom:1px solid rgba(155,185,217,.1); border-radius:6px; }
-    #bthbar button { flex:none; width:29px; height:29px; min-height:29px; padding:0!important; border-radius:8px!important; background:rgba(9,15,23,.4)!important; color:#d9e9f8!important; font:700 18px/1 "Kanit",system-ui,sans-serif!important; }
-    #bthbar button:hover { background:rgba(127,216,174,.18)!important; }
-    @media(max-width:420px) { #bth { width:min(320px,calc(100vw - 16px))!important; } .bth-potions { grid-template-columns:1fr; } }
+    .bth-switch-ui { position:relative; flex:none; width:30px; height:17px; border:1px solid rgba(255,255,255,.2); border-radius:99px; background:rgba(42,53,80,.9); transition:.15s; }
+    .bth-switch-ui::after { content:""; position:absolute; top:2px; left:2px; width:11px; height:11px; border-radius:50%; background:#8fa2bb; transition:.15s; }
+    .bth-switch input:checked + .bth-switch-ui { background:#2f74e0; border-color:#2f74e0; }
+    .bth-switch input:checked + .bth-switch-ui::after { transform:translateX(13px); background:#fff; }
+    .bth-switch input:focus-visible + .bth-switch-ui { outline:2px solid #9fd0ff; outline-offset:2px; }
+    .bth-note { color:#8fa2bb; font-size:10.5px; }
+    #bthqnote { padding:7px 9px; border:1px solid rgba(255,210,122,.25); border-radius:6px; background:rgba(255,210,122,.07); color:#ffd27a!important; }
+    #bthqlist { max-height:min(38vh,300px)!important; overflow:auto; scrollbar-width:thin; scrollbar-color:rgba(143,162,187,.4) transparent; }
+    #bthqlist > div, #bthqlist label { padding:6px 8px!important; margin-bottom:3px; border-radius:6px; background:linear-gradient(90deg,rgba(90,140,255,.32),rgba(90,140,255,.08)); }
+    #bthbar button { flex:none; width:24px; height:24px; min-height:24px; padding:0!important; border:1px solid rgba(255,255,255,.2)!important; border-radius:6px!important; background:rgba(42,53,80,.8)!important; color:#fff!important; font:600 12px/1 Kanit,system-ui,sans-serif!important; }
+    #bthbar button:hover { background:rgba(62,78,115,.95)!important; }
+    @media(max-width:420px) { #bth { width:min(300px,calc(100vw - 16px))!important; } .bth-potions { grid-template-columns:1fr; } }
   `;
   document.head.appendChild(uiStyle);
   const box = document.createElement('div');
@@ -573,7 +576,7 @@
        <div class="bth-section-title"><small>DAILY</small><span>ค่าหัววันนี้</span></div>
        <label class="bth-inline" for="bthqabove"><span>เลเวลคุณ <b id="bthqlv">?</b></span><span>เผื่อเลเวล <input id="bthqabove" type="number" min="0" max="30" style="width:48px"></span></label>
        <div id="bthqlist" style="margin:2px 0;max-height:220px;overflow:auto"></div>
-       <div id="bthqnote" style="color:#889;font-size:11px"></div>
+       <div id="bthqnote" style="color:#8fa2bb;font-size:11px"></div>
        <div style="display:flex;gap:7px;margin-top:2px"><button id="bthqgo" type="button" style="flex:2"></button><button id="bthqref" type="button" style="flex:1">↻ รีเฟรช</button></div>
        <div class="bth-note">Auto จะล่ามอนค่าหัวในทั้งแมพ เมื่อครบจะคืนค่าตั้งเดิมและกลับไปจุดฟาร์ม</div>
      </section>
@@ -670,14 +673,14 @@
     $('#bthqabove').value = bq.maxAbove;
     const cur = curBounty();
     if (bq.active) {
-      $('#bthqlist').innerHTML = bq.list.map((b, i) => `<div style="padding:3px 0;${i === bq.i ? 'color:#9fd;font-weight:bold' : b.claimed ? 'color:#7a7' : ''}">${i < bq.i || b.claimed ? '✓' : i === bq.i ? '▶' : '·'} ${b.mob} ${b.prog}/${b.need} <small style="color:#99a">${b.mapName}</small></div>`).join('');
+      $('#bthqlist').innerHTML = bq.list.map((b, i) => `<div style="padding:3px 0;${i === bq.i ? 'color:#ffd27a;font-weight:600' : b.claimed ? 'color:#9fd0ff' : ''}">${i < bq.i || b.claimed ? '✓' : i === bq.i ? '▶' : '·'} ${b.mob} ${b.prog}/${b.need} <small style="color:#8fa2bb">${b.mapName}</small></div>`).join('');
       $('#bthqnote').textContent = cur ? `กำลังทำ ${cur.mob} ที่ ${cur.mapName}` : '';
       $('#bthqgo').textContent = '■ หยุดค่าหัว';
       return;
     }
     const show = bqAll.filter(reachable), hidden = bqAll.filter(b => !reachable(b));
-    $('#bthqlist').innerHTML = show.length ? show.map(b => `<label style="display:block;padding:3px 0"><input type="checkbox" data-bq="${b.id}" ${bqPick.has(b.id) ? 'checked' : ''}> <b>${b.mob}</b> ${b.prog}/${b.need} <small style="color:#99a">${b.mapName} · Lv ${b.lo}–${b.hi}</small></label>`).join('')
-      : '<div style="color:#99a">ไม่มีค่าหัวที่ไปได้ (กด ↻ รีเฟรช)</div>';
+    $('#bthqlist').innerHTML = show.length ? show.map(b => `<label style="display:block;padding:3px 0"><input type="checkbox" data-bq="${b.id}" ${bqPick.has(b.id) ? 'checked' : ''}> <b>${b.mob}</b> ${b.prog}/${b.need} <small style="color:#8fa2bb">${b.mapName} · Lv ${b.lo}–${b.hi}</small></label>`).join('')
+      : '<div style="color:#8fa2bb">ไม่มีค่าหัวที่ไปได้ (กด ↻ รีเฟรช)</div>';
     $('#bthqnote').textContent = hidden.length ? `ซ่อน ${hidden.length} ตัว: ${hidden.map(b => b.claimed ? b.mob + ' (รับแล้ว)' : `${b.mob} (Lv ${b.lo}+)`).join(', ')}` : '';
     $('#bthqgo').textContent = '▶ เริ่มล่าค่าหัว';
     for (const c of document.querySelectorAll('#bthqlist [data-bq]')) c.onchange = e => { e.target.checked ? bqPick.add(e.target.dataset.bq) : bqPick.delete(e.target.dataset.bq); };
