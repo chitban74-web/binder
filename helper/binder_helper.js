@@ -138,14 +138,14 @@
     return cfg.running;
   }
 
-  // player counts of each channel, read from the tooltip of the game's signal bars on that row
+  // player count of each channel on this map, read from the tooltip of the game's signal bars on that row
   // ("แมพนี้ 1/40 คน · ทั้ง Channel 236/300 คน") -> written into the empty right side of the row
   const paintChCounts = () => {
     for (const row of document.querySelectorAll('#chmenu .chrow')) {
-      const m = ((row.querySelector('.chsig') || {}).title || '').match(/แมพนี้\s*(\d+)\/\d+.*?Channel\s*(\d+)\//); if (!m) continue;
+      const m = ((row.querySelector('.chsig') || {}).title || '').match(/แมพนี้\s*(\d+)\//); if (!m) continue;
       let s = row.querySelector('.bthcnt');
       if (!s) { s = document.createElement('span'); s.className = 'bthcnt'; row.appendChild(s); }
-      const t = `แมพ ${m[1]} · รวม ${m[2]}`;
+      const t = `${m[1]} คน`;
       if (s.textContent !== t) s.textContent = t;
     }
   };
@@ -708,7 +708,7 @@
     @keyframes bthpick { to { box-shadow:0 0 0 4px rgba(229,72,77,.35); } }
     #bthbar button { flex:none; width:24px; height:24px; min-height:24px; padding:0!important; border:1px solid rgba(255,255,255,.2)!important; border-radius:6px!important; background:rgba(42,53,80,.8)!important; color:#fff!important; font:600 12px/1 Kanit,system-ui,sans-serif!important; }
     #bthbar button:hover { background:rgba(62,78,115,.95)!important; }
-    #chmenu .chrow { position:relative; padding-right:104px; }
+    #chmenu .chrow { position:relative; padding-right:56px; }
     #chmenu .chrow .bthcnt { position:absolute; right:10px; top:7px; color:#000; font:700 11px var(--sans); }
     @media(max-width:420px) { #bth { width:min(300px,calc(100vw - 16px))!important; } .bth-potions { grid-template-columns:1fr; } }
   `;
