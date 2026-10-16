@@ -263,6 +263,8 @@
       if (isDead()) return false;
       if (mapName() === name) return true;
       if (mapName() !== lastMap) { lastMap = mapName(); lastMapAt = Date.now(); }
+      // game asks "วาร์ปไป <town> แล้วเดินต่อ?" when a nearer town has a warp point -> warp, then it walks on by itself
+      if (dialogOpen() && /วาร์ป/.test(dialogTitle())) { click($('#bcyes'), 'วาร์ปแล้วเดินต่อ'); lastGo = lastMapAt = Date.now(); await sleep(2000); continue; }
       // (re)start the game's own route walk when nothing has changed for a while
       if (Date.now() - lastGo > 25e3 && Date.now() - lastMapAt > 8e3) {
         lastGo = Date.now();
