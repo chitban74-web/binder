@@ -1,5 +1,5 @@
 // Binder Town helper — runs inside the game page, on top of the game's own AUTO.
-//  • bag full (weight >= sellPct or no free slot) → AUTO off → warp to town (500 G; walk if it can't) → sell by your sell filter
+//  • bag full (weight >= sellPct or no free slot) → AUTO off → warp to town (500 G; walk if it can't) → (salvage low Normal / Magic gear, if on) → sell by your sell filter
 //                                                → back to farm map → walk to the saved spot → AUTO on
 //  • died → wait deathWaitMs → respawn in town → (sell if weight >= sellAfterDeathPct) → back to farm map → saved spot → AUTO on
 //  • potion on the belt below its minimum → town → walk to the merchant → buy up to the target (vendorBuy, max 99 each)
@@ -17,6 +17,8 @@
   const DEF = {
     farmMap: '', farmSpot: null, town: '', sellPct: 95, sellAfterDeathPct: 40, deathWaitMs: 3000,
     quietCh: true, followLeader: true, bossHunt: true, mobIcons: true,
+    // town trip with selling: salvage Normal / Magic gear whose item level is below salvBelow first (off by default)
+    salvOn: false, salvBelow: 30,
     // potions: below `min` (0 = off) -> trip to town; in town always top up to `to`
     buy: { hp: { item: 'hi_potion', min: 50, to: 200 }, mp: { item: 'mana_potion', min: 30, to: 150 } },
     panel: { x: 8, y: 120, min: false }, running: false,
@@ -428,6 +430,50 @@
     await sleep(2000);
     log(`ขายแล้ว น้ำหนัก ${before}% → ${weightPct()}%`);
   }
+  // ---- salvage (แยกชิ้น): bag → "เลือกแยกชิ้น" → tick Normal / Magic gear below cfg.salvBelow → แยกชิ้น → confirm ----
+  // the game only marks gear it can salvage (.salvok: not locked / cash / no-trade); rarity is the slot's data-rar.
+  // item level is read from the game's own tooltip ("เลเวล N", level-1 gear has no such line), so it follows game updates
+  const SALV_RAR = ['normal', 'uncommon', 'magic']; // uncommon = Magic with 1 affix
+  function itemLevel(cell) {
+    if (typeof cell.onmouseenter !== 'function') return null;
+    cell.onmouseenter();
+    // gear of a slot you wear opens a compare tooltip: "ชิ้นนี้" (.tcmpcol.new) is the bag item
+    const tip = $('#tip'), card = tip && (tip.querySelector('.tcmpcol.new .it3') || tip.querySelector('.it3'));
+    const name = card && card.querySelector('.mxname'), own = cell.querySelector('.nm');
+    // tooltip not opened for this slot (touch mode / a pinned tooltip) -> unknown
+    const ok = !!name && !!own && !!own.textContent && name.textContent.includes(own.textContent);
+    const req = ok ? [...card.querySelectorAll('.mxside p, .mxreq p')].map(p => (p.textContent || '').trim().match(/^เลเวล\s*(\d+)$/)).find(Boolean) : null;
+    if (typeof cell.onmouseleave === 'function') cell.onmouseleave();
+    return ok ? (req ? +req[1] : 1) : null;
+  }
+  async function salvageJunk() {
+    if (!cfg.salvOn) return;
+    const bagShown = () => visible($('#invitems')), wasOpen = bagShown();
+    if (!wasOpen) { click($('#mbbag'), 'เปิดกระเป๋า'); await sleep(800); }
+    const btn = $('#bagsalv');
+    if (!bagShown() || !btn) { log('เปิดกระเป๋า / ปุ่มเลือกแยกชิ้นไม่ได้ — ข้ามการแยกชิ้น'); return; }
+    if (btn.classList.contains('on')) { click(btn, 'เลิกเลือกแยกชิ้น (ล้างที่เลือกไว้)'); await sleep(400); }
+    click(btn, 'เลือกแยกชิ้น'); await sleep(800);
+    let n = 0, unknown = 0;
+    for (const cell of document.querySelectorAll('#invitems .slot.salvok')) {
+      if (!SALV_RAR.includes(cell.dataset.rar) || cell.querySelector('.rfn')) continue; // never refined gear
+      const lv = itemLevel(cell);
+      if (lv === null) { unknown++; continue; }
+      if (lv < cfg.salvBelow) { cell.click(); n++; }
+    }
+    if (unknown) log(`อ่านเลเวลไอเทมไม่ได้ ${unknown} ชิ้น (ต้องเล่นด้วยเมาส์) — ไม่แยกชิ้นพวกนั้น`);
+    if (!n) log(`ไม่มีอุปกรณ์ Normal / Magic เลเวลต่ำกว่า ${cfg.salvBelow} ให้แยกชิ้น`);
+    else {
+      const before = weightPct();
+      click($('#salvbar [data-sv="go"]'), `แยกชิ้น ${n} ชิ้น`); await sleep(700);
+      if (dialogOpen() && /แยกชิ้น/.test(dialogTitle())) click($('#bcyes'), 'ยืนยันแยกชิ้น');
+      await sleep(2500);
+      log(`แยกชิ้นแล้ว ${n} ชิ้น · น้ำหนัก ${before}% → ${weightPct()}%`);
+    }
+    if (btn.classList.contains('on')) click(btn, 'เลิกเลือกแยกชิ้น');
+    if (!wasOpen && bagShown()) click($('#mbbag'), 'ปิดกระเป๋า');
+    await sleep(400);
+  }
   // top every potion plan up to its `to` (NPC sells max 99 per purchase; same message as the shop's buy button)
   async function buyPotions() {
     for (const p of potionPlans()) {
@@ -448,6 +494,7 @@
     setPhase(why); setAuto(false); await sleep(800);
     const town = cfg.town || 'Ashford';
     if (!TOWN_IDS[mapName()] && !(await warpToTown(town) || await travelTo(town))) { log('ไปเมืองไม่ได้'); return false; }
+    if (sell && cfg.salvOn) { setPhase('แยกชิ้นอุปกรณ์'); await salvageJunk(); }
     setPhase('ที่ร้านค้า ' + mapName());
     if (!await openShop()) return false;
     if (sell) await sellAll();
@@ -608,6 +655,9 @@
        <div class="bth-section-title"><small>RETURN</small><span>กลับเมืองและจัดกระเป๋า</span></div>
        <label class="bth-field" for="bthtown"><span>เมืองที่จะกลับไป</span><select id="bthtown">${Object.keys(TOWN_IDS).map(t => `<option value="${t}">${t}</option>`).join('')}</select></label>
        <label class="bth-inline" for="bthpct"><span>ขายของเมื่อน้ำหนักถึง</span><span><input id="bthpct" type="number" min="10" max="100"> %</span></label>
+       <label class="bth-switch"><input id="bthsalv" type="checkbox"><span class="bth-switch-ui"></span><span>แยกชิ้นอุปกรณ์ Normal / Magic ก่อนขาย</span></label>
+       <label class="bth-inline" for="bthsalvlv"><span>เฉพาะเลเวลไอเทมต่ำกว่า</span><span>Lv <input id="bthsalvlv" type="number" min="2" max="99" style="width:48px"></span></label>
+       <div class="bth-note">ไม่แยกชิ้น Rare / Epic / Unique / ของตีบวก / ของล็อก</div>
      </section>
      <section class="bth-section bth-page" role="tabpanel" data-bth-page="supply" hidden>
        <div class="bth-section-title"><small>SUPPLY</small><span>เติมยาอัตโนมัติ</span></div>
@@ -764,6 +814,7 @@
   function render() {
     $('#bthmap').textContent = cfg.farmMap ? cfg.farmMap + (cfg.farmSpot ? ` (${cfg.farmSpot.x.toFixed(0)}, ${cfg.farmSpot.y.toFixed(0)})` : '') : '(ยังไม่ตั้ง)';
     $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthboss').checked = !!cfg.bossHunt; $('#bthmobicon').checked = cfg.mobIcons !== false;
+    $('#bthsalv').checked = !!cfg.salvOn; $('#bthsalvlv').value = cfg.salvBelow;
     for (const k of ['hp', 'mp']) { const b = (cfg.buy || {})[k] || {}; $(`#bth_${k}_item`).value = b.item; $(`#bth_${k}_min`).value = b.min || 0; $(`#bth_${k}_to`).value = b.to || 0; }
     $('#bthrun').textContent = cfg.running ? '■ หยุด' : '▶ เริ่ม';
     if (!cfg.running) setPhase('หยุดอยู่');
@@ -794,6 +845,8 @@
   $('#bthtown').onchange = e => { cfg.town = e.target.value; save(); log('เมืองขาย: ' + cfg.town); };
   $('#bthpct').onchange = e => { cfg.sellPct = Math.max(10, Math.min(100, +e.target.value || 95)); save(); };
   $('#bthwait').onchange = e => { cfg.deathWaitMs = Math.max(0, +e.target.value || 0) * 1000; save(); };
+  $('#bthsalv').onchange = e => { cfg.salvOn = e.target.checked; save(); log(cfg.salvOn ? `เปิดแยกชิ้น Normal / Magic เลเวลต่ำกว่า ${cfg.salvBelow}` : 'ปิดแยกชิ้น'); };
+  $('#bthsalvlv').onchange = e => { cfg.salvBelow = Math.max(2, Math.min(99, Math.round(+e.target.value) || 30)); e.target.value = cfg.salvBelow; save(); };
   $('#bthquiet').onchange = e => { cfg.quietCh = e.target.checked; save(); };
   $('#bthlead').onchange = e => { cfg.followLeader = e.target.checked; save(); };
   $('#bthboss').onchange = e => { cfg.bossHunt = e.target.checked; save(); };
