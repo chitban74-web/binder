@@ -581,10 +581,17 @@
       if (p.have === null) { log(`${potName(p.item)} ไม่ได้อยู่ในช่องยา — ใส่ไว้ในช่อง Q/E ก่อน helper ถึงนับได้`); continue; }
       let need = (p.to || 0) - p.have, got = 0;
       while (need > 0 && cfg.running) {
-        const q = Math.min(99, need);
+        const q = Math.min(99, need), before = beltCount(p.item) || 0;
+        // server messages that name this item: when the 'bought' reply doesn't come, log what came instead
+        const r = room(), seen = new Set();
+        const off = r && r.onMessage('server', m => { for (const x of Array.isArray(m) ? m : [m]) if (x && x.type && JSON.stringify(x).includes(p.item)) seen.add(x.type); });
         const res = await request({ type: 'vendorBuy', itemId: p.item, qty: q }, m => m.type === 'bought' && m.itemId === p.item, 5000);
-        if (!res || !res.ok) { log(`ซื้อ ${potName(p.item)} ไม่ได้: ${res ? res.reason || 'ไม่ทราบสาเหตุ' : 'ไม่มีคำตอบ'}`); break; }
-        got += res.qty || q; need -= res.qty || q;
+        if (off) off();
+        // the belt count is what counts: the purchase can go through even when the reply isn't recognised
+        const added = res && res.ok ? res.qty || q : Math.max(0, (beltCount(p.item) || 0) - before);
+        if (!res && seen.size) log(`ร้านตอบกลับแบบอื่น (${[...seen].join(', ')})`);
+        if (!added) { log(`ซื้อ ${potName(p.item)} ไม่ได้: ${res ? res.reason || 'ไม่ทราบสาเหตุ' : 'ไม่มีคำตอบ'}`); break; }
+        got += added; need -= added;
         await sleep(400);
       }
       if (got) log(`ซื้อ ${potName(p.item)} ×${got} (มี ${beltCount(p.item)})`);
