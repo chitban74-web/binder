@@ -537,7 +537,8 @@
     const path = target && from && routeTo(from, target);
     if (!path || path.length < 2) return false;
     const [, next] = path, ex = (EXITS[from] || []).find(e => e[0] === next), known = (exitsSeen[from] || {})[next];
-    const spot = known || { x: ex[1], y: ex[2] };
+    const spot = known || { x: ex[1], y: ex[2] }, key = from + '>' + next;
+    if (Date.now() - (exitWalkFailed[key] || 0) < 10 * 60e3) return false; // this exit did not work a moment ago
     log(`หน้าต่างพับอยู่ — เดินเองไปทางออก ${MAP_NAMES[next] || next} (${spot.x}, ${spot.y}) · เส้นทาง ${path.map(m => MAP_NAMES[m] || m).join(' → ')}`);
     const deadline = Date.now() + 90e3; let lastSend = 0, atExit = 0;
     while (Date.now() < deadline && cfg.running && still()) {
@@ -546,13 +547,19 @@
       if (!r || !p) { await sleep(1000); continue; }
       if (dist(p, spot) <= 1.2) {
         if (!atExit) atExit = Date.now();
-        if (Date.now() - atExit > 10e3) { log('ถึงทางออกแล้วแต่แมพไม่เปลี่ยนใน 10 วิ — ใช้ปุ่มเดินทางของเกมแทน'); return false; }
+        if (Date.now() - atExit > 10e3) {
+          exitWalkFailed[key] = Date.now();
+          log(`ถึงทางออก (${spot.x}, ${spot.y}) แล้วแต่แมพไม่เปลี่ยนใน 10 วิ${known ? '' : ' (จุดนี้มาจาก zones.json ยังไม่เคยเห็นเกมเดินผ่าน)'} — ใช้ปุ่มเดินทางของเกมแทน ไม่ลองทางออกนี้ 10 นาที`);
+          return false;
+        }
       } else if (Date.now() - lastSend > 4000) { lastSend = Date.now(); r.send('input', { type: 'moveTo', x: spot.x, y: spot.y }); }
       await sleep(700);
     }
     return false;
   }
-  let exitWalkFailed = 0;
+  // per exit (from>to): a wrong exit must not stop the walk on the other legs (02:55: Glasswrack's failed, so the way
+  // back Sanctum -> Shattered Vale, whose exit is known, waited on the game's slow hidden-tab walk)
+  const exitWalkFailed = {};
   // where the game itself walks to leave a map (the last moveTo before the map changed to a neighbour): zones.json's exit
   // areas are out of date (Sanctum -> Shattered Vale: the game walks to (2, 15), zones.json says (2, 26)). Seeded with
   // what the log showed on 18 Oct, learned again on every map change, kept in localStorage.
@@ -584,9 +591,8 @@
       // game asks "วาร์ปไป <town> แล้วเดินต่อ?" when a nearer town has a warp point -> warp, then it walks on by itself
       if (dialogOpen() && /วาร์ป/.test(dialogTitle())) { click($('#bcyes'), 'วาร์ปแล้วเดินต่อ'); lastGo = lastMapAt = Date.now(); await sleep(2000); continue; }
       // hidden tab: walk exit to exit ourselves (unless that already failed in the last 10 min)
-      if (document.hidden && Date.now() - lastMapAt > 8e3 && Date.now() - exitWalkFailed > 10 * 60e3) {
+      if (document.hidden && Date.now() - lastMapAt > 8e3) {
         if (await walkExits(name, still)) { lastMap = mapName(); lastMapAt = Date.now(); continue; }
-        exitWalkFailed = Date.now();
       }
       // (re)start the game's own route walk when nothing has changed for a while
       if (Date.now() - lastGo > 25e3 && Date.now() - lastMapAt > 8e3) {
