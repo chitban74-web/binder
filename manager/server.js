@@ -24,8 +24,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ---------------- game tabs ----------------
 let marketQueue = Promise.resolve(); // market requests through the game tab run one after another
 const tabs = new Map(); // targetId -> { tab, browser, url, title, state, status, injecting }
+// the loading screen's error bar "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ลองใหม่อีกครั้ง": its ลองใหม่ button reloads the page
+const RETRY_BTN = `[...document.querySelectorAll('button')].find(b => b.offsetParent !== null && b.textContent.trim() === 'ลองใหม่' && /เชื่อมต่อ/.test(b.parentElement.textContent))`;
 const STATE_JS = `(() => ({ helper: !!window.__bth, inWorld: !!(document.getElementById('mapname') && document.getElementById('mapname').textContent.trim() && document.getElementById('autobig')),
-  status: window.__bth && window.__bth.status ? window.__bth.status() : null }))()`;
+  status: window.__bth && window.__bth.status ? window.__bth.status() : null,
+  loadErr: !!${RETRY_BTN} }))()`;
+const RETRY_JS = `(() => { const b = ${RETRY_BTN}; if (b) b.click(); return !!b; })()`;
 
 async function inject(t, keepRunning) {
   const code = fs.readFileSync(HELPER, 'utf8'); // read every time: updates apply on the next load
@@ -50,12 +54,23 @@ async function checkTab(key, target) {
   if (t.injecting) return;
   const s = await t.tab.eval(STATE_JS);
   t.status = s.status;
+  if (s.status) t.wasRunning = !!s.status.running; // kept over a page reload: ▶ goes on again in the new helper
   const state = s.helper ? 'helper' : s.inWorld ? 'world' : 'loading';
   if (state !== t.state) log(`[${key}] ${t.id.slice(0, 6)}: ${state === 'helper' ? 'helper ทำงาน' : state === 'world' ? 'เข้าเกมแล้ว' : 'ยังไม่เข้าเกม'}`);
   t.state = state;
+  if (s.loadErr) {
+    // could not reach the server: press ลองใหม่ again and again, waiting 10 s more each time (at most 1 min)
+    const wait = Math.min(60e3, 10e3 * ((t.retries || 0) + 1));
+    if (Date.now() - (t.retryAt || 0) < wait) return;
+    t.retries = (t.retries || 0) + 1; t.retryAt = Date.now();
+    log(`[${key}] ${t.id.slice(0, 6)}: เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — กดลองใหม่ (ครั้งที่ ${t.retries})`);
+    await t.tab.eval(RETRY_JS).catch(() => { });
+    return;
+  }
+  if (state !== 'loading') t.retries = 0;
   if (state !== 'world') return;
   t.injecting = true;
-  try { await inject(t, false); t.state = 'helper'; } catch (e) { log('โหลด helper ไม่สำเร็จ:', e.message); } finally { t.injecting = false; }
+  try { await inject(t, !!t.wasRunning); t.state = 'helper'; } catch (e) { log('โหลด helper ไม่สำเร็จ:', e.message); } finally { t.injecting = false; }
 }
 
 const browserUp = {};
