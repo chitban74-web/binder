@@ -4,7 +4,7 @@
 //  • died → wait deathWaitMs → respawn in town → (sell if weight >= sellAfterDeathPct) → back to farm map → saved spot → AUTO on
 //  • potion on the belt below its minimum → town → walk to the merchant → buy up to the target (vendorBuy, max 99 each)
 //  • on ▶ and on every return to the farm map: the party leader's channel if the leader is on this map,
-//    else the safe channel with the fewest players (never PvP CH10)
+//    else the safe channel with the fewest players (never PvP CH10); with the channel lock on: only the channel picked
 //  • the game's channel menu shows the player count of each channel on the right of its row
 //  • the game refuses channel switches and warps in combat: both wait for combat to end (AUTO fights back only while hit, 60 s max)
 //  • bounty window (🎯 ค่าหัว): today's bounties you can reach → each one: its map, AUTO targets = that mob only,
@@ -60,7 +60,7 @@
   const KEY = 'bth_cfg';
   const DEF = {
     farmMap: '', farmSpot: null, town: '', sellPct: 95, sellAfterDeathPct: 40, deathWaitMs: 3000,
-    quietCh: true, followLeader: true, bossHunt: true, worldBoss: true, mobIcons: true,
+    quietCh: true, followLeader: true, lockCh: false, lockChNum: 1, bossHunt: true, worldBoss: true, mobIcons: true,
     // town trip with selling: salvage Normal / Magic gear whose item level is below salvBelow first (off by default)
     salvOn: false, salvBelow: 30,
     // potions: below `min` (0 = off) -> trip to town; in town always top up to `to`
@@ -276,6 +276,13 @@
     const say = t => { chLast = t; if (!quiet) log(t); };
     const r = room(); const cur = chOf(r); if (!r || !cur) return null;
     const info = await queryChannels();
+    // channel lock: only ever the channel picked in the panel, never the leader's or the quietest
+    if (cfg.lockCh) {
+      const ch = cfg.lockChNum;
+      if (ch === cur) { say(`อยู่ CH${cur} ที่ล็อกไว้แล้ว`); return null; }
+      if (info && info.counts && ch > info.counts.length) { say(`แมพนี้ไม่มี CH${ch} — อยู่ CH เดิม`); return null; }
+      chLast = `ย้ายไป CH${ch} (ล็อก CH)`; return { ch, why: 'ล็อก CH', lock: info && info.lock };
+    }
     if (cfg.followLeader) {
       const lc = await leaderChannel(r, quiet);
       if (lc) {
@@ -302,8 +309,9 @@
     return { ch: best, why: `คนน้อยสุด: ${others(cur)} → ${others(best)} คน`, lock: info.lock };
   }
   let chLast = '';
+  const chPickOn = () => cfg.lockCh || cfg.quietCh || cfg.followLeader;
   async function moveToQuietChannel() {
-    if (!cfg.quietCh && !cfg.followLeader) return;
+    if (!chPickOn()) return;
     const p = await pickChannel();
     const r = room();
     if (p && r) await switchTo(r, chOf(r), p.ch, p.lock, p.why);
@@ -319,7 +327,7 @@
     await sleep(1500);
     if (changed()) return false;
     setAuto(false);
-    if (cfg.quietCh || cfg.followLeader) { setPhase('เลือก CH'); await moveToQuietChannel(); }
+    if (chPickOn()) { setPhase('เลือก CH'); await moveToQuietChannel(); }
     if (t.spot) { setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(t.spot, still); await sleep(500); }
     if (changed()) return false;
     setAuto(true);
@@ -846,7 +854,7 @@
         // just pressed ▶ on the farm map: quietest channel, then the saved spot
         startCheck = false;
         setAuto(false);
-        if (cfg.quietCh || cfg.followLeader) { setPhase('เลือก CH'); await moveToQuietChannel(); }
+        if (chPickOn()) { setPhase('เลือก CH'); await moveToQuietChannel(); }
         const g = farmGen;
         setPhase('เดินไปจุดฟาร์ม'); await walkToSpot(cfg.farmSpot, () => g === farmGen); await sleep(500);
         if (g === farmGen) setAuto(true); // new spot picked meanwhile -> the next tick walks there
@@ -973,6 +981,9 @@
      <section class="bth-section bth-page" role="tabpanel" data-bth-page="travel" hidden>
        <div class="bth-section-title"><small>TRAVEL</small><span>การเลือก Channel</span></div>
        <div id="bthchinfo" class="bth-chinfo"></div>
+       <label class="bth-switch"><input id="bthlockch" type="checkbox"><span class="bth-switch-ui"></span><span>ล็อก Channel</span></label>
+       <label class="bth-inline" for="bthlockchnum"><span>อยู่เฉพาะ CH</span><span><button id="bthlockchcur" type="button">ใช้ CH ตอนนี้</button><input id="bthlockchnum" type="number" min="1" max="99" style="width:48px"></span></label>
+       <div class="bth-note bth-subnote">เปิดอยู่ → ไม่ตามหัวตี้ ไม่ย้ายหา CH คนน้อย · ย้ายไป CH ที่ล็อกตอนกด ▶ และตอนกลับมาแมพฟาร์มเท่านั้น</div>
        <label class="bth-switch"><input id="bthlead" type="checkbox"><span class="bth-switch-ui"></span><span>ตาม Channel ของหัวตี้ก่อน</span></label>
        <div class="bth-note bth-subnote">หัวตี้ออนไลน์และอยู่แมพเดียวกัน → ย้ายไป CH เดียวกับหัวตี้ · ถ้าหัวตี้อยู่ CH PvP จะไม่ตาม</div>
        <label class="bth-switch"><input id="bthquiet" type="checkbox"><span class="bth-switch-ui"></span><span>ถ้าไม่เจอ ให้เลือก Channel คนน้อยสุด</span></label>
@@ -1181,7 +1192,7 @@
   }
   function render() {
     $('#bthmap').textContent = cfg.farmMap ? cfg.farmMap + (cfg.farmSpot ? ` (${cfg.farmSpot.x.toFixed(0)}, ${cfg.farmSpot.y.toFixed(0)})` : '') : '(ยังไม่ตั้ง)';
-    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthboss').checked = !!cfg.bossHunt; $('#bthwb').checked = cfg.worldBoss !== false; $('#bthmobicon').checked = cfg.mobIcons !== false;
+    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthlockch').checked = !!cfg.lockCh; $('#bthlockchnum').value = cfg.lockChNum; $('#bthlead').disabled = $('#bthquiet').disabled = !!cfg.lockCh; $('#bthboss').checked = !!cfg.bossHunt; $('#bthwb').checked = cfg.worldBoss !== false; $('#bthmobicon').checked = cfg.mobIcons !== false;
     $('#bthsalv').checked = !!cfg.salvOn; $('#bthsalvlv').value = cfg.salvBelow;
     for (const k of ['hp', 'mp']) { const b = (cfg.buy || {})[k] || {}; $(`#bth_${k}_item`).value = b.item; $(`#bth_${k}_min`).value = b.min || 0; $(`#bth_${k}_to`).value = b.to || 0; }
     $('#bthrun').textContent = cfg.running ? '■ หยุด' : '▶ เริ่ม';
@@ -1224,6 +1235,9 @@
   $('#bthsalvlv').onchange = e => { cfg.salvBelow = Math.max(2, Math.min(99, Math.round(+e.target.value) || 30)); e.target.value = cfg.salvBelow; save(); };
   $('#bthquiet').onchange = e => { cfg.quietCh = e.target.checked; save(); };
   $('#bthlead').onchange = e => { cfg.followLeader = e.target.checked; save(); };
+  $('#bthlockch').onchange = e => { cfg.lockCh = e.target.checked; save(); $('#bthlead').disabled = $('#bthquiet').disabled = cfg.lockCh; log(cfg.lockCh ? `ล็อก CH${cfg.lockChNum} · ปิดการย้าย CH อัตโนมัติ` : 'ปลดล็อก CH'); };
+  $('#bthlockchnum').onchange = e => { cfg.lockChNum = Math.max(1, Math.min(99, Math.round(+e.target.value) || 1)); e.target.value = cfg.lockChNum; save(); if (cfg.lockCh) log(`ล็อก CH${cfg.lockChNum}`); };
+  $('#bthlockchcur').onclick = () => { const ch = chOf(room()); if (!ch) return; $('#bthlockchnum').value = ch; $('#bthlockchnum').onchange({ target: $('#bthlockchnum') }); };
   $('#bthboss').onchange = e => { cfg.bossHunt = e.target.checked; save(); };
   $('#bthwb').onchange = e => { cfg.worldBoss = e.target.checked; save(); };
   if (!MOB_ICONS) $('#bthmobiconrow').style.display = 'none';
@@ -1299,7 +1313,7 @@
   const showChInfo = () => {
     const el = $('#bthchinfo'); if (!el) return;
     const ch = chOf(room());
-    const next = !cfg.running ? 'helper หยุดอยู่' : !(cfg.quietCh || cfg.followLeader) ? 'ปิดการเลือก CH' : 'เลือก CH ตอนเข้าแมพฟาร์ม';
+    const next = !cfg.running ? 'helper หยุดอยู่' : cfg.lockCh ? `ล็อก CH${cfg.lockChNum}` : !(cfg.quietCh || cfg.followLeader) ? 'ปิดการเลือก CH' : 'เลือก CH ตอนเข้าแมพฟาร์ม';
     const html = `<b>CH ${ch || '?'}</b> · ${next}${chLast ? `<br><small>ล่าสุด: ${chLast}</small>` : ''}`;
     if (el.innerHTML !== html) el.innerHTML = html;
   };
