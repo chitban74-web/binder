@@ -79,7 +79,13 @@
   // ---- reading the game UI ----
   const $ = s => document.querySelector(s);
   const visible = e => !!e && e.offsetParent !== null && getComputedStyle(e).visibility !== 'hidden';
-  const mapName = () => (($('#mapname') || {}).textContent || '').trim();
+  // map name from the server's room state first: the HUD's #mapname is not redrawn while the tab is hidden, so after a
+  // warp in a minimised window it still showed the old map (id -> name from data/maps/zones.csv; unknown ids: the HUD)
+  const MAP_NAMES = {'southvale_field':'Southvale Field','valebrook':'Valebrook','whispering_woods':'Whispering Woods','riverside':'Riverside','old_quarry':'Old Quarry','ancient_ruins':'Ancient Ruins','sunfield_plains':'Sunfield Plains','ashford':'Ashford','gloomroot_forest':'Gloomroot Forest','ember_hollow':'Ember Hollow','mistmire_swamp':'Mistmire Swamp','duskgate_pass':'Duskgate Pass','stormwall_city':'Stormwall City','frostpeak_slopes':'Frostpeak Slopes','frozen_mere':'Frozen Mere','howling_steppes':'Howling Steppes','cloudspire_ruins':'Cloudspire Ruins','sanctum':'Sanctum','shattered_vale':'Shattered Vale','umbral_depths':'Umbral Depths','throne_of_warden':'Throne of the Warden','training_grounds':'Training Grounds','rootfall_barrow':'Rootfall Barrow','honeyrill':'Honeyrill','bracken_sink':'Bracken Sink','verdigris_rise':'Verdigris Rise','pitchwood':'Pitchwood','yellowlick_flats':'Yellowlick Flats','peatcut_bog':'Peatcut Bog','sledrun_gully':'Sledrun Gully','brinecrust_shoals':'Brinecrust Shoals','kitewind_terraces':'Kitewind Terraces','glasswrack':'Glasswrack','marrowdeep':'Marrowdeep','rustbell_barracks':'Rustbell Barracks'};
+  const mapName = () => {
+    const r = window.__bthRoom, id = r && r.state && r.connection && r.connection.isOpen !== false ? r.state.mapId : '';
+    return MAP_NAMES[id] || (($('#mapname') || {}).textContent || '').trim();
+  };
   const weightPct = () => { const m = (($('#wtwarn') || {}).textContent || '').match(/(\d+)\s*%/); return m ? +m[1] : 0; };
   // full = weight over the threshold, or the game's own bag alarm (weight 100% or no free slot)
   const slotsFull = () => { const b = $('#mbbag'); return !!b && b.classList.contains('alarm'); };
