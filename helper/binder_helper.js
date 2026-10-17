@@ -14,7 +14,7 @@
 //  • World Boss round open (server "worldBoss" message) → warp into the arena → AUTO until the boss is dead / gone →
 //    leave → back to the farm spot (on by default, switch on the farm tab)
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
-//  • kicked for idling ("หลุดจากเกม · ไม่ได้เล่นนานเกินไป") → press เชื่อมต่อใหม่ → after the reload ▶ / AUTO go back on as they were
+//  • kicked for idling ("หลุดจากเกม · ไม่ได้เล่นนานเกินไป") → press เชื่อมต่อใหม่ → after the reload ▶ goes on (AUTO only, if no farm spot is saved yet)
 //    (needs the manager, which loads the helper again after the reload)
 // It presses the game's own buttons (warp, world map "go", respawn, sell, AUTO). The messages it sends itself go
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
@@ -1198,20 +1198,20 @@
     if (Date.now() - kickAt < 15e3) return; // reload already under way
     kickAt = Date.now();
     try { localStorage.setItem(RESUME_KEY, JSON.stringify({ at: kickAt, running: cfg.running, auto: lastAuto })); } catch { }
-    log(`หลุดจากเกม (ไม่ได้เล่นนานเกินไป) — เชื่อมต่อใหม่${cfg.running ? ' แล้วเปิด helper ต่อ' : lastAuto ? ' แล้วเปิด AUTO ต่อ' : ''}`);
+    log('หลุดจากเกม (ไม่ได้เล่นนานเกินไป) — เชื่อมต่อใหม่แล้วเปิด helper ต่อ');
     cfg.running = false; // not saved: ends a trip in progress on the dead room
     const card = title.closest('.bcard'), btn = card && card.querySelector('.bcact button');
     if (!click(btn, 'เชื่อมต่อใหม่') && typeof window.__hardReload === 'function') window.__hardReload();
   }, 2000);
-  // just reloaded after such a kick (note younger than 10 min): ▶ again, or only AUTO if the helper was stopped
+  // just reloaded after such a kick (note younger than 10 min): always ▶ (default on), or AUTO if no farm spot is saved yet
   (() => {
     let r = null;
     try { r = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); localStorage.removeItem(RESUME_KEY); } catch { }
-    if (!r || !(Date.now() - r.at < 10 * 60e3) || (!r.running && !r.auto)) return;
+    if (!r || !(Date.now() - r.at < 10 * 60e3)) return;
     setTimeout(() => {
       if (!alive) return;
-      if (r.running) { if (!cfg.running) $('#bthrun').click(); log('เชื่อมต่อใหม่แล้ว — เปิด helper ต่อ'); }
-      else { setAuto(true); log('เชื่อมต่อใหม่แล้ว — เปิด AUTO ต่อ'); }
+      if (cfg.farmMap) { if (!cfg.running) $('#bthrun').click(); log('เชื่อมต่อใหม่แล้ว — เปิด helper ต่อ'); }
+      else { setAuto(true); log('เชื่อมต่อใหม่แล้ว — เปิด AUTO ต่อ (ยังไม่ได้ตั้งจุดฟาร์ม)'); }
     }, 3000);
   })();
 
