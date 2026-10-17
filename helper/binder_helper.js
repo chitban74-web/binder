@@ -544,7 +544,7 @@
     }
     return false;
   }
-  let exitWalkFailed = 0, travelling = false;
+  let exitWalkFailed = 0;
   // where the game itself walks to leave a map (the last moveTo before the map changed to a neighbour): zones.json's exit
   // areas are out of date (Sanctum -> Shattered Vale: the game walks to (2, 15), zones.json says (2, 26)). Seeded with
   // what the log showed on 18 Oct, learned again on every map change, kept in localStorage.
@@ -588,7 +588,6 @@
         if (!spot) { log('ไม่เจอแมพ "' + name + '" บนแผนที่โลก'); return false; }
         click(spot, 'เลือก ' + name); await sleep(700);
         if (!click($('.wdgo'), 'เดินทางไป ' + name)) { log('ไม่มีปุ่มเดินทาง (อาจอยู่แมพนั้นแล้ว)'); }
-        else if (!document.hidden) { travelling = true; setTimeout(() => { travelling = false; }, 60e3); }
       }
       await sleep(1000);
     }
@@ -1200,10 +1199,9 @@
   const sentKinds = new Set();
   window.__bthSendHook = (type, msg) => {
     const kind = type + ':' + (msg && msg.type || '');
-    // during world-map travel: every message the game sends, with the map it is sent from (moveTo: where it walks to)
+    // last walk target, for learning map exits (exitTimer)
     if (type === 'input' && msg && msg.type === 'moveTo') { const r = room(); lastMove = { map: r && r.state.mapId, x: +msg.x, y: +msg.y, at: Date.now() }; }
-    if (travelling && type === 'input' && msg && msg.type !== 'ping') { const r = room(); log(`เกมส่งตอนเดินทาง [${r && r.state.mapId}] ${JSON.stringify(msg).slice(0, 120)}`); }
-    else if (!sentKinds.has(kind)) { sentKinds.add(kind); let j = ''; try { j = JSON.stringify(msg); } catch { } log(`ส่งถึงเซิร์ฟ (ครั้งแรก) ${kind} ${(j || '').slice(0, 160)}`); }
+    if (!sentKinds.has(kind)) { sentKinds.add(kind); let j = ''; try { j = JSON.stringify(msg); } catch { } log(`ส่งถึงเซิร์ฟ (ครั้งแรก) ${kind} ${(j || '').slice(0, 160)}`); }
     if (!pickUntil || type !== 'input' || !msg || msg.type !== 'moveTo' || !bigMapOpen()) return;
     setPick(false);
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปแมพฟาร์มก่อนแล้วเลือกจุดใหม่`); return; }
