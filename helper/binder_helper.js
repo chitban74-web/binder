@@ -528,7 +528,8 @@
     const r0 = room(); const from = r0 && r0.state.mapId;
     const path = target && from && routeTo(from, target);
     if (!path || path.length < 2) return false;
-    const [, next] = path, ex = (EXITS[from] || []).find(e => e[0] === next), spot = { x: ex[1], y: ex[2] };
+    const [, next] = path, ex = (EXITS[from] || []).find(e => e[0] === next), known = (exitsSeen[from] || {})[next];
+    const spot = known || { x: ex[1], y: ex[2] };
     log(`หน้าต่างพับอยู่ — เดินเองไปทางออก ${MAP_NAMES[next] || next} (${spot.x}, ${spot.y}) · เส้นทาง ${path.map(m => MAP_NAMES[m] || m).join(' → ')}`);
     const deadline = Date.now() + 90e3; let lastSend = 0, atExit = 0;
     while (Date.now() < deadline && cfg.running && still()) {
@@ -544,6 +545,26 @@
     return false;
   }
   let exitWalkFailed = 0, travelling = false;
+  // where the game itself walks to leave a map (the last moveTo before the map changed to a neighbour): zones.json's exit
+  // areas are out of date (Sanctum -> Shattered Vale: the game walks to (2, 15), zones.json says (2, 26)). Seeded with
+  // what the log showed on 18 Oct, learned again on every map change, kept in localStorage.
+  const EXITS_KEY = 'bth_exits';
+  const exitsSeen = (() => { try { return JSON.parse(localStorage.getItem(EXITS_KEY) || 'null'); } catch { return null; } })()
+    || { sanctum: { shattered_vale: { x: 2, y: 15 } }, shattered_vale: { glasswrack: { x: 2, y: 42 } } };
+  let lastMove = null, lastMapId = '';
+  const exitTimer = setInterval(() => {
+    const r = room(), id = r && r.state && r.state.mapId; if (!id) return;
+    if (lastMapId && id !== lastMapId && lastMove && lastMove.map === lastMapId && Date.now() - lastMove.at < 15e3
+      && (EXITS[lastMapId] || []).some(e => e[0] === id)) {
+      const was = (exitsSeen[lastMapId] || {})[id];
+      if (!was || was.x !== lastMove.x || was.y !== lastMove.y) {
+        exitsSeen[lastMapId] = { ...(exitsSeen[lastMapId] || {}), [id]: { x: lastMove.x, y: lastMove.y } };
+        try { localStorage.setItem(EXITS_KEY, JSON.stringify(exitsSeen)); } catch { }
+        log(`จำทางออก ${MAP_NAMES[lastMapId] || lastMapId} → ${MAP_NAMES[id] || id} ที่ (${lastMove.x}, ${lastMove.y})`);
+      }
+    }
+    lastMapId = id;
+  }, 500);
   async function travelTo(name, still = () => true) {
     if (mapName() === name) return true;
     const deadline = Date.now() + 6 * 60e3;
@@ -1180,7 +1201,8 @@
   window.__bthSendHook = (type, msg) => {
     const kind = type + ':' + (msg && msg.type || '');
     // during world-map travel: every message the game sends, with the map it is sent from (moveTo: where it walks to)
-    if (travelling && type === 'input' && msg) { const r = room(); log(`เกมส่งตอนเดินทาง [${r && r.state.mapId}] ${JSON.stringify(msg).slice(0, 120)}`); }
+    if (type === 'input' && msg && msg.type === 'moveTo') { const r = room(); lastMove = { map: r && r.state.mapId, x: +msg.x, y: +msg.y, at: Date.now() }; }
+    if (travelling && type === 'input' && msg && msg.type !== 'ping') { const r = room(); log(`เกมส่งตอนเดินทาง [${r && r.state.mapId}] ${JSON.stringify(msg).slice(0, 120)}`); }
     else if (!sentKinds.has(kind)) { sentKinds.add(kind); let j = ''; try { j = JSON.stringify(msg); } catch { } log(`ส่งถึงเซิร์ฟ (ครั้งแรก) ${kind} ${(j || '').slice(0, 160)}`); }
     if (!pickUntil || type !== 'input' || !msg || msg.type !== 'moveTo' || !bigMapOpen()) return;
     setPick(false);
@@ -1325,7 +1347,7 @@
 
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(kickTimer); stopTimers(); alive = false; for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(kickTimer); clearInterval(exitTimer); stopTimers(); alive = false; for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
