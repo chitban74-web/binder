@@ -920,6 +920,7 @@
     .bth-switch input:checked + .bth-switch-ui { background:#2f74e0; border-color:#2f74e0; }
     .bth-switch input:checked + .bth-switch-ui::after { transform:translateX(13px); background:#fff; }
     .bth-switch input:focus-visible + .bth-switch-ui { outline:2px solid #9fd0ff; outline-offset:2px; }
+    .bth-switch:has(input:disabled) { opacity:.4; cursor:not-allowed; pointer-events:none; }
     .bth-note { color:#8fa2bb; font-size:10.5px; }
     .bth-note b { color:#cfdcec; font-weight:600; }
     .bth-subnote { margin:-4px 0 4px 40px; }
@@ -1233,8 +1234,8 @@
   $('#bthwait').onchange = e => { cfg.deathWaitMs = Math.max(0, +e.target.value || 0) * 1000; save(); };
   $('#bthsalv').onchange = e => { cfg.salvOn = e.target.checked; save(); log(cfg.salvOn ? `เปิดแยกชิ้น Normal / Magic เลเวลต่ำกว่า ${cfg.salvBelow}` : 'ปิดแยกชิ้น'); };
   $('#bthsalvlv').onchange = e => { cfg.salvBelow = Math.max(2, Math.min(99, Math.round(+e.target.value) || 30)); e.target.value = cfg.salvBelow; save(); };
-  $('#bthquiet').onchange = e => { cfg.quietCh = e.target.checked; save(); };
-  $('#bthlead').onchange = e => { cfg.followLeader = e.target.checked; save(); };
+  $('#bthquiet').onchange = e => { if (cfg.lockCh) { e.target.checked = !!cfg.quietCh; return; } cfg.quietCh = e.target.checked; save(); };
+  $('#bthlead').onchange = e => { if (cfg.lockCh) { e.target.checked = !!cfg.followLeader; return; } cfg.followLeader = e.target.checked; save(); };
   $('#bthlockch').onchange = e => { cfg.lockCh = e.target.checked; save(); $('#bthlead').disabled = $('#bthquiet').disabled = cfg.lockCh; log(cfg.lockCh ? `ล็อก CH${cfg.lockChNum} · ปิดการย้าย CH อัตโนมัติ` : 'ปลดล็อก CH'); };
   $('#bthlockchnum').onchange = e => { cfg.lockChNum = Math.max(1, Math.min(99, Math.round(+e.target.value) || 1)); e.target.value = cfg.lockChNum; save(); if (cfg.lockCh) log(`ล็อก CH${cfg.lockChNum}`); };
   $('#bthlockchcur').onclick = () => { const ch = chOf(room()); if (!ch) return; $('#bthlockchnum').value = ch; $('#bthlockchnum').onchange({ target: $('#bthlockchnum') }); };
