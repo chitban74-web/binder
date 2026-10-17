@@ -148,7 +148,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(fs.readFileSync(path.join(PUBLIC, sf[1])));
     }
     // market (price board / one item) read through a game tab's own room — the same requests as the game's market window
-    if (req.method === 'GET' && ['/api/market/board', '/api/market/item', '/api/market/counts'].includes(url.pathname)) {
+    if (req.method === 'GET' && ['/api/market/board', '/api/market/item', '/api/market/counts', '/api/market/listings'].includes(url.pathname)) {
       const t = [...tabs.values()].find(x => x.state === 'helper' && !x.tab.closed);
       if (!t) return json(res, 503, { ok: false, error: 'ไม่มีแท็บเกมที่โหลด helper อยู่' });
       const qp = k => url.searchParams.get(k) || '';
@@ -162,7 +162,10 @@ const server = http.createServer(async (req, res) => {
       if (['normal', 'magic', 'rare', 'epic', 'unique'].includes(qp('rarity'))) filters.rarity = qp('rarity');
       const sort = ['def', 'vol', 'asc', 'desc', 'up', 'down'].includes(qp('sort')) ? qp('sort') : 'def';
       const msg = url.pathname === '/api/market/board' ? { type: 'marketBoard', ...filters, bsort: sort }
-        : url.pathname === '/api/market/counts' ? { type: 'marketQuery', ...filters, sort: 'new' }
+        : url.pathname === '/api/market/counts' ? { type: 'marketQuery', ...filters, sort: 'def' }
+        // all listings (the game's "ประกาศทั้งหมด"): 100 per page, page index p
+        : url.pathname === '/api/market/listings' ? { type: 'marketQuery', ...filters, p: num('p', 10000),
+          sort: ['def', 'asc', 'desc', 'unit', 'tier', 'lvhi', 'lvlo'].includes(qp('sort')) ? qp('sort') : 'def' }
         : { type: 'marketItem', itemId: qp('id').slice(0, 300), range: ['7d', '30d'].includes(qp('range')) ? qp('range') : '7d' };
       const want = msg.type === 'marketQuery' ? 'market' : msg.type;
       // one market request at a time: replies are matched by type only, two in flight would swap their answers
@@ -177,7 +180,8 @@ const server = http.createServer(async (req, res) => {
             room.send('input', msg); });
           if (!reply) return { ok: false, error: 'ตลาดไม่ตอบ' };
           // counts only: the listings themselves are not needed (and can be big)
-          return reply.type === 'market' ? { ok: true, type: 'counts', total: reply.total || 0, subCounts: reply.subCounts || null } : { ok: true, ...reply };
+          if (reply.type === 'market' && !${JSON.stringify(url.pathname === '/api/market/listings')}) return { ok: true, type: 'counts', total: reply.total || 0, subCounts: reply.subCounts || null };
+          return { ok: true, ...reply };
         })()`);
         return json(res, r && r.ok ? 200 : 502, r || { ok: false, error: 'อ่านไม่สำเร็จ' });
       } catch (e) { return json(res, 502, { ok: false, error: e.message }); } finally { release(); }

@@ -7,6 +7,7 @@
   const g = n => (Number(n) || 0).toLocaleString('en-US');
   const ago = t => { if (!t) return '-'; const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? 'เมื่อกี้' : s < 3600 ? `${Math.round(s / 60)} นาทีก่อน` : s < 86400 ? `${Math.round(s / 3600)} ชม.ก่อน` : `${Math.round(s / 86400)} วันก่อน`; };
   const CATS = [['', 'ทั้งหมด'], ['weapon', 'อาวุธ'], ['gear', 'ของสวมใส่'], ['use', 'ของใช้'], ['mat', 'วัตถุดิบ'], ['card', 'การ์ด']];
+  const LSORTS = [['def', 'ลงล่าสุด'], ['asc', 'ราคา ต่ำ→สูง'], ['desc', 'ราคา สูง→ต่ำ'], ['unit', 'ราคาต่อชิ้น ต่ำ→สูง'], ['tier', 'Tier Affix สูง→ต่ำ'], ['lvhi', 'เลเวลสวมใส่ สูง→ต่ำ'], ['lvlo', 'เลเวลสวมใส่ ต่ำ→สูง']];
   const SORTS = [['def', 'ลงล่าสุด'], ['vol', 'ซื้อขายเยอะสุด'], ['asc', 'ราคาต่ำ → สูง'], ['desc', 'ราคาสูง → ต่ำ'], ['up', 'ราคาขึ้นแรงสุด'], ['down', 'ราคาลงแรงสุด']];
   const RAR = { normal: 'Normal', common: 'Normal', uncommon: 'Magic', magic: 'Magic', rare: 'Rare', epic: 'Epic', unique: 'Unique', legendary: 'Legendary' };
   const RARS = [['', 'ทุกระดับ'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['epic', 'Epic'], ['unique', 'Unique']];
@@ -14,7 +15,7 @@
   // sub-types and affixes as the game's market window lists them (weapon names from the game's class table)
   const SUBS = { weapon: [["sword", "ดาบ"], ["greatsword", "ดาบสองมือ"], ["mace", "กระบอง"], ["dagger", "มีดสั้น"], ["bow", "ธนู"], ["staff", "ไม้เท้า"], ["wand", "ไม้กายสิทธิ์"], ["rod", "คทา"], ["book", "ตำรา"], ["spear", "หอก"], ["axe", "ขวาน"], ["crossbow", "หน้าไม้"], ["orb", "ลูกแก้วเวท"], ["hand_crossbow", "หน้าไม้มือ"], ["javelin", "หลาว"], ["sling", "สลิง"], ["pike", "ทวน"], ["lance", "หอกทหารม้า"], ["knuckles", "สนับมือ"], ["flail", "ลูกตุ้มโซ่"], ["rapier", "เรเปียร์"], ["throwing_knives", "มีดบิน"], ["greatstaff", "ไม้เท้ายาว"], ["spellstaff", "ไม้เท้าศึก"], ["maul", "ค้อนศักดิ์สิทธิ์"], ["lightstaff", "ไม้เท้าแสง"], ["scythe", "เคียวใหญ่"], ["chain_sickle", "เคียวโซ่"]], gear: [["armor", "เกราะ"], ["headgear", "หมวก"], ["face", "หน้า"], ["mouth", "ปาก"], ["boots", "รองเท้า"], ["offhand", "มือรอง / โล่"], ["accessory", "เครื่องประดับ"], ["necklace", "สร้อยคอ"], ["belt", "เข็มขัด"]] };
   const AFFIXES = [["desperate", "ดาเมจตอนเลือดคุณต่ำกว่า 35%"], ["vsdebuff", "ดาเมจใส่มอนที่ติดสตัน/ตรึง/สโล%"], ["opener", "ดาเมจใส่มอนที่เลือดยังเกิน 90%"], ["bossbane", "ดาเมจใส่ Boss%"], ["castspd", "ร่ายไว%"], ["aspd", "สปีดตี%"], ["agi", "AGI"], ["atk", "ATK"], ["atkpct", "ATK%"], ["block", "Block%"], ["bossres", "Boss Resist%"], ["p_bulwark", "Bulwark (Trigger)"], ["p_chain", "Chain Spark (Trigger)"], ["crit", "CRIT%"], ["critdmg", "Crit DMG%"], ["p_nova", "Death Burst (Trigger)"], ["guard", "DEF"], ["dex", "DEX"], ["p_echo", "Echo Strike (Trigger)"], ["evasive", "FLEE"], ["p_haste", "Frenzy (Trigger)"], ["p_frost", "Frostbite (Trigger)"], ["mending", "Heal power"], ["hit", "HIT"], ["regen", "HP regen/s"], ["int", "INT"], ["p_barrier", "Lifeline (Trigger)"], ["leech", "Lifesteal%"], ["luk", "LUK"], ["manatide", "Mana Tide: MP ที่ใช้กับสกิลเวท"], ["matk", "MATK"], ["matkpct", "MATK%"], ["hp", "Max HP"], ["hppct", "Max HP%"], ["mp", "Max MP"], ["move", "Move speed%"], ["p_bleed", "Rend (Trigger)"], ["p_renew", "Second Wind (Trigger)"], ["p_siphon", "Siphon (Trigger)"], ["cdr", "Skill CDR%"], ["p_gust", "Slipstream (Trigger)"], ["sturdy", "Soft DEF"], ["spellamp", "Spell Amp%"], ["str", "STR"], ["p_expose", "Sunder (Trigger)"], ["p_thorns", "Thorns (Trigger)"], ["p_vigor", "Vigor (Trigger)"], ["vit", "VIT"]];
-  let st = { req: 0, q: '', rarity: '', progress: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
+  let st = { view: 'board', lsort: 'def', lpage: 0, ltotal: 0, listings: [], lloading: false, lerror: '', req: 0, q: '', rarity: '', progress: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
 
   // item id -> base id, rarity, display name (gear ids carry "|rare|..." / "^insight", cards "|mob")
   const parse = (key, itemId) => {
@@ -45,6 +46,62 @@
     if (!opts.length && !insight) return '';
     const sum = opts.reduce((a, o) => a + o.tier, 0);
     return `<div class="mk-opts">${opts.map(o => `<span class="mk-opt t${Math.min(8, o.tier)}" title="Tier ${o.tier}"><b>T${o.tier}</b>${esc(optText(o))}</span>`).join('')}${insight ? `<span class="mk-opt ins">✦ ${esc(insight)}</span>` : ''}${opts.length ? `<span class="mk-tsum" title="Tier รวมของทุกออฟ">ΣT ${sum}</span>` : ''}</div>`; };
+  // one listing as the game shows it: "<prefixes> <base> <first suffix>", rarity from the number of options,
+  // wear level and ATK (base x3) of the equipment, every option with its tier
+  const ITEM_EQUIP = () => window.BT_EQUIP || {}, ITEM_AFFIX = () => window.BT_AFFIX || {};
+  function listingItem(itemId) {
+    const raw = String(itemId || '').split('#')[0];
+    const [head, rest = ''] = raw.split('|');
+    const [core, grade] = head.split('^')[0].split('~');
+    const names = window.BT_ITEM_NAMES || {};
+    const eq = ITEM_EQUIP()[core];
+    const opts = eq ? rest.split(',').map(x => x.split(':')).filter(a => a.length === 3).map(([id, t, v]) => ({ id, tier: Number(t) || 0, value: Number(v) || 0 })) : [];
+    const aff = ITEM_AFFIX();
+    const tierName = o => { const a = aff[o.id]; return a ? (a[1][o.tier - 1] || a[1][a[1].length - 1] || '') : ''; };
+    const pre = opts.filter(o => (aff[o.id] || [])[0] === 'p').map(tierName).filter(Boolean);
+    const suf = opts.filter(o => (aff[o.id] || [])[0] === 's').map(tierName).filter(Boolean).slice(0, 1);
+    let base = (names[core] || core) + (grade ? ` ★${grade}` : '');
+    if (core === 'spirit_card' && rest && !rest.includes(':')) base += ' · ' + rest.replace(/_/g, ' ');
+    const rarity = !eq ? '' : opts.length >= 4 ? 'epic' : opts.length === 3 ? 'rare' : opts.length ? 'magic' : 'normal';
+    const insight = (head.split('^')[1] || '').replace(/^ins_/, '').replace(/_/g, ' ');
+    return { core, name: [...pre, base, ...suf].join(' '), rarity, lv: eq ? eq[0] : 0, atk: eq && eq[1] ? eq[1] * 3 : 0, opts, tierName, insight };
+  }
+  function listingCard(l) {
+    const it = listingItem(l.itemId), unit = Math.round(l.price / Math.max(1, l.qty));
+    return `<div class="mk-lcard r-${it.rarity || 'common'}" data-lid="${l.id}" title="ดูกราฟราคาของไอเทมชนิดนี้">
+      <span class="mk-ico r-${it.rarity || 'common'}">${icon(it.core)}</span>
+      <div class="mk-lmain">
+        <b class="mk-lname">${esc(it.name)}</b>
+        <div class="mk-lmeta">${it.rarity ? `<i class="mk-rar r-${it.rarity}">${RAR[it.rarity]}</i>` : ''}${it.lv ? `<span class="mk-pill">Lv ${it.lv}</span>` : ''}${it.atk ? `<span class="mk-pill">ATK ${g(it.atk)}</span>` : ''}${it.insight ? `<span class="mk-opt ins">✦ ${esc(it.insight)}</span>` : ''}</div>
+        ${it.opts.length ? `<div class="mk-lopts">${it.opts.map(o => `<div class="mk-lopt t${Math.min(8, o.tier)}"><b>T${o.tier}</b><span>${esc(optText(o))}</span><small>${esc(it.tierName(o))}</small></div>`).join('')}</div>` : ''}
+      </div>
+      <div class="mk-lprice"><b>${g(unit)}<small> G${l.qty > 1 ? '/ชิ้น' : ''}</small></b>${l.qty > 1 ? `<span>×${g(l.qty)} = ${g(l.price)} G</span>` : ''}<span class="mk-seller">${esc(l.seller)}</span><small>${ago(l.at)}</small></div>
+    </div>`;
+  }
+  async function loadListings() {
+    const my = ++st.req;
+    st.lloading = true; st.lerror = ''; renderListings();
+    if (SUBS[st.cat]) loadCounts();
+    const p = filterParams(); p.set('sort', st.lsort); p.set('p', st.lpage);
+    try {
+      const r = await (await fetch('/api/market/listings?' + p)).json();
+      if (my !== st.req) return;
+      if (!r.ok) throw new Error(r.error || 'อ่านประกาศไม่สำเร็จ');
+      st.listings = r.listings || []; st.ltotal = r.total || 0;
+    } catch (e) { if (my !== st.req) return; st.lerror = e.message; st.listings = []; }
+    st.lloading = false; renderListings();
+  }
+  function renderListings() {
+    if (st.view !== 'list') return;
+    const pages = Math.max(1, Math.ceil(st.ltotal / 100));
+    $('mk-count').textContent = st.lloading ? 'กำลังโหลดประกาศ…' : st.lerror ? '⚠ ' + st.lerror : `${g(st.ltotal)} ประกาศ · หน้า ${st.lpage + 1}/${pages} (หน้าละ 100)`;
+    $('mk-lists').innerHTML = st.listings.length ? st.listings.map(listingCard).join('') : `<div class="mk-empty small">${st.lloading ? 'กำลังโหลด…' : 'ไม่มีประกาศ'}</div>`;
+    const win = [...new Set([0, st.lpage - 2, st.lpage - 1, st.lpage, st.lpage + 1, st.lpage + 2, pages - 1])].filter(x => x >= 0 && x < pages).sort((a, b) => a - b);
+    $('mk-pager').innerHTML = pages > 1 ? `<button type="button" data-lpg="${st.lpage - 1}" ${st.lpage ? '' : 'disabled'}>‹</button>`
+      + win.map((x, i) => (i && x - win[i - 1] > 1 ? '<span class="mk-gap">…</span>' : '') + `<button type="button" data-lpg="${x}" class="${x === st.lpage ? 'on' : ''}">${x + 1}</button>`).join('')
+      + `<button type="button" data-lpg="${st.lpage + 1}" ${st.lpage < pages - 1 ? '' : 'disabled'}>›</button>` : '';
+  }
+  const reload = () => (st.view === 'list' ? (st.lpage = 0, loadListings()) : loadBoard());
   const icon = base => `<img src="${ICON}${encodeURIComponent(base)}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
   const chg = c => c == null || !isFinite(c) ? '' : `<i class="mk-chg ${c > 0.05 ? 'up' : c < -0.05 ? 'down' : 'flat'}">${c > 0.05 ? '▲' : c < -0.05 ? '▼' : '•'} ${Math.abs(c).toFixed(1)}%</i>`;
 
@@ -63,10 +120,12 @@
             <button type="button" class="mk-clear" id="mk-clear">ล้างตัวกรอง</button>
           </div>
         </div>
+        <div class="mk-views" id="mk-views"><button type="button" data-view="board" class="on">กระดานราคา</button><button type="button" data-view="list">ประกาศทั้งหมด</button></div>
         <div class="mk-bar"><span id="mk-count">กำลังโหลด…</span>
           <label>เรียง <select class="mk-input" id="mk-sort">${SORTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
           <button type="button" class="mk-icon" id="mk-reload" title="โหลดใหม่">⟳</button></div>
-        <div class="mk-table">
+        <div class="mk-lists" id="mk-lists" hidden></div>
+        <div class="mk-table" id="mk-table">
           <div class="mk-head"><span>ไอเทม</span><span class="r">ราคาถูกสุด</span><span class="r">ในตลาด</span><span class="r">ขายล่าสุด</span></div>
           <div id="mk-rows"></div>
         </div>
@@ -170,6 +229,7 @@
   }
 
   function renderBoard() {
+    if (st.view === 'list') return renderListings();
     $('mk-count').textContent = st.loading ? (st.progress || 'กำลังโหลด…') : st.error ? '⚠ ' + st.error : `${g(st.total)} ชนิดในตลาด (ครบทุกชนิด)`;
     const rows = st.rows.slice(st.page * PAGE, st.page * PAGE + PAGE);
     $('mk-rows').innerHTML = rows.length ? rows.map(r => {
@@ -230,23 +290,45 @@
 
   // events
   let qTimer = null;
-  $('mk-q').oninput = e => { clearTimeout(qTimer); qTimer = setTimeout(() => { st.q = e.target.value.trim(); loadBoard(); }, 400); };
-  $('mk-sort').onchange = e => { st.sort = e.target.value; st.rows = sortRows(st.rows); st.page = 0; renderBoard(); };
-  $('mk-reload').onclick = loadBoard;
-  $('mk-cats').onclick = e => { const b = e.target.closest('button[data-cat]'); if (!b) return; st.cat = b.dataset.cat; st.sub = 'all'; st.counts = null; for (const x of $('mk-cats').children) x.classList.toggle('on', x === b); renderFilters(); loadBoard(); };
-  $('mk-rars').onclick = e => { const b = e.target.closest('button[data-rar]'); if (!b) return; st.rarity = b.dataset.rar; for (const x of $('mk-rars').children) x.classList.toggle('on', x === b); loadBoard(); };
-  $('mk-subs').onclick = e => { const b = e.target.closest('button[data-sub]'); if (!b) return; st.sub = b.dataset.sub; renderFilters(); loadBoard(); };
+  $('mk-q').oninput = e => { clearTimeout(qTimer); qTimer = setTimeout(() => { st.q = e.target.value.trim(); reload(); }, 400); };
+  $('mk-sort').onchange = e => {
+    if (st.view === 'list') { st.lsort = e.target.value; st.lpage = 0; loadListings(); return; }
+    st.sort = e.target.value; st.rows = sortRows(st.rows); st.page = 0; renderBoard();
+  };
+  // view switch: price board / every listing
+  $('mk-views').onclick = e => {
+    const b = e.target.closest('button[data-view]'); if (!b || b.dataset.view === st.view) return;
+    st.view = b.dataset.view; for (const x of $('mk-views').children) x.classList.toggle('on', x === b);
+    $('mk-table').hidden = st.view === 'list'; $('mk-lists').hidden = st.view !== 'list';
+    $('mk-sort').innerHTML = (st.view === 'list' ? LSORTS : SORTS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    $('mk-sort').value = st.view === 'list' ? st.lsort : st.sort;
+    if (st.view === 'list') loadListings(); else renderBoard();
+  };
+  $('mk-reload').onclick = () => (st.view === 'list' ? loadListings() : loadBoard());
+  $('mk-cats').onclick = e => { const b = e.target.closest('button[data-cat]'); if (!b) return; st.cat = b.dataset.cat; st.sub = 'all'; st.counts = null; for (const x of $('mk-cats').children) x.classList.toggle('on', x === b); renderFilters(); reload(); };
+  $('mk-rars').onclick = e => { const b = e.target.closest('button[data-rar]'); if (!b) return; st.rarity = b.dataset.rar; for (const x of $('mk-rars').children) x.classList.toggle('on', x === b); reload(); };
+  $('mk-subs').onclick = e => { const b = e.target.closest('button[data-sub]'); if (!b) return; st.sub = b.dataset.sub; renderFilters(); reload(); };
   const lv = id => Math.max(0, Math.min(99, Math.floor(Number($(id).value) || 0)));
-  $('mk-lvmin').onchange = () => { st.lvMin = lv('mk-lvmin'); renderFilters(); loadBoard(); };
-  $('mk-lvmax').onchange = () => { st.lvMax = lv('mk-lvmax'); renderFilters(); loadBoard(); };
-  $('mk-affix').onchange = e => { st.affix = e.target.value; renderFilters(); loadBoard(); };
-  $('mk-tiers').onclick = e => { const b = e.target.closest('button[data-t]'); if (!b) return; st.tierMin = Number(b.dataset.t); for (const x of $('mk-tiers').querySelectorAll('button')) x.classList.toggle('on', x === b); renderFilters(); loadBoard(); };
+  $('mk-lvmin').onchange = () => { st.lvMin = lv('mk-lvmin'); renderFilters(); reload(); };
+  $('mk-lvmax').onchange = () => { st.lvMax = lv('mk-lvmax'); renderFilters(); reload(); };
+  $('mk-affix').onchange = e => { st.affix = e.target.value; renderFilters(); reload(); };
+  $('mk-tiers').onclick = e => { const b = e.target.closest('button[data-t]'); if (!b) return; st.tierMin = Number(b.dataset.t); for (const x of $('mk-tiers').querySelectorAll('button')) x.classList.toggle('on', x === b); renderFilters(); reload(); };
   $('mk-clear').onclick = () => { st.lvMin = st.lvMax = st.tierMin = 0; st.affix = ''; $('mk-lvmin').value = $('mk-lvmax').value = ''; $('mk-affix').value = '';
-    for (const x of $('mk-tiers').querySelectorAll('button')) x.classList.toggle('on', x.dataset.t === '0'); renderFilters(); loadBoard(); };
+    for (const x of $('mk-tiers').querySelectorAll('button')) x.classList.toggle('on', x.dataset.t === '0'); renderFilters(); reload(); };
+  $('mk-pager').addEventListener('click', e => { const b = e.target.closest('button[data-lpg]'); if (!b || b.disabled) return; st.lpage = Number(b.dataset.lpg); loadListings(); $('mk-lists').scrollTop = 0; });
   $('mk-pager').onclick = e => { const b = e.target.closest('button[data-pg]'); if (!b || b.disabled) return; st.page = Number(b.dataset.pg); renderBoard(); };
   $('mk-rows').onclick = e => {
     const b = e.target.closest('.mk-row'); if (!b) return;
     st.sel = st.rows.find(r => r.key === b.dataset.key); st.item = null; renderBoard(); loadItem();
+  };
+  // a listing card opens the price chart / listings of its kind on the right
+  $('mk-lists').onclick = e => {
+    const c = e.target.closest('.mk-lcard'); if (!c) return;
+    const l = st.listings.find(x => String(x.id) === c.dataset.lid); if (!l) return;
+    const it = listingItem(l.itemId);
+    st.sel = { key: it.rarity ? `${it.core}|${it.rarity}` : it.core, itemId: l.itemId }; st.item = null;
+    for (const x of $('mk-lists').children) x.classList.toggle('sel', x === c);
+    loadItem();
   };
   $('mk-detail').onclick = e => { const b = e.target.closest('button[data-range]'); if (!b) return; st.range = b.dataset.range; st.item = null; loadItem(); };
 
