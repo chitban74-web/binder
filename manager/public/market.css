@@ -187,3 +187,50 @@
 .mk-buyer b.gold { color: var(--accent-gold); font-family: var(--font-mono); }
 .mk-buyer select { padding: 4px 8px; }
 .mk-buyer small { margin-left: auto; color: var(--text-faint); font-size: 11px; }
+
+/* item box = the game's item tooltip (listings view + item panel) */
+.mk-lcard { display: block; padding: 0; border-left: 0; }
+.mk-li.ib-wrap { padding: 0; background: none; }
+.ib { --rc: #94a3b8; display: grid; gap: 8px; padding: 12px 14px; border-radius: var(--radius-md); background: linear-gradient(170deg, rgba(20,28,48,.92), rgba(8,12,24,.94));
+  border: 1px solid var(--line-strong); }
+.ib-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.ib-title { display: grid; gap: 4px; min-width: 0; }
+.ib-name { font-size: 15px; line-height: 1.25; color: var(--rc); }
+.mk-lcard .ib, .mk-li .ib { --rc: inherit; }
+.ib-head .mk-ico.r-normal ~ .ib-title .ib-name, .ib-head .mk-ico.r-common ~ .ib-title .ib-name { color: var(--text-main); }
+.ib-head .mk-ico.r-magic ~ .ib-title .ib-name { color: #60a5fa; } .ib-head .mk-ico.r-rare ~ .ib-title .ib-name { color: #facc15; }
+.ib-head .mk-ico.r-epic ~ .ib-title .ib-name { color: #c084fc; } .ib-head .mk-ico.r-unique ~ .ib-title .ib-name { color: #fb923c; }
+.ib-title small { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11.5px; color: var(--text-muted); }
+.ib-title small b { color: #7dd3fc; }
+.ib-buy { display: grid; justify-items: end; gap: 3px; text-align: right; }
+.ib-buy > b { font: 800 16px var(--font-mono); color: var(--accent-gold); }
+.ib-buy > b small { font-size: 10.5px; font-weight: 600; color: #fde68a; }
+.ib-buy > span { font-size: 11.5px; color: var(--text-muted); }
+.ib-buy .mk-buy { margin-top: 4px; }
+.ib-base { display: flex; flex-wrap: wrap; gap: 2px 18px; padding: 6px 0; border-top: 1px dashed var(--line-strong); border-bottom: 1px dashed var(--line-strong); font-size: 12.5px; }
+.ib-base span { color: var(--text-muted); }
+.ib-base b { font-family: var(--font-mono); }
+.ib-opts { display: grid; gap: 4px; }
+.ib-opt { --tc: #94a3b8; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 12.5px; }
+.ib-opt > b { font: 800 10.5px var(--font-mono); color: #0b1222; background: var(--tc); border-radius: 5px; padding: 1px 6px; }
+.ib-opt > em { font: 600 10.5px var(--font-mono); color: var(--text-faint); font-style: normal; }
+.ib-opt > span { color: color-mix(in srgb, var(--tc) 75%, #ffffff); font-weight: 600; }
+.ib-opt > small { color: var(--text-faint); font-size: 10.5px; font-style: italic; }
+.ib-opt.t1 { --tc: #cbd5e1; } .ib-opt.t2 { --tc: #86efac; } .ib-opt.t3 { --tc: #93c5fd; } .ib-opt.t4 { --tc: #c4b5fd; }
+.ib-opt.t5 { --tc: #fdba74; } .ib-opt.t6 { --tc: #fca5a5; } .ib-opt.t7 { --tc: #f0abfc; } .ib-opt.t8 { --tc: #fde68a; }
+.ib-opt.ins { --tc: #22e3c4; grid-template-columns: auto minmax(0, 1fr) auto; }
+.ib-tier { border-radius: var(--radius-sm); background: rgba(255,255,255,.03); border: 1px solid var(--line); padding: 6px 10px; font-size: 12px; }
+.ib-tier summary { cursor: pointer; font-weight: 700; color: var(--text-main); list-style: none; }
+.ib-tier summary::-webkit-details-marker { display: none; }
+.ib-tier summary::before { content: '▸ '; color: var(--text-faint); }
+.ib-tier[open] summary::before { content: '▾ '; }
+.ib-tier summary small { color: var(--text-muted); font-weight: 500; }
+.ib-tier p { margin: 6px 0; color: var(--text-muted); font-size: 11.5px; }
+.tb { --tc: #94a3b8; display: inline-block; text-decoration: none; font: 800 10.5px var(--font-mono); color: #0b1222; background: var(--tc); border-radius: 5px; padding: 1px 6px; }
+.tb.t1 { --tc: #cbd5e1; } .tb.t2 { --tc: #86efac; } .tb.t3 { --tc: #93c5fd; } .tb.t4 { --tc: #c4b5fd; }
+.tb.t5 { --tc: #fdba74; } .tb.t6 { --tc: #fca5a5; } .tb.t7 { --tc: #f0abfc; } .tb.t8 { --tc: #fde68a; }
+.ib-odds { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; color: var(--text-muted); }
+.ib-odds i { font-style: normal; font-family: var(--font-mono); font-size: 11.5px; }
+.ib-ladder { display: flex; flex-wrap: wrap; gap: 5px; }
+.ib-ladder i { font-style: normal; font: 600 10.5px var(--font-mono); padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line-strong); color: var(--text-faint); }
+.ib-ladder i.on { color: var(--text-main); border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.06); }

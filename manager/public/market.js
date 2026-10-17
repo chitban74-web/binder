@@ -70,19 +70,52 @@
     const cap = eq ? TIER_LV.filter(x => x <= ilvl).length : 0;
     return { core, name: [...pre, base, ...suf].join(' '), rarity, lv: eq ? eq[0] : 0, atk: eq && eq[1] ? eq[1] * 3 : 0, opts, tierName, insight, ilvl, cap };
   }
+  // per-row tier odds of an item whose cap is `cap` (the game's H3/Fj: +1 tier 3 %, the cap ~25-50 %, lower tiers falling off)
+  function tierOdds(cap, tiers = 8) {
+    const up = 0.03, s = Math.max(0, cap - 1), want = 0.25 + 0.25 * Math.max(0, Math.min(1, (cap - 1) / 7));
+    const a = u => { let p = 0; for (let h = 0; h <= s; h++) p += u ** h; return (1 - up) / p; };
+    let lo = 0.3, hi = 0.8;
+    if (a(hi) >= want) lo = hi; else if (a(lo) <= want) hi = lo; else for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; a(m) > want ? lo = m : hi = m; }
+    const l = (lo + hi) / 2, c = a(l), out = new Map();
+    for (const [o, ch] of [[1, up], ...Array.from({ length: s + 1 }, (_, u) => [-u, c * l ** u])]) { const t = Math.max(1, Math.min(tiers, cap + o)); out.set(t, (out.get(t) || 0) + ch); }
+    return [...out].sort((x, y) => y[0] - x[0]);
+  }
+  const STAT_LABEL = { healPower: ['Heal power', 0], atk: ['ATK', 0], matk: ['MATK', 0], def: ['DEF', 0], softDef: ['Soft DEF', 0], hit: ['HIT', 0], flee: ['FLEE', 0],
+    maxHp: ['Max HP', 0], maxMp: ['Max MP', 0], hpRegen: ['HP regen/s', 0], crit: ['CRIT', 1], critDmg: ['ดาเมจคริ', 1], aspd: ['สปีดตี', 1], cdr: ['Skill CDR', 1],
+    moveSpeed: ['Move speed', 1], block: ['Block', 1], castSpd: ['ร่ายไว', 1] };
+  const TYPE_NAME = Object.fromEntries([...SUBS.weapon, ...SUBS.gear]);
+  // the whole item box of one listing (name, type, level, base stats, options with tier, cap tier box)
+  function itemBox(l, opts = {}) {
+    const it = listingItem(l.itemId), eq = (window.BT_EQUIP || {})[it.core];
+    const unit = Math.round(l.price / Math.max(1, l.qty));
+    const head = `<div class="ib-head">
+        <span class="mk-ico r-${it.rarity || 'common'}">${icon(it.core)}</span>
+        <div class="ib-title"><b class="ib-name">${esc(it.name)}</b>
+          <small>${it.rarity ? `<i class="mk-rar r-${it.rarity}">${RAR[it.rarity]}</i>` : ''}${eq ? `${esc(eq[7] || '')} · ${esc(TYPE_NAME[eq[2]] || eq[2] || '')}` : ''}${it.lv ? ` · <b>เลเวล ${it.lv}</b>` : ''}</small></div>
+        <div class="ib-buy"><b>${g(unit)}<small> G${l.qty > 1 ? '/ชิ้น' : ''}</small></b>${l.qty > 1 ? `<span>×${g(l.qty)} = ${g(l.price)} G</span>` : ''}
+          <span class="mk-seller">${esc(l.seller)} · ${ago(l.at)}</span>${buyBtn(l)}</div>
+      </div>`;
+    if (!eq) return `<div class="ib">${head}</div>`;
+    const base = [eq[1] ? `<div><span>ATK :</span> <b>${g(eq[1] * 3)}</b></div>` : '', eq[3] ? `<div><span>MATK :</span> <b>${g(eq[3] * 3)}</b></div>` : '', eq[4] ? `<div><span>DEF :</span> <b>${g(eq[4] * 3)}</b></div>` : '',
+      ...Object.entries(eq[5] || {}).map(([k, v]) => `<div><span>${k.toUpperCase()} :</span> <b>+${v}</b></div>`),
+      ...Object.entries(eq[6] || {}).map(([k, v]) => { const [lb, pct] = STAT_LABEL[k] || [k, 0]; return `<div><span>${esc(lb)} :</span> <b>+${v}${pct ? '%' : ''}</b></div>`; })].join('');
+    const lines = it.opts.map(o => `<div class="ib-opt t${Math.min(8, o.tier)}"><b>T${o.tier}</b><em>/T${it.cap}</em><span>${esc(optText(o))}</span><small>${esc(it.tierName(o))}</small></div>`).join('')
+      + (it.insight ? `<div class="ib-opt ins"><b>✦</b><span>${esc(it.insight)}</span><small>insight</small></div>` : '');
+    const odds = tierOdds(it.cap).map(([t, c]) => `<i><u class="tb t${t}">T${t}</u> ${Math.round(c * 100)}%</i>`).join('');
+    const ladder = TIER_LV.map((lv, i) => `<i class="${i < it.cap ? 'on' : ''}">T${i + 1} Lv ${lv}</i>`).join('');
+    return `<div class="ib">${head}
+      <div class="ib-base">${base}</div>
+      ${lines ? `<div class="ib-opts">${lines}</div>` : ''}
+      <details class="ib-tier"${opts.open ? ' open' : ''}><summary>Tier Affix สูงสุดของชิ้นนี้: <u class="tb t${it.cap}">T${it.cap}</u>${it.cap < 8 ? ` <small>(ลุ้น T${it.cap + 1} 1%)</small>` : ''}</summary>
+        <div class="ib-odds">โอกาสแต่ละแถว: ${odds}</div>
+        <p>Affix ${it.opts.length} แถว (จำนวนแถวตายตัวตามความหายาก) · เลเวลไอเทม ${it.ilvl} — ดรอปจากมอนเลเวลสูงกว่า = Tier สูงกว่า · Reroll ที่ Smith สุ่มได้ถึง Tier เดียวกัน</p>
+        <div class="ib-ladder">${ladder}</div></details>
+    </div>`;
+  }
   const optRows = it => (it.opts.length || it.insight) ? `<div class="mk-lopts">${it.opts.map(o => `<div class="mk-lopt t${Math.min(8, o.tier)}"><b>T${o.tier}</b><span>${esc(optText(o))}</span><small>${esc(it.tierName(o))}</small></div>`).join('')}${it.insight ? `<div class="mk-lopt ins"><b>✦</b><span>${esc(it.insight)}</span><small>insight</small></div>` : ''}</div>` : '';
   const buyBtn = l => `<button type="button" class="mk-buy" data-buy="${l.id}" title="ซื้อประกาศนี้ (ของส่งเข้าจดหมายในเกม)">ซื้อ</button>`;
   function listingCard(l) {
-    const it = listingItem(l.itemId), unit = Math.round(l.price / Math.max(1, l.qty));
-    return `<div class="mk-lcard r-${it.rarity || 'common'}" data-lid="${l.id}" title="ดูกราฟราคาของไอเทมชนิดนี้">
-      <span class="mk-ico r-${it.rarity || 'common'}">${icon(it.core)}</span>
-      <div class="mk-lmain">
-        <b class="mk-lname">${esc(it.name)}</b>
-        <div class="mk-lmeta">${it.rarity ? `<i class="mk-rar r-${it.rarity}">${RAR[it.rarity]}</i>` : ''}${it.lv ? `<span class="mk-pill">Lv ${it.lv}</span>` : ''}${it.atk ? `<span class="mk-pill">ATK ${g(it.atk)}</span>` : ''}${it.cap ? `<span class="mk-cap t${it.cap}" title="Tier Affix สูงสุดของชิ้นนี้ · เลเวลไอเทม ${it.ilvl}${it.cap < 8 ? ` · ลุ้น T${it.cap + 1} 1%` : ''}">สูงสุด T${it.cap}<small>iLv ${it.ilvl}</small></span>` : ''}${it.insight ? `<span class="mk-opt ins">✦ ${esc(it.insight)}</span>` : ''}</div>
-        ${optRows({ ...it, insight: '' })}
-      </div>
-      <div class="mk-lprice"><b>${g(unit)}<small> G${l.qty > 1 ? '/ชิ้น' : ''}</small></b>${l.qty > 1 ? `<span>×${g(l.qty)} = ${g(l.price)} G</span>` : ''}<span class="mk-seller">${esc(l.seller)}</span><small>${ago(l.at)}</small>${buyBtn(l)}</div>
-    </div>`;
+    return `<div class="mk-lcard" data-lid="${l.id}" title="คลิกเพื่อดูกราฟราคาของไอเทมชนิดนี้">${itemBox(l)}</div>`;
   }
   const MAX_ALL_PAGES = 80;   // "every page" stops here (8,000 listings) — narrow the filters for more
   async function listingsPage(page) {
@@ -340,12 +373,7 @@
       <div class="mk-chartbox">${chart(v.series)}</div>
       <h4>ประกาศขาย (${(v.listings || []).length})</h4>
       ${buyerBar()}
-      <div class="mk-list">${(v.listings || []).length ? (v.listings || []).map(l => { const li = listingItem(l.itemId); return `<div class="mk-li">
-          <div class="mk-li-top"><b>${g(Math.round(l.price / Math.max(1, l.qty)))}<small> G${l.qty > 1 ? '/ชิ้น' : ''}</small></b>
-          ${l.qty > 1 ? `<span>×${g(l.qty)} = ${g(l.price)} G</span>` : ''}<span class="mk-seller">${esc(l.seller)}</span><small>${ago(l.at)}</small>
-          ${li.cap ? `<span class="mk-cap t${li.cap}" title="Tier Affix สูงสุดของชิ้นนี้ · เลเวลไอเทม ${li.ilvl}">สูงสุด T${li.cap}<small>iLv ${li.ilvl}</small></span>` : ''}${buyBtn(l)}</div>
-          ${optRows(li)}</div>`; }).join('')
-        : '<div class="mk-empty small">ไม่มีประกาศขาย</div>'}</div>`;
+      <div class="mk-list">${(v.listings || []).length ? (v.listings || []).map(l => `<div class="mk-li ib-wrap">${itemBox(l)}</div>`).join('') : '<div class="mk-empty small">ไม่มีประกาศขาย</div>'}</div>`;
   }
 
   // events
