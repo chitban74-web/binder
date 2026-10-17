@@ -512,6 +512,38 @@
   const setAuto = on => { if (autoOn() !== on) click($('#autobig'), on ? 'เปิด AUTO' : 'ปิด AUTO'); };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+  // ---- walking map to map ourselves while the tab is hidden ----
+  // the world map's "เดินทางไป" walk did not move the character in a minimised window (01:52–01:53: pressed every 24 s,
+  // still in Sanctum), so then walk exit to exit with moveTo, like walkToSpot. Exits from data/maps/zones.json
+  // (map id -> [to, x, y] centre of the exit area). Not yet seen working: logs each step, gives up after 10 s at an exit.
+  const EXITS = {'southvale_field':[['valebrook',29.5,2.0],['honeyrill',27.5,2.0]],'valebrook':[['southvale_field',21.5,42.5],['whispering_woods',21.5,2.0],['riverside',42.0,25.0],['old_quarry',2.0,30.0]],'whispering_woods':[['valebrook',27.5,54.0],['ancient_ruins',27.5,2.0],['bloomcrown_glade',42.5,2.0],['bracken_sink',32.5,54.0]],'riverside':[['valebrook',2.0,34.5],['honeyrill',2.0,26.0]],'old_quarry':[['valebrook',54.0,32.0],['verdigris_rise',2.0,28.0]],'ancient_ruins':[['whispering_woods',27.5,54.0],['sunfield_plains',27.5,2.0]],'sunfield_plains':[['ancient_ruins',27.5,54.0],['ashford',26.5,2.0],['gloomroot_forest',54.0,29.0],['bracken_sink',2.0,29.0]],'ashford':[['sunfield_plains',24.0,46.0],['gloomroot_forest',46.0,34.0],['ember_hollow',24.0,2.0],['mistmire_swamp',2.0,40.0],['duskgate_pass',45.5,2.0]],'gloomroot_forest':[['sunfield_plains',53.5,28.5],['ashford',26.5,54.0],['pitchwood',28.5,2.0]],'ember_hollow':[['ashford',25.5,54.0],['mistmire_swamp',2.0,26.5],['cinder_eyrie',54.0,22.5],['yellowlick_flats',54.0,28.0]],'mistmire_swamp':[['ashford',25.5,2.0],['ember_hollow',53.5,44.5],['duskgate_pass',40.5,2.0],['lotus_hollow',2.0,42.5],['peatcut_bog',2.0,28.0]],'duskgate_pass':[['mistmire_swamp',28.5,54.0],['stormwall_city',31.5,2.0],['ashford',12.0,2.0]],'stormwall_city':[['duskgate_pass',23.5,46.0],['frostpeak_slopes',2.0,28.0],['frozen_mere',24.0,2.0],['howling_steppes',46.0,23.0],['cloudspire_ruins',39.5,2.0]],'frostpeak_slopes':[['stormwall_city',54.0,27.5],['sledrun_gully',28.5,2.0]],'frozen_mere':[['stormwall_city',26.5,54.0],['aurora_hollow',2.0,24.5],['brinecrust_shoals',54.0,28.0]],'howling_steppes':[['stormwall_city',2.0,27.0],['cloudspire_ruins',42.5,2.0],['brinecrust_shoals',28.5,54.0]],'cloudspire_ruins':[['howling_steppes',26.5,54.0],['sanctum',26.5,2.0],['stormwall_city',2.0,12.0],['tempest_aerie',27.5,2.0],['kitewind_terraces',28.5,54.0]],'sanctum':[['cloudspire_ruins',22.0,42.5],['shattered_vale',2.0,26.0],['umbral_depths',22.0,2.0],['throne_of_warden',42.0,21.0],['rustbell_barracks',32.0,42.0]],'shattered_vale':[['sanctum',54.0,26.5],['opalweb_grotto',39.5,54.0],['glasswrack',2.0,28.0]],'umbral_depths':[['sanctum',27.5,54.0],['throne_of_warden',27.5,2.0],['marrowdeep',2.0,28.0]],'throne_of_warden':[['umbral_depths',24.5,46.0],['sanctum',32.0,2.0],['wardens_seat',24.5,46.0]],'training_grounds':[],'rootfall_barrow':[],'honeyrill':[['southvale_field',27.5,54.0],['riverside',54.0,26.0]],'bracken_sink':[['whispering_woods',28.5,2.0],['sunfield_plains',54.0,32.0]],'verdigris_rise':[['old_quarry',54.0,28.0]],'pitchwood':[['gloomroot_forest',28.5,54.0]],'yellowlick_flats':[['ember_hollow',2.0,28.0]],'peatcut_bog':[['mistmire_swamp',54.0,28.0]],'sledrun_gully':[['frostpeak_slopes',28.5,54.0]],'brinecrust_shoals':[['frozen_mere',2.0,28.0],['howling_steppes',28.5,2.0]],'kitewind_terraces':[['cloudspire_ruins',28.5,2.0]],'glasswrack':[['shattered_vale',54.0,28.0]],'marrowdeep':[['umbral_depths',54.0,28.0]],'rustbell_barracks':[['sanctum',28.5,2.0]]};
+  const routeTo = (from, to) => {
+    const prev = { [from]: null }, q = [from];
+    while (q.length) { const m = q.shift(); if (m === to) break; for (const [n] of EXITS[m] || []) if (!(n in prev)) { prev[n] = m; q.push(n); } }
+    if (!(to in prev)) return null;
+    const path = []; for (let m = to; m; m = prev[m]) path.unshift(m); return path;
+  };
+  async function walkExits(name, still) {
+    const target = Object.keys(MAP_NAMES).find(id => MAP_NAMES[id] === name);
+    const r0 = room(); const from = r0 && r0.state.mapId;
+    const path = target && from && routeTo(from, target);
+    if (!path || path.length < 2) return false;
+    const [, next] = path, ex = (EXITS[from] || []).find(e => e[0] === next), spot = { x: ex[1], y: ex[2] };
+    log(`หน้าต่างพับอยู่ — เดินเองไปทางออก ${MAP_NAMES[next] || next} (${spot.x}, ${spot.y}) · เส้นทาง ${path.map(m => MAP_NAMES[m] || m).join(' → ')}`);
+    const deadline = Date.now() + 90e3; let lastSend = 0, atExit = 0;
+    while (Date.now() < deadline && cfg.running && still()) {
+      const r = room(), p = myPos();
+      if (r && r.state.mapId !== from) return true; // next map: the caller's loop goes on from there
+      if (!r || !p) { await sleep(1000); continue; }
+      if (dist(p, spot) <= 1.2) {
+        if (!atExit) atExit = Date.now();
+        if (Date.now() - atExit > 10e3) { log('ถึงทางออกแล้วแต่แมพไม่เปลี่ยนใน 10 วิ — ใช้ปุ่มเดินทางของเกมแทน'); return false; }
+      } else if (Date.now() - lastSend > 4000) { lastSend = Date.now(); r.send('input', { type: 'moveTo', x: spot.x, y: spot.y }); }
+      await sleep(700);
+    }
+    return false;
+  }
+  let exitWalkFailed = 0;
   async function travelTo(name, still = () => true) {
     if (mapName() === name) return true;
     const deadline = Date.now() + 6 * 60e3;
@@ -522,6 +554,11 @@
       if (mapName() !== lastMap) { lastMap = mapName(); lastMapAt = Date.now(); }
       // game asks "วาร์ปไป <town> แล้วเดินต่อ?" when a nearer town has a warp point -> warp, then it walks on by itself
       if (dialogOpen() && /วาร์ป/.test(dialogTitle())) { click($('#bcyes'), 'วาร์ปแล้วเดินต่อ'); lastGo = lastMapAt = Date.now(); await sleep(2000); continue; }
+      // hidden tab: walk exit to exit ourselves (unless that already failed in the last 10 min)
+      if (document.hidden && Date.now() - lastMapAt > 8e3 && Date.now() - exitWalkFailed > 10 * 60e3) {
+        if (await walkExits(name, still)) { lastMap = mapName(); lastMapAt = Date.now(); continue; }
+        exitWalkFailed = Date.now();
+      }
       // (re)start the game's own route walk when nothing has changed for a while
       if (Date.now() - lastGo > 25e3 && Date.now() - lastMapAt > 8e3) {
         lastGo = Date.now();
