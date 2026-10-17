@@ -610,19 +610,52 @@
     }
     return mapId() === WB_ARENA;
   }
-  async function worldBossTrip() {
-    const id = wb.view.id;
-    setPhase('World Boss: เข้าสนาม');
-    log(`World Boss ${wb.view.state === 'live' ? 'เกิดแล้ว' : 'กำลังจะมา'} — เข้าไปตี`);
+  // the boss in the arena (state key "wb_boss"); AUTO does not walk there from the entrance by itself
+  const wbBoss = () => {
+    const r = room(); if (!r || !r.state || !r.state.mobs) return null;
+    let b = r.state.mobs.get ? r.state.mobs.get('wb_boss') : null;
+    if (!b) r.state.mobs.forEach(m => { if (!b && m.mobType === 'wraithroot_colossus') b = m; });
+    return b && b.state !== 'dead' ? b : null;
+  };
+  // damage share of the round: the server sends fractions of the boss HP (0.042 = 4.2 %)
+  const wbPct = v => (Number(v) || 0) <= 1 ? `${((Number(v) || 0) * 100).toFixed(1)}%` : Number(v).toLocaleString();
+  async function wbWalkToBoss() {
+    const b = wbBoss(), p = myPos(), r = room();
+    if (!b || !p || !r) return;
+    if (dist(p, b) <= 5) return;
     setAuto(false);
-    if (!await waitForCombatToFinish('วาร์ป')) return;
-    if (!await wbEnter()) { wb.doneId = id; log('เข้าสนาม World Boss ไม่ได้ — กลับไปฟาร์ม'); await backToFarm(); return; }
-    await sleep(1500); setAuto(true);
+    setPhase('World Boss: เดินไปหาบอส');
+    for (let i = 0; i < 25 && cfg.running && mapId() === WB_ARENA && !isDead(); i++) {
+      const bb = wbBoss(), pp = myPos(); if (!bb || !pp) break;
+      if (dist(pp, bb) <= 3) break;
+      if (i % 4 === 0) r.send('input', { type: 'moveTo', x: bb.x, y: bb.y });
+      await sleep(500);
+    }
+    setAuto(true);
+  }
+  // Also resumes when the helper (re)starts while the character is already in the arena: without round data (it only
+  // comes on a map join / round change) the round counts as over once the boss is gone for 20 s.
+  async function worldBossTrip() {
+    let id = wb.view ? wb.view.id : null, noBossSince = 0;
+    if (mapId() !== WB_ARENA) {
+      setPhase('World Boss: เข้าสนาม');
+      log(`World Boss ${wb.view && wb.view.state === 'live' ? 'เกิดแล้ว' : 'กำลังจะมา'} — เข้าไปตี`);
+      setAuto(false);
+      if (!await waitForCombatToFinish('วาร์ป')) return;
+      if (!await wbEnter()) { wb.doneId = id; log('เข้าสนาม World Boss ไม่ได้ — กลับไปฟาร์ม'); await backToFarm(); return; }
+      await sleep(1500);
+    } else log('อยู่ในสนาม World Boss อยู่แล้ว — ตีต่อ');
+    await wbWalkToBoss(); setAuto(true);
     while (cfg.running) {
       const v = wb.view, now = Date.now();
-      if (!v || v.id !== id || v.state === 'dead' || v.state === 'fled') break;
-      if (v.state === 'live' && v.endsAt && now > v.endsAt + 5000) break;
-      if (v.state === 'idle' && v.startAt && now > v.startAt + WB_OPEN_MS) break;
+      if (v && id === null) id = v.id;   // round data arrived while inside
+      if (v) {
+        if (v.id !== id || v.state === 'dead' || v.state === 'fled') break;
+        if (v.state === 'live' && v.endsAt && now > v.endsAt + 5000) break;
+        if (v.state === 'idle' && v.startAt && now > v.startAt + WB_OPEN_MS) break;
+      } else if (mapId() === WB_ARENA) {
+        if (wbBoss()) noBossSince = 0; else if (!noBossSince) noBossSince = now; else if (now - noBossSince > 20000) break;
+      }
       if (isDead()) {
         setPhase('World Boss: ตาย — เกิดใหม่แล้วเข้าไปใหม่');
         for (let i = 0; i < 20 && isDead() && cfg.running; i++) { const b = $('#drespawn'); if (b && !b.disabled) click(b, 'เกิดใหม่'); await sleep(1500); }
@@ -633,17 +666,19 @@
         if (!wbOpen()) break;
         setAuto(false);
         if (!await wbEnter()) break;
-        await sleep(1500); setAuto(true);
+        await sleep(1500); await wbWalkToBoss(); setAuto(true);
         continue;
       }
+      if (!v || v.state === 'live') await wbWalkToBoss();   // drifted away (AUTO chased an add / just respawned): back to the boss
       if (!autoOn()) setAuto(true);
-      setPhase(v.state === 'live'
-        ? `World Boss: ตี · HP ${v.frac != null ? (v.frac * 100).toFixed(1) + '%' : '?'} · ดาเมจเรา ${wb.mine.toLocaleString()}/${wb.need.toLocaleString()} · เหลือ ${wbLeft(v.endsAt - now)}`
-        : `World Boss: รอในสนาม · เริ่มใน ${wbLeft(v.startAt - now)}`);
+      setPhase(!v ? 'World Boss: ตี (ยังไม่มีข้อมูลรอบ)'
+        : v.state === 'live'
+          ? `World Boss: ตี · HP ${v.frac != null ? (v.frac * 100).toFixed(1) + '%' : '?'} · ดาเมจเรา ${wbPct(wb.mine)} (เกณฑ์รางวัล ${wbPct(wb.need)}) · เหลือ ${wbLeft(v.endsAt - now)}`
+          : `World Boss: รอในสนาม · เริ่มใน ${wbLeft(v.startAt - now)}`);
       await sleep(2000);
     }
     wb.doneId = id;
-    log(`World Boss จบ (${(wb.view && wb.view.state) || '?'}) · ดาเมจเรา ${wb.mine.toLocaleString()}/${wb.need.toLocaleString()} — ออกจากสนาม`);
+    log(`World Boss จบ (${(wb.view && wb.view.state) || 'บอสหายไปแล้ว'}) · ดาเมจเรา ${wbPct(wb.mine)} (เกณฑ์ ${wbPct(wb.need)}) — ออกจากสนาม`);
     setAuto(false);
     if (mapId() === WB_ARENA) {
       const r = room(); if (r) r.send('input', { type: 'worldBossWarp', enter: false });
@@ -671,8 +706,8 @@
         const sell = weightPct() >= cfg.sellAfterDeathPct;
         if (sell || potionPlans().some(p => p.have !== null && p.have < (p.to || 0))) await townTrip('ในเมือง: ขายของ / ซื้อยา', sell);
         await backToFarm();
-      } else if (cfg.worldBoss && wbOpen() && wb.view.id !== wb.doneId) {
-        await worldBossTrip();
+      } else if (cfg.worldBoss && (mapId() === WB_ARENA || (wbOpen() && wb.view.id !== wb.doneId))) {
+        await worldBossTrip();   // also when the helper starts already inside the arena
       } else if (bagFull()) {
         await townTrip(`ของเต็ม (น้ำหนัก ${weightPct()}%${slotsFull() ? ' / ช่องเต็ม' : ''}) — กลับเมือง`, true);
         // still full after selling (sell filter keeps the rest) -> stop instead of warping again and again
