@@ -55,6 +55,12 @@ async function checkTab(key, target) {
   const s = await t.tab.eval(STATE_JS);
   t.status = s.status;
   if (s.status) t.wasRunning = !!s.status.running; // kept over a page reload: ▶ goes on again in the new helper
+  if (s.status && s.status.log) {
+    // copy the helper's new log lines (newest first) to server.log, so why it stopped can be read afterwards
+    const seen = s.status.log.indexOf(t.lastLog), fresh = s.status.log.slice(0, seen < 0 ? s.status.log.length : seen);
+    for (const l of fresh.reverse()) log(`[${key}] ${t.id.slice(0, 6)} helper: ${l}`);
+    if (s.status.log.length) t.lastLog = s.status.log[0];
+  }
   const state = s.helper ? 'helper' : s.inWorld ? 'world' : 'loading';
   if (state !== t.state) log(`[${key}] ${t.id.slice(0, 6)}: ${state === 'helper' ? 'helper ทำงาน' : state === 'world' ? 'เข้าเกมแล้ว' : 'ยังไม่เข้าเกม'}`);
   t.state = state;
