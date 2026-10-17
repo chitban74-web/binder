@@ -543,7 +543,7 @@
     }
     return false;
   }
-  let exitWalkFailed = 0;
+  let exitWalkFailed = 0, travelling = false;
   async function travelTo(name, still = () => true) {
     if (mapName() === name) return true;
     const deadline = Date.now() + 6 * 60e3;
@@ -567,6 +567,7 @@
         if (!spot) { log('ไม่เจอแมพ "' + name + '" บนแผนที่โลก'); return false; }
         click(spot, 'เลือก ' + name); await sleep(700);
         if (!click($('.wdgo'), 'เดินทางไป ' + name)) { log('ไม่มีปุ่มเดินทาง (อาจอยู่แมพนั้นแล้ว)'); }
+        else if (!document.hidden) { travelling = true; setTimeout(() => { travelling = false; }, 60e3); }
       }
       await sleep(1000);
     }
@@ -1178,7 +1179,9 @@
   const sentKinds = new Set();
   window.__bthSendHook = (type, msg) => {
     const kind = type + ':' + (msg && msg.type || '');
-    if (!sentKinds.has(kind)) { sentKinds.add(kind); let j = ''; try { j = JSON.stringify(msg); } catch { } log(`ส่งถึงเซิร์ฟ (ครั้งแรก) ${kind} ${(j || '').slice(0, 160)}`); }
+    // during world-map travel: every message the game sends, with the map it is sent from (moveTo: where it walks to)
+    if (travelling && type === 'input' && msg) { const r = room(); log(`เกมส่งตอนเดินทาง [${r && r.state.mapId}] ${JSON.stringify(msg).slice(0, 120)}`); }
+    else if (!sentKinds.has(kind)) { sentKinds.add(kind); let j = ''; try { j = JSON.stringify(msg); } catch { } log(`ส่งถึงเซิร์ฟ (ครั้งแรก) ${kind} ${(j || '').slice(0, 160)}`); }
     if (!pickUntil || type !== 'input' || !msg || msg.type !== 'moveTo' || !bigMapOpen()) return;
     setPick(false);
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปแมพฟาร์มก่อนแล้วเลือกจุดใหม่`); return; }
@@ -1332,7 +1335,7 @@
         farmMap: cfg.farmMap, farmSpot: cfg.farmSpot, town: cfg.town,
         potions: potionPlans().map(p => ({ k: p.k, name: potName(p.item), have: p.have, min: p.min, to: p.to })),
         bounty: bq.active ? { done: bq.i, total: bq.list.length, mob: b && b.mob, map: b && b.mapName, prog: b && b.prog, need: b && b.need } : null,
-        log: logs.slice(0, 8),
+        log: logs.slice(0, 30), // the manager copies new lines to server.log every 3 s: 8 lost bursts
       };
     },
   };
