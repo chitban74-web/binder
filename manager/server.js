@@ -147,15 +147,22 @@ const server = http.createServer(async (req, res) => {
       return res.end(fs.readFileSync(path.join(PUBLIC, sf[1])));
     }
     // market (price board / one item) read through a game tab's own room — the same requests as the game's market window
-    if (req.method === 'GET' && (url.pathname === '/api/market/board' || url.pathname === '/api/market/item')) {
+    if (req.method === 'GET' && ['/api/market/board', '/api/market/item', '/api/market/counts'].includes(url.pathname)) {
       const t = [...tabs.values()].find(x => x.state === 'helper' && !x.tab.closed);
       if (!t) return json(res, 503, { ok: false, error: 'ไม่มีแท็บเกมที่โหลด helper อยู่' });
-      const msg = url.pathname === '/api/market/board'
-        ? { type: 'marketBoard', q: (url.searchParams.get('q') || '').slice(0, 40) || undefined,
-            cat: ['weapon', 'gear', 'use', 'mat', 'card'].includes(url.searchParams.get('cat')) ? url.searchParams.get('cat') : undefined,
-            bsort: ['def', 'vol', 'asc', 'desc', 'up', 'down'].includes(url.searchParams.get('sort')) ? url.searchParams.get('sort') : 'def' }
-        : { type: 'marketItem', itemId: (url.searchParams.get('id') || '').slice(0, 300), range: ['7d', '30d'].includes(url.searchParams.get('range')) ? url.searchParams.get('range') : '7d' };
-      const want = msg.type;
+      const qp = k => url.searchParams.get(k) || '';
+      const num = (k, max) => Math.max(0, Math.min(max, Math.floor(Number(qp(k)) || 0)));
+      // the same filters as the game's market window: search, category, sub-type, gear level range, affix, minimum tier
+      const cat = ['weapon', 'gear', 'use', 'mat', 'card'].includes(qp('cat')) ? qp('cat') : 'all';
+      const gearOnly = cat === 'all' || cat === 'weapon' || cat === 'gear';
+      const filters = { q: qp('q').slice(0, 40), cat, sub: /^[a-z_]{1,30}$/.test(qp('sub')) ? qp('sub') : 'all',
+        lvMin: gearOnly ? num('lvMin', 99) : 0, lvMax: gearOnly ? num('lvMax', 99) : 0,
+        affix: gearOnly && /^[a-z_]{1,24}$/.test(qp('affix')) ? qp('affix') : '', tierMin: gearOnly ? num('tierMin', 8) : 0 };
+      const sort = ['def', 'vol', 'asc', 'desc', 'up', 'down'].includes(qp('sort')) ? qp('sort') : 'def';
+      const msg = url.pathname === '/api/market/board' ? { type: 'marketBoard', ...filters, bsort: sort }
+        : url.pathname === '/api/market/counts' ? { type: 'marketQuery', ...filters, sort: 'new' }
+        : { type: 'marketItem', itemId: qp('id').slice(0, 300), range: ['7d', '30d'].includes(qp('range')) ? qp('range') : '7d' };
+      const want = msg.type === 'marketQuery' ? 'market' : msg.type;
       try {
         const r = await t.tab.eval(`(async () => {
           const room = window.__bthRoom; if (!room) return { ok: false, error: 'helper ยังไม่ได้จับห้องเกม' };
@@ -163,7 +170,9 @@ const server = http.createServer(async (req, res) => {
           const reply = await new Promise(res => { let off; const t = setTimeout(() => { off && off(); res(null); }, 6000);
             off = room.onMessage('server', m => { const e = (Array.isArray(m) ? m : [m]).find(x => x && x.type === ${JSON.stringify(want)}); if (e) { clearTimeout(t); off && off(); res(e); } });
             room.send('input', msg); });
-          return reply ? { ok: true, ...reply } : { ok: false, error: 'ตลาดไม่ตอบ' };
+          if (!reply) return { ok: false, error: 'ตลาดไม่ตอบ' };
+          // counts only: the listings themselves are not needed (and can be big)
+          return reply.type === 'market' ? { ok: true, type: 'counts', total: reply.total || 0, subCounts: reply.subCounts || null } : { ok: true, ...reply };
         })()`);
         return json(res, r && r.ok ? 200 : 502, r || { ok: false, error: 'อ่านไม่สำเร็จ' });
       } catch (e) { return json(res, 502, { ok: false, error: e.message }); }

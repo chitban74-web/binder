@@ -10,7 +10,10 @@
   const SORTS = [['def', 'ลงล่าสุด'], ['vol', 'ซื้อขายเยอะสุด'], ['asc', 'ราคาต่ำ → สูง'], ['desc', 'ราคาสูง → ต่ำ'], ['up', 'ราคาขึ้นแรงสุด'], ['down', 'ราคาลงแรงสุด']];
   const RAR = { common: 'ธรรมดา', magic: 'Magic', rare: 'Rare', epic: 'Epic', unique: 'Unique', legendary: 'Legendary' };
   const PAGE = 15;
-  let st = { q: '', cat: '', sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
+  // sub-types and affixes as the game's market window lists them (weapon names from the game's class table)
+  const SUBS = { weapon: [["sword", "ดาบ"], ["greatsword", "ดาบสองมือ"], ["mace", "กระบอง"], ["dagger", "มีดสั้น"], ["bow", "ธนู"], ["staff", "ไม้เท้า"], ["wand", "ไม้กายสิทธิ์"], ["rod", "คทา"], ["book", "ตำรา"], ["spear", "หอก"], ["axe", "ขวาน"], ["crossbow", "หน้าไม้"], ["orb", "ลูกแก้วเวท"], ["hand_crossbow", "หน้าไม้มือ"], ["javelin", "หลาว"], ["sling", "สลิง"], ["pike", "ทวน"], ["lance", "หอกทหารม้า"], ["knuckles", "สนับมือ"], ["flail", "ลูกตุ้มโซ่"], ["rapier", "เรเปียร์"], ["throwing_knives", "มีดบิน"], ["greatstaff", "ไม้เท้ายาว"], ["spellstaff", "ไม้เท้าศึก"], ["maul", "ค้อนศักดิ์สิทธิ์"], ["lightstaff", "ไม้เท้าแสง"], ["scythe", "เคียวใหญ่"], ["chain_sickle", "เคียวโซ่"]], gear: [["armor", "เกราะ"], ["headgear", "หมวก"], ["face", "หน้า"], ["mouth", "ปาก"], ["boots", "รองเท้า"], ["offhand", "มือรอง / โล่"], ["accessory", "เครื่องประดับ"], ["necklace", "สร้อยคอ"], ["belt", "เข็มขัด"]] };
+  const AFFIXES = [["desperate", "ดาเมจตอนเลือดคุณต่ำกว่า 35%"], ["vsdebuff", "ดาเมจใส่มอนที่ติดสตัน/ตรึง/สโล%"], ["opener", "ดาเมจใส่มอนที่เลือดยังเกิน 90%"], ["bossbane", "ดาเมจใส่ Boss%"], ["castspd", "ร่ายไว%"], ["aspd", "สปีดตี%"], ["agi", "AGI"], ["atk", "ATK"], ["atkpct", "ATK%"], ["block", "Block%"], ["bossres", "Boss Resist%"], ["p_bulwark", "Bulwark (Trigger)"], ["p_chain", "Chain Spark (Trigger)"], ["crit", "CRIT%"], ["critdmg", "Crit DMG%"], ["p_nova", "Death Burst (Trigger)"], ["guard", "DEF"], ["dex", "DEX"], ["p_echo", "Echo Strike (Trigger)"], ["evasive", "FLEE"], ["p_haste", "Frenzy (Trigger)"], ["p_frost", "Frostbite (Trigger)"], ["mending", "Heal power"], ["hit", "HIT"], ["regen", "HP regen/s"], ["int", "INT"], ["p_barrier", "Lifeline (Trigger)"], ["leech", "Lifesteal%"], ["luk", "LUK"], ["manatide", "Mana Tide: MP ที่ใช้กับสกิลเวท"], ["matk", "MATK"], ["matkpct", "MATK%"], ["hp", "Max HP"], ["hppct", "Max HP%"], ["mp", "Max MP"], ["move", "Move speed%"], ["p_bleed", "Rend (Trigger)"], ["p_renew", "Second Wind (Trigger)"], ["p_siphon", "Siphon (Trigger)"], ["cdr", "Skill CDR%"], ["p_gust", "Slipstream (Trigger)"], ["sturdy", "Soft DEF"], ["spellamp", "Spell Amp%"], ["str", "STR"], ["p_expose", "Sunder (Trigger)"], ["p_thorns", "Thorns (Trigger)"], ["p_vigor", "Vigor (Trigger)"], ["vit", "VIT"]];
+  let st = { q: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
 
   // item id -> base id, rarity, display name (gear ids carry "|rare|..." / "^insight", cards "|mob")
   const parse = (key, itemId) => {
@@ -34,6 +37,13 @@
         <div class="mk-tools">
           <input class="mk-input" id="mk-q" type="search" placeholder="🔍 ค้นหาไอเทม…">
           <div class="mk-cats" id="mk-cats">${CATS.map(([v, l]) => `<button type="button" data-cat="${v}" class="${v === '' ? 'on' : ''}">${l}</button>`).join('')}</div>
+          <div class="mk-subs" id="mk-subs" hidden></div>
+          <div class="mk-gear" id="mk-gear">
+            <label>Lv ใส่ <input class="mk-input" id="mk-lvmin" type="number" min="1" max="99" placeholder="1"> – <input class="mk-input" id="mk-lvmax" type="number" min="1" max="99" placeholder="99"></label>
+            <label>Affix <select class="mk-input" id="mk-affix"><option value="">ทุก Affix</option>${AFFIXES.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select></label>
+            <span class="mk-tiers" id="mk-tiers"><span>Tier ขั้นต่ำ</span><button type="button" data-t="0" class="all on">ทุก Tier</button>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<button type="button" data-t="${n}" class="t${n}">T${n}+</button>`).join('')}</span>
+            <button type="button" class="mk-clear" id="mk-clear">ล้างตัวกรอง</button>
+          </div>
         </div>
         <div class="mk-bar"><span id="mk-count">กำลังโหลด…</span>
           <label>เรียง <select class="mk-input" id="mk-sort">${SORTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
@@ -48,9 +58,35 @@
     </div>`;
   const $ = id => document.getElementById(id);
 
+  const gearCat = () => st.cat === '' || st.cat === 'weapon' || st.cat === 'gear';
+  function filterParams() {
+    const p = new URLSearchParams();
+    if (st.q) p.set('q', st.q); if (st.cat) p.set('cat', st.cat);
+    if (SUBS[st.cat] && st.sub !== 'all') p.set('sub', st.sub);
+    if (gearCat()) { if (st.lvMin) p.set('lvMin', st.lvMin); if (st.lvMax) p.set('lvMax', st.lvMax); if (st.affix) p.set('affix', st.affix); if (st.tierMin) p.set('tierMin', st.tierMin); }
+    return p;
+  }
+  // listing counts per sub-type for the chips (the game's marketQuery answer)
+  async function loadCounts() {
+    const p = filterParams(); p.delete('sub');
+    try { const r = await (await fetch('/api/market/counts?' + p)).json(); st.counts = r.ok ? r : null; } catch (e) { st.counts = null; }
+    renderFilters();
+  }
+  function renderFilters() {
+    const subs = SUBS[st.cat], el = $('mk-subs');
+    el.hidden = !subs;
+    if (subs) {
+      const c = (st.counts && st.counts.subCounts) || {}, all = Object.values(c).reduce((a, b) => a + b, 0);
+      el.innerHTML = [['all', 'ทั้งหมด'], ...subs].map(([v, l]) => { const n = v === 'all' ? all : c[v] || 0;
+        return `<button type="button" data-sub="${v}" class="${st.sub === v ? 'on' : ''} ${st.counts && !n ? 'none' : ''}">${esc(l)}<em>${st.counts ? g(n) : '…'}</em></button>`; }).join('');
+    }
+    $('mk-gear').hidden = !gearCat();
+    $('mk-gear').classList.toggle('active', !!(st.lvMin || st.lvMax || st.affix || st.tierMin));
+  }
   async function loadBoard() {
     st.loading = true; st.error = ''; renderBoard();
-    const p = new URLSearchParams({ sort: st.sort }); if (st.q) p.set('q', st.q); if (st.cat) p.set('cat', st.cat);
+    const p = filterParams(); p.set('sort', st.sort);
+    if (SUBS[st.cat]) loadCounts();
     try {
       const r = await (await fetch('/api/market/board?' + p)).json();
       if (!r.ok) throw new Error(r.error || 'อ่านตลาดไม่สำเร็จ');
@@ -133,7 +169,15 @@
   $('mk-q').oninput = e => { clearTimeout(qTimer); qTimer = setTimeout(() => { st.q = e.target.value.trim(); loadBoard(); }, 400); };
   $('mk-sort').onchange = e => { st.sort = e.target.value; loadBoard(); };
   $('mk-reload').onclick = loadBoard;
-  $('mk-cats').onclick = e => { const b = e.target.closest('button[data-cat]'); if (!b) return; st.cat = b.dataset.cat; for (const x of $('mk-cats').children) x.classList.toggle('on', x === b); loadBoard(); };
+  $('mk-cats').onclick = e => { const b = e.target.closest('button[data-cat]'); if (!b) return; st.cat = b.dataset.cat; st.sub = 'all'; st.counts = null; for (const x of $('mk-cats').children) x.classList.toggle('on', x === b); renderFilters(); loadBoard(); };
+  $('mk-subs').onclick = e => { const b = e.target.closest('button[data-sub]'); if (!b) return; st.sub = b.dataset.sub; renderFilters(); loadBoard(); };
+  const lv = id => Math.max(0, Math.min(99, Math.floor(Number($(id).value) || 0)));
+  $('mk-lvmin').onchange = () => { st.lvMin = lv('mk-lvmin'); renderFilters(); loadBoard(); };
+  $('mk-lvmax').onchange = () => { st.lvMax = lv('mk-lvmax'); renderFilters(); loadBoard(); };
+  $('mk-affix').onchange = e => { st.affix = e.target.value; renderFilters(); loadBoard(); };
+  $('mk-tiers').onclick = e => { const b = e.target.closest('button[data-t]'); if (!b) return; st.tierMin = Number(b.dataset.t); for (const x of $('mk-tiers').querySelectorAll('button')) x.classList.toggle('on', x === b); renderFilters(); loadBoard(); };
+  $('mk-clear').onclick = () => { st.lvMin = st.lvMax = st.tierMin = 0; st.affix = ''; $('mk-lvmin').value = $('mk-lvmax').value = ''; $('mk-affix').value = '';
+    for (const x of $('mk-tiers').querySelectorAll('button')) x.classList.toggle('on', x.dataset.t === '0'); renderFilters(); loadBoard(); };
   $('mk-pager').onclick = e => { const b = e.target.closest('button[data-pg]'); if (!b || b.disabled) return; st.page = Number(b.dataset.pg); renderBoard(); };
   $('mk-rows').onclick = e => {
     const b = e.target.closest('.mk-row'); if (!b) return;

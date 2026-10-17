@@ -74,3 +74,27 @@
 
 @media (max-width: 1100px) { .mk-wrap { grid-template-columns: 1fr; } .mk-detail { position: static; } }
 @media (max-width: 640px) { .mk-head, .mk-row { grid-template-columns: minmax(0, 1fr) 90px 90px; } .mk-head span:nth-child(3), .mk-row > span:nth-child(3) { display: none; } .mk-kpis { grid-template-columns: 1fr 1fr; } }
+
+/* filters: sub-type chips, gear level / affix / tier (same as the game's market window) */
+.mk-subs { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; border-radius: var(--radius-md); background: var(--bg-inset); border: 1px solid var(--line); }
+.mk-subs button { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.03); border: 1px solid var(--line-strong); color: var(--text-main); border-radius: 8px; padding: 5px 10px; font: 600 12px var(--font-sans); cursor: pointer; }
+.mk-subs button em { font-style: normal; font: 600 11px var(--font-mono); color: var(--text-faint); }
+.mk-subs button:hover { border-color: var(--border-glow); }
+.mk-subs button.on { background: rgba(14,165,233,.16); border-color: var(--primary); color: #7dd3fc; }
+.mk-subs button.on em { color: #7dd3fc; }
+.mk-subs button.none { opacity: .4; }
+.mk-gear { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--bg-inset); border: 1px solid var(--line); font-size: 12.5px; color: var(--text-muted); }
+.mk-gear[hidden] { display: none; }
+.mk-gear.active { border-color: var(--border-glow); }
+.mk-gear label { display: flex; align-items: center; gap: 6px; }
+.mk-gear input[type=number] { width: 60px; padding: 5px 8px; }
+.mk-gear select { max-width: 230px; padding: 5px 8px; }
+.mk-tiers { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.mk-tiers > span { margin-right: 4px; }
+.mk-tiers button { border: 1px solid var(--line-strong); background: rgba(255,255,255,.03); color: var(--text-muted); border-radius: 8px; padding: 4px 9px; font: 700 11.5px var(--font-sans); cursor: pointer; }
+.mk-tiers button.t1 { color: #cbd5e1; } .mk-tiers button.t2 { color: #86efac; } .mk-tiers button.t3 { color: #93c5fd; } .mk-tiers button.t4 { color: #c4b5fd; }
+.mk-tiers button.t5 { color: #fdba74; } .mk-tiers button.t6 { color: #fca5a5; } .mk-tiers button.t7 { color: #f0abfc; } .mk-tiers button.t8 { color: #fde68a; }
+.mk-tiers button.on { background: rgba(255,255,255,.12); border-color: currentColor; box-shadow: 0 0 0 1px currentColor inset; }
+.mk-tiers button.all.on { color: var(--text-main); }
+.mk-clear { margin-left: auto; background: none; border: 1px solid var(--line-strong); color: var(--text-muted); border-radius: 8px; padding: 5px 12px; font: 600 12px var(--font-sans); cursor: pointer; }
+.mk-clear:hover { color: var(--text-main); border-color: var(--border-glow); }
