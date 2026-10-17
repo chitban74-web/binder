@@ -14,6 +14,8 @@
 //  • World Boss round open (server "worldBoss" message) → warp into the arena → AUTO until the boss is dead / gone →
 //    leave → back to the farm spot (on by default, switch on the farm tab)
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
+//  • kicked for idling ("หลุดจากเกม · ไม่ได้เล่นนานเกินไป") → press เชื่อมต่อใหม่ → after the reload ▶ / AUTO go back on as they were
+//    (needs the manager, which loads the helper again after the reload)
 // It presses the game's own buttons (warp, world map "go", respawn, sell, AUTO). The messages it sends itself go
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
 // socialQuery, vendorBuy, huntQuery, bountyClaim.
@@ -1184,9 +1186,38 @@
     if (el.innerHTML !== html) el.innerHTML = html;
   };
   const chInfoTimer = setInterval(() => { showChInfo(); showWbInfo(); }, 1000);
+
+  // ---- kicked for idling: the game's window "หลุดจากเกม · ไม่ได้เล่นนานเกินไป" (close code 4007) ----
+  // its button "เชื่อมต่อใหม่" reloads the page; the manager loads the helper again once back in the world and that
+  // helper turns ▶ / AUTO on again from the note below. Other kicks (playing in another tab, staff) are left alone.
+  const RESUME_KEY = 'bth_resume';
+  let lastAuto = false, kickAt = 0, alive = true;
+  const kickTimer = setInterval(() => {
+    const title = [...document.querySelectorAll('.wbveil .cwtitle')].find(e => /ไม่ได้เล่นนานเกินไป/.test(e.textContent));
+    if (!title) { lastAuto = autoOn(); return; }
+    if (Date.now() - kickAt < 15e3) return; // reload already under way
+    kickAt = Date.now();
+    try { localStorage.setItem(RESUME_KEY, JSON.stringify({ at: kickAt, running: cfg.running, auto: lastAuto })); } catch { }
+    log(`หลุดจากเกม (ไม่ได้เล่นนานเกินไป) — เชื่อมต่อใหม่${cfg.running ? ' แล้วเปิด helper ต่อ' : lastAuto ? ' แล้วเปิด AUTO ต่อ' : ''}`);
+    cfg.running = false; // not saved: ends a trip in progress on the dead room
+    const card = title.closest('.bcard'), btn = card && card.querySelector('.bcact button');
+    if (!click(btn, 'เชื่อมต่อใหม่') && typeof window.__hardReload === 'function') window.__hardReload();
+  }, 2000);
+  // just reloaded after such a kick (note younger than 10 min): ▶ again, or only AUTO if the helper was stopped
+  (() => {
+    let r = null;
+    try { r = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); localStorage.removeItem(RESUME_KEY); } catch { }
+    if (!r || !(Date.now() - r.at < 10 * 60e3) || (!r.running && !r.auto)) return;
+    setTimeout(() => {
+      if (!alive) return;
+      if (r.running) { if (!cfg.running) $('#bthrun').click(); log('เชื่อมต่อใหม่แล้ว — เปิด helper ต่อ'); }
+      else { setAuto(true); log('เชื่อมต่อใหม่แล้ว — เปิด AUTO ต่อ'); }
+    }, 3000);
+  })();
+
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(kickTimer); alive = false; for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
