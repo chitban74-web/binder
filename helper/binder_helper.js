@@ -719,7 +719,8 @@
         await backToFarm();
       } else if (mapName() === tgt().map && lowPotions().length) {
         const low = lowPotions().map(p => `${potName(p.item)} ${p.have}/${p.min}`).join(', ');
-        await townTrip(`ยาใกล้หมด (${low}) — กลับเมืองซื้อ`, weightPct() >= cfg.sellAfterDeathPct);
+        const reached = await townTrip(`ยาใกล้หมด (${low}) — กลับเมืองซื้อ`, weightPct() >= cfg.sellAfterDeathPct);
+        if (!reached && cfg.running) return stopWith('ไปร้านค้าไม่ได้', `ไปเมือง / เปิดหน้าร้านไม่ได้ เลยยังไม่ได้ซื้อยา (${low}) — หยุด helper`);
         // still below minimum (not enough Gold, item not sold here) -> stop instead of warping again and again
         if (lowPotions().length) return stopWith('ซื้อยาไม่ได้', `ซื้อยาแล้วยังต่ำกว่าขั้นต่ำ (${lowPotions().map(p => potName(p.item) + ' ' + p.have).join(', ')}) — Gold ไม่พอ? หยุด helper`);
         await backToFarm();
