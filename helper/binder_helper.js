@@ -34,7 +34,9 @@
   const load = () => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { ...DEF }; } };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch { } };
   const cfg = load();
-  cfg.running = false; // always start stopped; the user presses ▶
+  // the saved flag is still true when the page went away while running (reload, game update, kick); ■ saves false
+  const wasRunning = cfg.running;
+  cfg.running = false; // start stopped; resumed below only when the last page was running a moment ago
   // +1 whenever you set a new farm map / spot: a trip still heading for the old one sees it and gives up
   let farmGen = 0;
 
@@ -289,7 +291,7 @@
   const saveBq = () => { try { localStorage.setItem(BQ_KEY, JSON.stringify(bq)); } catch { } };
   const curBounty = () => (bq.active ? bq.list[bq.i] || null : null);
   function tgt() { const b = curBounty(); return b ? { map: b.mapName, spot: null } : { map: cfg.farmMap, spot: cfg.farmSpot }; }
-  const myLevel = () => { const r = room(); const p = r && r.state.players.get(r.sessionId); return p ? p.level : 0; };
+  const myLevel = () => { const r = room(); const p = r && r.state.players && r.state.players.get(r.sessionId); return p ? p.level : 0; };
   const huntView = async () => { const h = await request({ type: 'huntQuery' }, m => m.type === 'hunt'); return h && h.view ? h.view.bounty : null; };
 
   // today's bounties from the game's own bounty window (#huntbody), progress from the server (huntQuery)
@@ -1188,13 +1190,26 @@
   const chInfoTimer = setInterval(() => { showChInfo(); showWbInfo(); }, 1000);
 
   // ---- kicked for idling: the game's window "หลุดจากเกม · ไม่ได้เล่นนานเกินไป" (close code 4007) ----
-  // its button "เชื่อมต่อใหม่" reloads the page; the manager loads the helper again once back in the world and that
-  // helper turns ▶ / AUTO on again from the note below. Other kicks (playing in another tab, staff) are left alone.
-  const RESUME_KEY = 'bth_resume';
+  // its button "เชื่อมต่อใหม่" reloads the page (the manager loads the helper again once back in the world and that
+  // helper turns ▶ / AUTO on again from the note below) or reconnects in place (this helper turns it on again itself).
+  // Other kicks (playing in another tab, staff) are left alone.
+  const RESUME_KEY = 'bth_resume', ALIVE_KEY = 'bth_alive';
   let lastAuto = false, kickAt = 0, alive = true;
+  // ▶ again if a farm spot is saved, else AUTO again
+  const resume = why => {
+    if (!alive) return;
+    if (cfg.farmMap) { if (!cfg.running) $('#bthrun').click(); log(why + ' — เปิด helper ต่อ'); }
+    else { setAuto(true); log(why + ' — เปิด AUTO ต่อ (ยังไม่ได้ตั้งจุดฟาร์ม)'); }
+  };
   const kickTimer = setInterval(() => {
+    if (cfg.running) try { localStorage.setItem(ALIVE_KEY, String(Date.now())); } catch { }
     const title = [...document.querySelectorAll('.wbveil .cwtitle')].find(e => /ไม่ได้เล่นนานเกินไป/.test(e.textContent));
-    if (!title) { lastAuto = autoOn(); return; }
+    if (!title) {
+      // the game reconnected in place (no page reload, so this helper is still here): turn it on again ourselves
+      if (kickAt && mapName() && Date.now() - kickAt > 8e3) { kickAt = 0; try { localStorage.removeItem(RESUME_KEY); } catch { } setTimeout(() => resume('เชื่อมต่อใหม่แล้ว'), 3000); }
+      else if (!kickAt) lastAuto = autoOn();
+      return;
+    }
     if (Date.now() - kickAt < 15e3) return; // reload already under way
     kickAt = Date.now();
     try { localStorage.setItem(RESUME_KEY, JSON.stringify({ at: kickAt, running: cfg.running, auto: lastAuto })); } catch { }
@@ -1203,16 +1218,13 @@
     const card = title.closest('.bcard'), btn = card && card.querySelector('.bcact button');
     if (!click(btn, 'เชื่อมต่อใหม่') && typeof window.__hardReload === 'function') window.__hardReload();
   }, 2000);
-  // just reloaded after such a kick (note younger than 10 min): always ▶ (default on), or AUTO if no farm spot is saved yet
+  // just reloaded after such a kick (note younger than 10 min): always ▶ (default on), or AUTO if no farm spot is saved yet.
+  // Same after any other reload (game update, connection lost, the manager reloading the tab) while ▶ was on a moment ago.
   (() => {
-    let r = null;
-    try { r = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); localStorage.removeItem(RESUME_KEY); } catch { }
-    if (!r || !(Date.now() - r.at < 10 * 60e3)) return;
-    setTimeout(() => {
-      if (!alive) return;
-      if (cfg.farmMap) { if (!cfg.running) $('#bthrun').click(); log('เชื่อมต่อใหม่แล้ว — เปิด helper ต่อ'); }
-      else { setAuto(true); log('เชื่อมต่อใหม่แล้ว — เปิด AUTO ต่อ (ยังไม่ได้ตั้งจุดฟาร์ม)'); }
-    }, 3000);
+    let r = null, at = 0;
+    try { r = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); localStorage.removeItem(RESUME_KEY); at = +localStorage.getItem(ALIVE_KEY) || 0; } catch { }
+    const kicked = !!r && Date.now() - r.at < 10 * 60e3, reloaded = wasRunning && Date.now() - at < 10 * 60e3;
+    if (kicked || reloaded) setTimeout(() => resume(kicked ? 'เชื่อมต่อใหม่แล้ว' : 'หน้าเกมโหลดใหม่'), 3000);
   })();
 
   window.__bth = {
