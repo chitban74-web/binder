@@ -37,7 +37,11 @@ async function openBrowser(key) {
     return r && r.ok ? 'เปิดแท็บเกมใหม่แล้ว' : 'เบราว์เซอร์เปิดอยู่แล้ว';
   }
   fs.mkdirSync(profileOf(key), { recursive: true });
-  spawn(exe, [`--remote-debugging-port=${b.port}`, '--remote-allow-origins=*', `--user-data-dir=${profileOf(key)}`, '--no-first-run', '--no-default-browser-check', GAME_URL], { detached: true, stdio: 'ignore' }).unref();
+  // a minimised / hidden window slows the page's timers down to once a minute, so the helper takes minutes per step:
+  // keep background tabs at full speed
+  const keepAwake = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
+    '--disable-features=IntensiveWakeUpThrottling,CalculateNativeWinOcclusion'];
+  spawn(exe, [`--remote-debugging-port=${b.port}`, '--remote-allow-origins=*', `--user-data-dir=${profileOf(key)}`, '--no-first-run', '--no-default-browser-check', ...keepAwake, GAME_URL], { detached: true, stdio: 'ignore' }).unref();
   for (let i = 0; i < 40; i++) { await new Promise(r => setTimeout(r, 500)); if (await targets(b.port)) return 'เปิดแล้ว'; }
   throw new Error(`${b.name} ไม่ตอบที่ port ${b.port} — ถ้ามีหน้าต่างที่ใช้โปรไฟล์นี้เปิดอยู่ (ไม่ได้เปิดจากระบบนี้) ให้ปิดก่อน`);
 }
