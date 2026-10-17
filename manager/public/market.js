@@ -15,7 +15,7 @@
   // sub-types and affixes as the game's market window lists them (weapon names from the game's class table)
   const SUBS = { weapon: [["sword", "ดาบ"], ["greatsword", "ดาบสองมือ"], ["mace", "กระบอง"], ["dagger", "มีดสั้น"], ["bow", "ธนู"], ["staff", "ไม้เท้า"], ["wand", "ไม้กายสิทธิ์"], ["rod", "คทา"], ["book", "ตำรา"], ["spear", "หอก"], ["axe", "ขวาน"], ["crossbow", "หน้าไม้"], ["orb", "ลูกแก้วเวท"], ["hand_crossbow", "หน้าไม้มือ"], ["javelin", "หลาว"], ["sling", "สลิง"], ["pike", "ทวน"], ["lance", "หอกทหารม้า"], ["knuckles", "สนับมือ"], ["flail", "ลูกตุ้มโซ่"], ["rapier", "เรเปียร์"], ["throwing_knives", "มีดบิน"], ["greatstaff", "ไม้เท้ายาว"], ["spellstaff", "ไม้เท้าศึก"], ["maul", "ค้อนศักดิ์สิทธิ์"], ["lightstaff", "ไม้เท้าแสง"], ["scythe", "เคียวใหญ่"], ["chain_sickle", "เคียวโซ่"]], gear: [["armor", "เกราะ"], ["headgear", "หมวก"], ["face", "หน้า"], ["mouth", "ปาก"], ["boots", "รองเท้า"], ["offhand", "มือรอง / โล่"], ["accessory", "เครื่องประดับ"], ["necklace", "สร้อยคอ"], ["belt", "เข็มขัด"]] };
   const AFFIXES = [["desperate", "ดาเมจตอนเลือดคุณต่ำกว่า 35%"], ["vsdebuff", "ดาเมจใส่มอนที่ติดสตัน/ตรึง/สโล%"], ["opener", "ดาเมจใส่มอนที่เลือดยังเกิน 90%"], ["bossbane", "ดาเมจใส่ Boss%"], ["castspd", "ร่ายไว%"], ["aspd", "สปีดตี%"], ["agi", "AGI"], ["atk", "ATK"], ["atkpct", "ATK%"], ["block", "Block%"], ["bossres", "Boss Resist%"], ["p_bulwark", "Bulwark (Trigger)"], ["p_chain", "Chain Spark (Trigger)"], ["crit", "CRIT%"], ["critdmg", "Crit DMG%"], ["p_nova", "Death Burst (Trigger)"], ["guard", "DEF"], ["dex", "DEX"], ["p_echo", "Echo Strike (Trigger)"], ["evasive", "FLEE"], ["p_haste", "Frenzy (Trigger)"], ["p_frost", "Frostbite (Trigger)"], ["mending", "Heal power"], ["hit", "HIT"], ["regen", "HP regen/s"], ["int", "INT"], ["p_barrier", "Lifeline (Trigger)"], ["leech", "Lifesteal%"], ["luk", "LUK"], ["manatide", "Mana Tide: MP ที่ใช้กับสกิลเวท"], ["matk", "MATK"], ["matkpct", "MATK%"], ["hp", "Max HP"], ["hppct", "Max HP%"], ["mp", "Max MP"], ["move", "Move speed%"], ["p_bleed", "Rend (Trigger)"], ["p_renew", "Second Wind (Trigger)"], ["p_siphon", "Siphon (Trigger)"], ["cdr", "Skill CDR%"], ["p_gust", "Slipstream (Trigger)"], ["sturdy", "Soft DEF"], ["spellamp", "Spell Amp%"], ["str", "STR"], ["p_expose", "Sunder (Trigger)"], ["p_thorns", "Thorns (Trigger)"], ["p_vigor", "Vigor (Trigger)"], ["vit", "VIT"]];
-  let st = { view: 'board', lsort: 'def', lpage: 0, ltotal: 0, listings: [], lloading: false, lerror: '', req: 0, q: '', rarity: '', progress: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
+  let st = { capF: 0, lall: null, lprog: '', view: 'board', lsort: 'def', lpage: 0, ltotal: 0, listings: [], lloading: false, lerror: '', req: 0, q: '', rarity: '', progress: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
 
   // item id -> base id, rarity, display name (gear ids carry "|rare|..." / "^insight", cards "|mob")
   const parse = (key, itemId) => {
@@ -49,6 +49,8 @@
   // one listing as the game shows it: "<prefixes> <base> <first suffix>", rarity from the number of options,
   // wear level and ATK (base x3) of the equipment, every option with its tier
   const ITEM_EQUIP = () => window.BT_EQUIP || {}, ITEM_AFFIX = () => window.BT_AFFIX || {};
+  // item level = max(base level, the level each option's tier needs); cap tier = tiers unlocked at that level
+  const TIER_LV = [1, 12, 26, 40, 55, 70, 82, 92];
   function listingItem(itemId) {
     const raw = String(itemId || '').split('#')[0];
     const [head, rest = ''] = raw.split('|');
@@ -64,7 +66,9 @@
     if (core === 'spirit_card' && rest && !rest.includes(':')) base += ' · ' + rest.replace(/_/g, ' ');
     const rarity = !eq ? '' : opts.length >= 4 ? 'epic' : opts.length === 3 ? 'rare' : opts.length ? 'magic' : 'normal';
     const insight = (head.split('^')[1] || '').replace(/^ins_/, '').replace(/_/g, ' ');
-    return { core, name: [...pre, base, ...suf].join(' '), rarity, lv: eq ? eq[0] : 0, atk: eq && eq[1] ? eq[1] * 3 : 0, opts, tierName, insight };
+    const ilvl = eq ? Math.max(eq[0] || 1, ...opts.map(o => TIER_LV[Math.min(8, o.tier) - 1] || 0)) : 0;
+    const cap = eq ? TIER_LV.filter(x => x <= ilvl).length : 0;
+    return { core, name: [...pre, base, ...suf].join(' '), rarity, lv: eq ? eq[0] : 0, atk: eq && eq[1] ? eq[1] * 3 : 0, opts, tierName, insight, ilvl, cap };
   }
   function listingCard(l) {
     const it = listingItem(l.itemId), unit = Math.round(l.price / Math.max(1, l.qty));
@@ -72,36 +76,63 @@
       <span class="mk-ico r-${it.rarity || 'common'}">${icon(it.core)}</span>
       <div class="mk-lmain">
         <b class="mk-lname">${esc(it.name)}</b>
-        <div class="mk-lmeta">${it.rarity ? `<i class="mk-rar r-${it.rarity}">${RAR[it.rarity]}</i>` : ''}${it.lv ? `<span class="mk-pill">Lv ${it.lv}</span>` : ''}${it.atk ? `<span class="mk-pill">ATK ${g(it.atk)}</span>` : ''}${it.insight ? `<span class="mk-opt ins">✦ ${esc(it.insight)}</span>` : ''}</div>
+        <div class="mk-lmeta">${it.rarity ? `<i class="mk-rar r-${it.rarity}">${RAR[it.rarity]}</i>` : ''}${it.lv ? `<span class="mk-pill">Lv ${it.lv}</span>` : ''}${it.atk ? `<span class="mk-pill">ATK ${g(it.atk)}</span>` : ''}${it.cap ? `<span class="mk-cap t${it.cap}" title="Tier Affix สูงสุดของชิ้นนี้ · เลเวลไอเทม ${it.ilvl}${it.cap < 8 ? ` · ลุ้น T${it.cap + 1} 1%` : ''}">สูงสุด T${it.cap}<small>iLv ${it.ilvl}</small></span>` : ''}${it.insight ? `<span class="mk-opt ins">✦ ${esc(it.insight)}</span>` : ''}</div>
         ${it.opts.length ? `<div class="mk-lopts">${it.opts.map(o => `<div class="mk-lopt t${Math.min(8, o.tier)}"><b>T${o.tier}</b><span>${esc(optText(o))}</span><small>${esc(it.tierName(o))}</small></div>`).join('')}</div>` : ''}
       </div>
       <div class="mk-lprice"><b>${g(unit)}<small> G${l.qty > 1 ? '/ชิ้น' : ''}</small></b>${l.qty > 1 ? `<span>×${g(l.qty)} = ${g(l.price)} G</span>` : ''}<span class="mk-seller">${esc(l.seller)}</span><small>${ago(l.at)}</small></div>
     </div>`;
   }
-  async function loadListings() {
+  const MAX_ALL_PAGES = 80;   // "every page" stops here (8,000 listings) — narrow the filters for more
+  async function listingsPage(page) {
+    const p = filterParams(); p.set('sort', st.lsort); p.set('p', page);
+    let err = null;
+    for (let i = 0; i < 3; i++) {
+      try { const r = await (await fetch('/api/market/listings?' + p)).json(); if (r.ok) return r; err = new Error(r.error || 'อ่านประกาศไม่สำเร็จ'); } catch (e) { err = e; }
+      await new Promise(z => setTimeout(z, 2000 * (i + 1)));
+    }
+    throw err;
+  }
+  async function loadListings(keepAll) {
     const my = ++st.req;
-    st.lloading = true; st.lerror = ''; renderListings();
-    if (SUBS[st.cat]) loadCounts();
-    const p = filterParams(); p.set('sort', st.lsort); p.set('p', st.lpage);
+    st.lloading = true; st.lerror = ''; st.lprog = ''; renderListings();
+    if (SUBS[st.cat] && !keepAll) loadCounts();
     try {
-      const r = await (await fetch('/api/market/listings?' + p)).json();
-      if (my !== st.req) return;
-      if (!r.ok) throw new Error(r.error || 'อ่านประกาศไม่สำเร็จ');
-      st.listings = r.listings || []; st.ltotal = r.total || 0;
+      if (!st.capF) {
+        st.lall = null;
+        const r = await listingsPage(st.lpage);
+        if (my !== st.req) return;
+        st.listings = r.listings || []; st.ltotal = r.total || 0;
+      } else {
+        if (!keepAll || !st.lall) {
+          const first = await listingsPage(0), pages = Math.min(MAX_ALL_PAGES, Math.ceil((first.total || 0) / 100));
+          const all = [...(first.listings || [])];
+          for (let pg = 1; pg < pages; pg++) {
+            if (my !== st.req) return;
+            st.lprog = `ดึงประกาศทุกหน้า… ${pg + 1}/${pages}`; renderListings();
+            await new Promise(z => setTimeout(z, 350));
+            all.push(...((await listingsPage(pg)).listings || []));
+          }
+          if (my !== st.req) return;
+          st.lall = { rows: all, total: first.total || 0, cut: Math.ceil((first.total || 0) / 100) > MAX_ALL_PAGES };
+        }
+        const rows = st.lall.rows.filter(l => listingItem(l.itemId).cap === st.capF);
+        st.ltotal = rows.length; st.listings = rows.slice(st.lpage * 100, st.lpage * 100 + 100);
+      }
     } catch (e) { if (my !== st.req) return; st.lerror = e.message; st.listings = []; }
     st.lloading = false; renderListings();
   }
   function renderListings() {
     if (st.view !== 'list') return;
     const pages = Math.max(1, Math.ceil(st.ltotal / 100));
-    $('mk-count').textContent = st.lloading ? 'กำลังโหลดประกาศ…' : st.lerror ? '⚠ ' + st.lerror : `${g(st.ltotal)} ประกาศ · หน้า ${st.lpage + 1}/${pages} (หน้าละ 100)`;
+    $('mk-count').textContent = st.lloading ? (st.lprog || 'กำลังโหลดประกาศ…') : st.lerror ? '⚠ ' + st.lerror
+      : `${g(st.ltotal)} ประกาศ${st.capF ? ` ที่สูงสุด T${st.capF} (จาก ${g(st.lall ? st.lall.rows.length : 0)}${st.lall && st.lall.cut ? ` — ดึงแค่ ${MAX_ALL_PAGES} หน้าแรก กรองหมวดเพิ่มเพื่อให้ครบ` : ''})` : ''} · หน้า ${st.lpage + 1}/${pages} (หน้าละ 100)`;
     $('mk-lists').innerHTML = st.listings.length ? st.listings.map(listingCard).join('') : `<div class="mk-empty small">${st.lloading ? 'กำลังโหลด…' : 'ไม่มีประกาศ'}</div>`;
     const win = [...new Set([0, st.lpage - 2, st.lpage - 1, st.lpage, st.lpage + 1, st.lpage + 2, pages - 1])].filter(x => x >= 0 && x < pages).sort((a, b) => a - b);
     $('mk-pager').innerHTML = pages > 1 ? `<button type="button" data-lpg="${st.lpage - 1}" ${st.lpage ? '' : 'disabled'}>‹</button>`
       + win.map((x, i) => (i && x - win[i - 1] > 1 ? '<span class="mk-gap">…</span>' : '') + `<button type="button" data-lpg="${x}" class="${x === st.lpage ? 'on' : ''}">${x + 1}</button>`).join('')
       + `<button type="button" data-lpg="${st.lpage + 1}" ${st.lpage < pages - 1 ? '' : 'disabled'}>›</button>` : '';
   }
-  const reload = () => (st.view === 'list' ? (st.lpage = 0, loadListings()) : loadBoard());
+  const reload = () => (st.view === 'list' ? (st.lpage = 0, st.lall = null, loadListings()) : loadBoard());
   const icon = base => `<img src="${ICON}${encodeURIComponent(base)}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
   const chg = c => c == null || !isFinite(c) ? '' : `<i class="mk-chg ${c > 0.05 ? 'up' : c < -0.05 ? 'down' : 'flat'}">${c > 0.05 ? '▲' : c < -0.05 ? '▼' : '•'} ${Math.abs(c).toFixed(1)}%</i>`;
 
@@ -124,6 +155,7 @@
         <div class="mk-bar"><span id="mk-count">กำลังโหลด…</span>
           <label>เรียง <select class="mk-input" id="mk-sort">${SORTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
           <button type="button" class="mk-icon" id="mk-reload" title="โหลดใหม่">⟳</button></div>
+        <div class="mk-capf" id="mk-capf" hidden><span>Tier สูงสุดของชิ้น</span><button type="button" data-cap="0" class="all on">ทุก T</button>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<button type="button" data-cap="${n}" class="t${n}">T${n}</button>`).join('')}<small>กรองจากทุกหน้าของตัวกรองที่เลือก</small></div>
         <div class="mk-lists" id="mk-lists" hidden></div>
         <div class="mk-table" id="mk-table">
           <div class="mk-head"><span>ไอเทม</span><span class="r">ราคาถูกสุด</span><span class="r">ในตลาด</span><span class="r">ขายล่าสุด</span></div>
@@ -292,14 +324,14 @@
   let qTimer = null;
   $('mk-q').oninput = e => { clearTimeout(qTimer); qTimer = setTimeout(() => { st.q = e.target.value.trim(); reload(); }, 400); };
   $('mk-sort').onchange = e => {
-    if (st.view === 'list') { st.lsort = e.target.value; st.lpage = 0; loadListings(); return; }
+    if (st.view === 'list') { st.lsort = e.target.value; st.lpage = 0; st.lall = null; loadListings(); return; }
     st.sort = e.target.value; st.rows = sortRows(st.rows); st.page = 0; renderBoard();
   };
   // view switch: price board / every listing
   $('mk-views').onclick = e => {
     const b = e.target.closest('button[data-view]'); if (!b || b.dataset.view === st.view) return;
     st.view = b.dataset.view; for (const x of $('mk-views').children) x.classList.toggle('on', x === b);
-    $('mk-table').hidden = st.view === 'list'; $('mk-lists').hidden = st.view !== 'list';
+    $('mk-table').hidden = st.view === 'list'; $('mk-lists').hidden = st.view !== 'list'; $('mk-capf').hidden = st.view !== 'list';
     $('mk-sort').innerHTML = (st.view === 'list' ? LSORTS : SORTS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
     $('mk-sort').value = st.view === 'list' ? st.lsort : st.sort;
     if (st.view === 'list') loadListings(); else renderBoard();
@@ -315,11 +347,17 @@
   $('mk-tiers').onclick = e => { const b = e.target.closest('button[data-t]'); if (!b) return; st.tierMin = Number(b.dataset.t); for (const x of $('mk-tiers').querySelectorAll('button')) x.classList.toggle('on', x === b); renderFilters(); reload(); };
   $('mk-clear').onclick = () => { st.lvMin = st.lvMax = st.tierMin = 0; st.affix = ''; $('mk-lvmin').value = $('mk-lvmax').value = ''; $('mk-affix').value = '';
     for (const x of $('mk-tiers').querySelectorAll('button')) x.classList.toggle('on', x.dataset.t === '0'); renderFilters(); reload(); };
-  $('mk-pager').addEventListener('click', e => { const b = e.target.closest('button[data-lpg]'); if (!b || b.disabled) return; st.lpage = Number(b.dataset.lpg); loadListings(); $('mk-lists').scrollTop = 0; });
+  $('mk-pager').addEventListener('click', e => { const b = e.target.closest('button[data-lpg]'); if (!b || b.disabled) return; st.lpage = Number(b.dataset.lpg); loadListings(!!st.capF); $('mk-lists').scrollTop = 0; });
   $('mk-pager').onclick = e => { const b = e.target.closest('button[data-pg]'); if (!b || b.disabled) return; st.page = Number(b.dataset.pg); renderBoard(); };
   $('mk-rows').onclick = e => {
     const b = e.target.closest('.mk-row'); if (!b) return;
     st.sel = st.rows.find(r => r.key === b.dataset.key); st.item = null; renderBoard(); loadItem();
+  };
+  $('mk-capf').onclick = e => {
+    const b = e.target.closest('button[data-cap]'); if (!b) return;
+    st.capF = Number(b.dataset.cap); st.lpage = 0;
+    for (const x of $('mk-capf').querySelectorAll('button')) x.classList.toggle('on', x === b);
+    loadListings(!!st.lall);   // the pages already loaded for the same filters are reused
   };
   // a listing card opens the price chart / listings of its kind on the right
   $('mk-lists').onclick = e => {
