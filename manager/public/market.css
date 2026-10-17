@@ -98,3 +98,11 @@
 .mk-tiers button.all.on { color: var(--text-main); }
 .mk-clear { margin-left: auto; background: none; border: 1px solid var(--line-strong); color: var(--text-muted); border-radius: 8px; padding: 5px 12px; font: 600 12px var(--font-sans); cursor: pointer; }
 .mk-clear:hover { color: var(--text-main); border-color: var(--border-glow); }
+
+/* rarity chips */
+.mk-rars { display: flex; flex-wrap: wrap; gap: 6px; }
+.mk-rars button { --rc: #94a3b8; background: var(--bg-inset); border: 1px solid color-mix(in srgb, var(--rc) 40%, transparent); color: var(--rc); border-radius: 999px; padding: 4px 12px; font: 700 11.5px var(--font-sans); cursor: pointer; }
+.mk-rars button.r-all { --rc: var(--text-muted); }
+.mk-rars button.r-normal { --rc: #cbd5e1; }
+.mk-rars button.on { background: color-mix(in srgb, var(--rc) 20%, transparent); border-color: var(--rc); }
+.r-normal { --rc: #cbd5e1; }

@@ -22,6 +22,7 @@ const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------------- game tabs ----------------
+let marketQueue = Promise.resolve(); // market requests through the game tab run one after another
 const tabs = new Map(); // targetId -> { tab, browser, url, title, state, status, injecting }
 const STATE_JS = `(() => ({ helper: !!window.__bth, inWorld: !!(document.getElementById('mapname') && document.getElementById('mapname').textContent.trim() && document.getElementById('autobig')),
   status: window.__bth && window.__bth.status ? window.__bth.status() : null }))()`;
@@ -158,11 +159,15 @@ const server = http.createServer(async (req, res) => {
       const filters = { q: qp('q').slice(0, 40), cat, sub: /^[a-z_]{1,30}$/.test(qp('sub')) ? qp('sub') : 'all',
         lvMin: gearOnly ? num('lvMin', 99) : 0, lvMax: gearOnly ? num('lvMax', 99) : 0,
         affix: gearOnly && /^[a-z_]{1,24}$/.test(qp('affix')) ? qp('affix') : '', tierMin: gearOnly ? num('tierMin', 8) : 0 };
+      if (['normal', 'magic', 'rare', 'epic', 'unique'].includes(qp('rarity'))) filters.rarity = qp('rarity');
       const sort = ['def', 'vol', 'asc', 'desc', 'up', 'down'].includes(qp('sort')) ? qp('sort') : 'def';
       const msg = url.pathname === '/api/market/board' ? { type: 'marketBoard', ...filters, bsort: sort }
         : url.pathname === '/api/market/counts' ? { type: 'marketQuery', ...filters, sort: 'new' }
         : { type: 'marketItem', itemId: qp('id').slice(0, 300), range: ['7d', '30d'].includes(qp('range')) ? qp('range') : '7d' };
       const want = msg.type === 'marketQuery' ? 'market' : msg.type;
+      // one market request at a time: replies are matched by type only, two in flight would swap their answers
+      const prev = marketQueue; let release; marketQueue = new Promise(r => { release = r; });
+      await prev;
       try {
         const r = await t.tab.eval(`(async () => {
           const room = window.__bthRoom; if (!room) return { ok: false, error: 'helper ยังไม่ได้จับห้องเกม' };
@@ -175,7 +180,7 @@ const server = http.createServer(async (req, res) => {
           return reply.type === 'market' ? { ok: true, type: 'counts', total: reply.total || 0, subCounts: reply.subCounts || null } : { ok: true, ...reply };
         })()`);
         return json(res, r && r.ok ? 200 : 502, r || { ok: false, error: 'อ่านไม่สำเร็จ' });
-      } catch (e) { return json(res, 502, { ok: false, error: e.message }); }
+      } catch (e) { return json(res, 502, { ok: false, error: e.message }); } finally { release(); }
     }
     if (req.method !== 'POST') return json(res, 404, { error: 'not found' });
     let m;
