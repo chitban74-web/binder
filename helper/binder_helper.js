@@ -641,7 +641,7 @@
   }
   // one trip: town -> shop -> (sell) -> top up potions
   async function townTrip(why, sell) {
-    setPhase(why); setAuto(false); await sleep(800);
+    setPhase(why); log(why); setAuto(false); await sleep(800);
     const town = cfg.town || 'Ashford';
     if (!TOWN_IDS[mapName()] && !(await warpToTown(town) || await travelTo(town))) { log('ไปเมืองไม่ได้'); return false; }
     if (sell && cfg.salvOn) { setPhase('แยกชิ้นอุปกรณ์'); await salvageJunk(); }
