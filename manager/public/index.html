@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="market.css">
 </head>
 <body>
   <!-- layout follows Pelican Manager (manager/public/index.html); buttons marked "soon" are placeholders for now -->
@@ -93,6 +94,7 @@
         <div class="section-title-left">
           <nav class="tab-bar" role="tablist">
             <button type="button" class="tab-btn active" data-tab="profiles" role="tab"><span class="icon">🎮</span> รายชื่อจอเกมและบอท <span class="tab-count" id="tab-count-profiles">0</span></button>
+            <button type="button" class="tab-btn" data-tab="market" role="tab"><span class="icon">🏪</span> ตลาด</button>
             <button type="button" class="tab-btn" data-tab="zeny" role="tab"><span class="icon">💰</span> ระบบรวมเงิน</button>
             <button type="button" class="tab-btn" data-tab="screens" role="tab"><span class="icon">📺</span> ดูจอเกม</button>
             <button type="button" class="tab-btn" data-tab="browsers" role="tab"><span class="icon">🌐</span> เบราว์เซอร์ <span class="tab-count" id="tab-count-browsers">0</span></button>
@@ -140,6 +142,9 @@
         </div>
         <div class="profiles-grid sc-root" id="profiles-grid"></div>
       </section>
+
+      <!-- TAB: MARKET (market.js) -->
+      <section class="tab-pane" data-pane="market" id="market-pane"></section>
 
       <!-- TAB: GOLD (placeholder) -->
       <section class="tab-pane" data-pane="zeny">
@@ -299,5 +304,7 @@ document.addEventListener('click', async e => {
 });
 refresh(); setInterval(refresh, 2000);
 </script>
+<script src="item_names.js"></script>
+<script src="market.js"></script>
 </body>
 </html>

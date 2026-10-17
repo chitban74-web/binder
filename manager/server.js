@@ -146,6 +146,28 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': type + (/css|js/.test(sf[2]) ? '; charset=utf-8' : ''), 'Cache-Control': 'no-store' });
       return res.end(fs.readFileSync(path.join(PUBLIC, sf[1])));
     }
+    // market (price board / one item) read through a game tab's own room — the same requests as the game's market window
+    if (req.method === 'GET' && (url.pathname === '/api/market/board' || url.pathname === '/api/market/item')) {
+      const t = [...tabs.values()].find(x => x.state === 'helper' && !x.tab.closed);
+      if (!t) return json(res, 503, { ok: false, error: 'ไม่มีแท็บเกมที่โหลด helper อยู่' });
+      const msg = url.pathname === '/api/market/board'
+        ? { type: 'marketBoard', q: (url.searchParams.get('q') || '').slice(0, 40) || undefined,
+            cat: ['weapon', 'gear', 'use', 'mat', 'card'].includes(url.searchParams.get('cat')) ? url.searchParams.get('cat') : undefined,
+            bsort: ['def', 'vol', 'asc', 'desc', 'up', 'down'].includes(url.searchParams.get('sort')) ? url.searchParams.get('sort') : 'def' }
+        : { type: 'marketItem', itemId: (url.searchParams.get('id') || '').slice(0, 300), range: ['7d', '30d'].includes(url.searchParams.get('range')) ? url.searchParams.get('range') : '7d' };
+      const want = msg.type;
+      try {
+        const r = await t.tab.eval(`(async () => {
+          const room = window.__bthRoom; if (!room) return { ok: false, error: 'helper ยังไม่ได้จับห้องเกม' };
+          const msg = ${JSON.stringify(msg)};
+          const reply = await new Promise(res => { let off; const t = setTimeout(() => { off && off(); res(null); }, 6000);
+            off = room.onMessage('server', m => { const e = (Array.isArray(m) ? m : [m]).find(x => x && x.type === ${JSON.stringify(want)}); if (e) { clearTimeout(t); off && off(); res(e); } });
+            room.send('input', msg); });
+          return reply ? { ok: true, ...reply } : { ok: false, error: 'ตลาดไม่ตอบ' };
+        })()`);
+        return json(res, r && r.ok ? 200 : 502, r || { ok: false, error: 'อ่านไม่สำเร็จ' });
+      } catch (e) { return json(res, 502, { ok: false, error: e.message }); }
+    }
     if (req.method !== 'POST') return json(res, 404, { error: 'not found' });
     let m;
     if ((m = url.pathname.match(/^\/api\/browser\/(\w+)\/open$/))) return json(res, 200, { ok: true, msg: await openBrowser(m[1]) });
