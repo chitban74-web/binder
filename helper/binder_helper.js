@@ -129,10 +129,21 @@
   // entered 10 min before it starts. Rewards by damage rank (heal / tank count) come by mail.
   const WB_ARENA = 'rootfall_barrow', WB_OPEN_MS = 20 * 60e3, WB_SOON_MS = 10 * 60e3;
   const wb = { view: null, mine: 0, need: 0, at: 0, doneId: null };
+  // the bag from the server's "inv" messages: { items: [{ id, qty }] } is the whole bag, with d: true only the changed
+  // stacks (items) and the removed ones (gone) — merged the same way as the game does. null until a whole bag was seen
+  let invItems = null;
   window.__bthOnServer = m => {
-    for (const e of Array.isArray(m) ? m : [m]) if (e && e.type === 'worldBoss' && e.view) {
-      wb.view = e.view; wb.at = Date.now();
-      if (e.mine !== undefined) { wb.mine = Number(e.mine) || 0; wb.need = Number(e.need) || 0; }
+    for (const e of Array.isArray(m) ? m : [m]) {
+      if (e && e.type === 'worldBoss' && e.view) {
+        wb.view = e.view; wb.at = Date.now();
+        if (e.mine !== undefined) { wb.mine = Number(e.mine) || 0; wb.need = Number(e.need) || 0; }
+      }
+      if (e && e.type === 'inv' && Array.isArray(e.items)) {
+        if (!e.d) { if (!invItems) log('ได้ข้อมูลกระเป๋าทั้งหมดจากเซิร์ฟแล้ว (' + e.items.length + ' ช่อง)'); invItems = new Map(); }
+        if (!invItems) continue;
+        for (const id of e.gone || []) invItems.delete(id);
+        for (const it of e.items) invItems.set(it.id, it.qty);
+      }
     }
   };
   const wbOpen = () => {
@@ -715,6 +726,23 @@
       if (got) log(`ซื้อ ${potName(p.item)} ×${got} (มี ${beltCount(p.item)})`);
     }
   }
+  // potions in the bag beyond what the panel tops up to: the HP / MP potion picked there keeps its "เติมถึง" amount,
+  // every other potion is sold (same message as the bag's "ขาย"). Nothing picked in the panel -> nothing sold
+  async function sellSparePotions() {
+    const plans = potionPlans();
+    if (!plans.length) return;
+    if (!invItems) { log('ยังไม่ได้ข้อมูลกระเป๋าจากเซิร์ฟ — ข้ามการขายยาส่วนเกิน'); return; }
+    const keep = Object.fromEntries(plans.map(p => [p.item, Math.max(0, p.to || 0)]));
+    for (const id of [...Object.keys(POTIONS.hp), ...Object.keys(POTIONS.mp)]) {
+      const have = invItems.get(id) || 0, q = have - (keep[id] || 0);
+      if (q <= 0 || !cfg.running) continue;
+      const r = room(); if (!r) return;
+      r.send('input', { type: 'sell', itemId: id, qty: q });
+      await sleep(1200);
+      const now = invItems.get(id) || 0;
+      log(now < have ? `ขาย ${potName(id)} ×${have - now} (เหลือ ${now})` : `ขาย ${potName(id)} ×${q} ไม่สำเร็จ (ยังมี ${now})`);
+    }
+  }
   // one trip: town -> shop -> (sell) -> top up potions
   async function townTrip(why, sell) {
     setPhase(why); log(why); setAuto(false); await sleep(800);
@@ -724,6 +752,7 @@
     setPhase('ที่ร้านค้า ' + mapName());
     if (!await openShop()) return false;
     if (sell) await sellAll();
+    await sellSparePotions();
     await buyPotions();
     closeShop();
     return true;
