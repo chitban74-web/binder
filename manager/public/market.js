@@ -15,7 +15,7 @@
   // sub-types and affixes as the game's market window lists them (weapon names from the game's class table)
   const SUBS = { weapon: [["sword", "ดาบ"], ["greatsword", "ดาบสองมือ"], ["mace", "กระบอง"], ["dagger", "มีดสั้น"], ["bow", "ธนู"], ["staff", "ไม้เท้า"], ["wand", "ไม้กายสิทธิ์"], ["rod", "คทา"], ["book", "ตำรา"], ["spear", "หอก"], ["axe", "ขวาน"], ["crossbow", "หน้าไม้"], ["orb", "ลูกแก้วเวท"], ["hand_crossbow", "หน้าไม้มือ"], ["javelin", "หลาว"], ["sling", "สลิง"], ["pike", "ทวน"], ["lance", "หอกทหารม้า"], ["knuckles", "สนับมือ"], ["flail", "ลูกตุ้มโซ่"], ["rapier", "เรเปียร์"], ["throwing_knives", "มีดบิน"], ["greatstaff", "ไม้เท้ายาว"], ["spellstaff", "ไม้เท้าศึก"], ["maul", "ค้อนศักดิ์สิทธิ์"], ["lightstaff", "ไม้เท้าแสง"], ["scythe", "เคียวใหญ่"], ["chain_sickle", "เคียวโซ่"]], gear: [["armor", "เกราะ"], ["headgear", "หมวก"], ["face", "หน้า"], ["mouth", "ปาก"], ["boots", "รองเท้า"], ["offhand", "มือรอง / โล่"], ["accessory", "เครื่องประดับ"], ["necklace", "สร้อยคอ"], ["belt", "เข็มขัด"]] };
   const AFFIXES = [["desperate", "ดาเมจตอนเลือดคุณต่ำกว่า 35%"], ["vsdebuff", "ดาเมจใส่มอนที่ติดสตัน/ตรึง/สโล%"], ["opener", "ดาเมจใส่มอนที่เลือดยังเกิน 90%"], ["bossbane", "ดาเมจใส่ Boss%"], ["castspd", "ร่ายไว%"], ["aspd", "สปีดตี%"], ["agi", "AGI"], ["atk", "ATK"], ["atkpct", "ATK%"], ["block", "Block%"], ["bossres", "Boss Resist%"], ["p_bulwark", "Bulwark (Trigger)"], ["p_chain", "Chain Spark (Trigger)"], ["crit", "CRIT%"], ["critdmg", "Crit DMG%"], ["p_nova", "Death Burst (Trigger)"], ["guard", "DEF"], ["dex", "DEX"], ["p_echo", "Echo Strike (Trigger)"], ["evasive", "FLEE"], ["p_haste", "Frenzy (Trigger)"], ["p_frost", "Frostbite (Trigger)"], ["mending", "Heal power"], ["hit", "HIT"], ["regen", "HP regen/s"], ["int", "INT"], ["p_barrier", "Lifeline (Trigger)"], ["leech", "Lifesteal%"], ["luk", "LUK"], ["manatide", "Mana Tide: MP ที่ใช้กับสกิลเวท"], ["matk", "MATK"], ["matkpct", "MATK%"], ["hp", "Max HP"], ["hppct", "Max HP%"], ["mp", "Max MP"], ["move", "Move speed%"], ["p_bleed", "Rend (Trigger)"], ["p_renew", "Second Wind (Trigger)"], ["p_siphon", "Siphon (Trigger)"], ["cdr", "Skill CDR%"], ["p_gust", "Slipstream (Trigger)"], ["sturdy", "Soft DEF"], ["spellamp", "Spell Amp%"], ["str", "STR"], ["p_expose", "Sunder (Trigger)"], ["p_thorns", "Thorns (Trigger)"], ["p_vigor", "Vigor (Trigger)"], ["vit", "VIT"]];
-  let st = { buyers: [], buyerTab: '', capF: 0, lall: null, lprog: '', view: 'board', lsort: 'def', lpage: 0, ltotal: 0, listings: [], lloading: false, lerror: '', req: 0, q: '', rarity: '', progress: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
+  let st = { lsel: null, buyers: [], buyerTab: '', capF: 0, lall: null, lprog: '', view: 'board', lsort: 'def', lpage: 0, ltotal: 0, listings: [], lloading: false, lerror: '', req: 0, q: '', rarity: '', progress: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
 
   // item id -> base id, rarity, display name (gear ids carry "|rare|..." / "^insight", cards "|mob")
   const parse = (key, itemId) => {
@@ -115,11 +115,47 @@
         <div class="ib-ladder">${ladder}</div></details>
       ${foot}</div>`;
   }
+  // "ประกาศทั้งหมด" right panel: the picked listing as a full item inspector (same data as tipCard, larger layout)
+  function inspCard(l) {
+    const it = listingItem(l.itemId), eq = (window.BT_EQUIP || {})[it.core], T = window.BT_TIP, W = window.BT_WEAPON;
+    const unit = Math.round(l.price / Math.max(1, l.qty)), rc = `r-${it.rarity || 'common'}`;
+    const full = eq && T && W;
+    const wt = full && (eq[7] === 'weapon' || eq[7] === 'offhand') && eq[2] !== eq[7] ? eq[2] : '';
+    const hand = !full ? '' : eq[7] === 'offhand' ? 'มือรอง' : eq[7] !== 'weapon' ? '' : T.twoHand.has(wt) ? 'สองมือ' : 'มือเดียว';
+    const chips = [it.rarity ? `<i class="mk-rar ${rc}">${RAR[it.rarity]}</i>` : '', full ? `<span>${esc(T.slots[eq[7]] || eq[7])}</span>` : '', wt ? `<span>${esc(W.names[wt] || wt)}</span>` : '', hand ? `<span class="hand">${hand}</span>` : '', it.cap ? `<span class="mk-cap t${it.cap}">สูงสุด T${it.cap}</span>` : ''].filter(Boolean).join('');
+    const jobs = wt && W.classes[wt] ? W.classes[wt].map(j => W.jobs[j] || j).join(' / ') : '';
+    const hero = `<div class="ins-hero ${rc}"><span class="mk-ico huge ${rc}">${icon(it.core)}</span>
+      <div class="ins-hd"><b class="ins-name">${esc(it.name)}</b><div class="ins-chips">${chips}</div>
+        ${it.lv > 1 || jobs ? `<div class="ins-req">${it.lv > 1 ? `<span>เลเวล <b>${it.lv}</b></span>` : ''}${jobs ? `<span>${esc(jobs)}</span>` : ''}</div>` : ''}</div></div>`;
+    const price = `<div class="ins-price"><div><small>ราคา${l.qty > 1 ? 'ต่อชิ้น' : ''}</small><b>${g(unit)}<em> G</em></b>${l.qty > 1 ? `<span>×${g(l.qty)} = ${g(l.price)} G</span>` : ''}</div>
+      <div class="ins-seller"><small>ผู้ขาย</small><b>${esc(l.seller)}</b><span>${ago(l.at)}</span></div>${buyBtn(l).replace('class="mk-buy"', 'class="mk-buy big"')}</div>`;
+    if (!full) return `<div class="mk-insp">${hero}${price}</div>`;
+    const tile = (k, v, big) => `<div class="ins-stat${big ? ' big' : ''}"><small>${esc(k)}</small><b>${v}</b></div>`;
+    const stats = [['ATK', eq[1]], ['MATK', eq[3]], ['DEF', eq[4]]].filter(x => x[1]).map(([k, v]) => tile(k, g(v * T.scale), 1)).join('')
+      + Object.entries(eq[5] || {}).map(([k, v]) => tile(k.toUpperCase(), `+${v}`)).join('')
+      + Object.entries(eq[6] || {}).map(([k, v]) => tile((T.gear[k] || [k])[0], `+${g(T.stat(k, v))}${PCT_STAT.test(k) ? '%' : ''}`)).join('');
+    const aff = window.BT_AFFIX || {}, mult = T.focus[it.opts.filter(o => aff[o.id]).length] || 1;
+    const opts = it.opts.map(o => { const a = aff[o.id], mod = a && a[2] || {};
+      return `<div class="ins-aff${mod.t === 'proc' ? ' proc' : ''}"><span class="ins-t"><u class="tb t${Math.min(8, o.tier)}">T${o.tier}</u><i>/T${it.cap}</i></span><span class="ins-txt">${esc(mod.t ? T.affixText(mod, o.value, mult) : optText(o))}</span><small>${esc(it.tierName(o))}</small></div>`; }).join('');
+    const notes = [mult !== 1 && it.opts.some(o => ((aff[o.id] || [])[2] || {}).t !== 'proc') ? `<div>◆ <b>Focused ×${mult}</b> <small>Affix ${it.opts.length} แถว — ค่าด้านบนคูณแล้ว</small></div>` : '',
+      ...(eq[7] === 'weapon' ? (W.props[eq[8]] || []).map(p => `<div>⚙ <b>${esc(T.propNames[p] || p)}</b> <span>${esc(T.props[p] || '')}</span></div>`) : []),
+      it.insight ? `<div class="ins">✒ <b>Inscription</b> <span>${esc(it.insight)}</span></div>` : ''].filter(Boolean).join('');
+    const odds = tierOdds(it.cap).map(([t, c]) => `<i><u class="tb t${t}">T${t}</u> ${Math.round(c * 100)}%</i>`).join('');
+    const ladder = TIER_LV.map((lv, i) => `<i class="${i < it.cap ? 'on' : ''}">T${i + 1} Lv ${lv}</i>`).join('');
+    return `<div class="mk-insp">${hero}${price}
+      ${stats ? `<h5>ค่าพื้นฐาน</h5><div class="ins-stats">${stats}</div>` : ''}
+      ${opts ? `<h5>Affix <small>${it.opts.length} แถว</small></h5><div class="ins-affs">${opts}</div>` : ''}
+      ${notes ? `<div class="ins-notes">${notes}</div>` : ''}
+      <details class="ib-tier"><summary>Tier Affix สูงสุดของชิ้นนี้: <u class="tb t${it.cap}">T${it.cap}</u>${it.cap < 8 ? ` <small>(ลุ้น T${it.cap + 1} 1%)</small>` : ''}</summary>
+        <div class="ib-odds">โอกาสแต่ละแถว: ${odds}</div>
+        <p>Affix ${it.opts.length} แถว (จำนวนแถวตายตัวตามความหายาก) · เลเวลไอเทม ${it.ilvl} — ดรอปจากมอนเลเวลสูงกว่า = Tier สูงกว่า · Reroll ที่ Smith สุ่มได้ถึง Tier เดียวกัน</p>
+        <div class="ib-ladder">${ladder}</div></details></div>`;
+  }
   const optRows = it => (it.opts.length || it.insight) ? `<div class="mk-lopts">${it.opts.map(o => `<div class="mk-lopt t${Math.min(8, o.tier)}"><b>T${o.tier}</b><span>${esc(optText(o))}</span><small>${esc(it.tierName(o))}</small></div>`).join('')}${it.insight ? `<div class="mk-lopt ins"><b>✦</b><span>${esc(it.insight)}</span><small>insight</small></div>` : ''}</div>` : '';
   const buyBtn = l => `<button type="button" class="mk-buy" data-buy="${l.id}" title="ซื้อประกาศนี้ (ของส่งเข้าจดหมายในเกม)">ซื้อ</button>`;
   function listingCard(l) {
     const it = listingItem(l.itemId), unit = Math.round(l.price / Math.max(1, l.qty));
-    return `<div class="mk-lcard r-${it.rarity || 'common'}" data-lid="${l.id}" title="คลิกเพื่อดูไอเทมชนิดนี้และประกาศทั้งหมดของมัน">
+    return `<div class="mk-lcard r-${it.rarity || 'common'}${st.lsel && st.lsel.id === l.id ? ' sel' : ''}" data-lid="${l.id}" title="คลิกเพื่อดูรายละเอียดไอเทมนี้ทางขวา">
       <span class="mk-ico r-${it.rarity || 'common'}">${icon(it.core)}</span>
       <div class="mk-lmain"><b class="mk-lname r-${it.rarity || 'common'}">${esc(it.name)}</b>
         <div class="mk-lmeta">${it.rarity ? `<i class="mk-rar r-${it.rarity}">${RAR[it.rarity]}</i>` : ''}${it.lv ? `<span class="mk-pill">Lv ${it.lv}</span>` : ''}${it.cap ? `<span class="mk-cap t${it.cap}" title="Tier Affix สูงสุดของชิ้นนี้ · เลเวลไอเทม ${it.ilvl}">สูงสุด T${it.cap}</span>` : ''}</div>
@@ -156,10 +192,11 @@
     if (l.price > b.gold) return alert(`Gold ไม่พอ: ต้องใช้ ${g(l.price)} G แต่ ${b.name} มี ${g(b.gold)} G`);
     if (!confirm(`ซื้อ ${it.name}${l.qty > 1 ? ` ×${l.qty}` : ''}\nราคา ${g(l.price)} G จาก ${l.seller}\n\nด้วยตัวละคร ${b.name}\nGold ${g(b.gold)} → ${g(b.gold - l.price)}\n\nของจะส่งเข้าจดหมายในเกม`)) return;
     const r = await (await fetch('/api/market/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tabId: b.tabId, id: l.id }) })).json().catch(() => ({ ok: false, error: 'ส่งคำสั่งไม่สำเร็จ' }));
+    if (r.ok && st.lsel && st.lsel.id === l.id) st.lsel = null;
     alert(r.ok ? `ซื้อสำเร็จ — ${it.name} ส่งเข้าจดหมายของ ${b.name} แล้ว` : `ซื้อไม่สำเร็จ: ${r.error || ''}`);
     await loadBuyers();
     if (st.sel) loadItem();
-    if (st.view === 'list') loadListings(!!st.lall);
+    if (st.view === 'list') { renderDetail(); loadListings(!!st.lall); }
   }
   async function loadListings(keepAll) {
     const my = ++st.req;
@@ -366,7 +403,12 @@
 
   function renderDetail() {
     const el = $('mk-detail');
-    if (!st.sel) return;
+    // "ประกาศทั้งหมด": the listing picked on the left as a full item inspector
+    if (st.view === 'list') {
+      el.innerHTML = st.lsel ? inspCard(st.lsel) + buyerBar() : '<div class="mk-empty"><span class="mk-empty-ico">⇠</span><b>เลือกไอเทมจากด้านซ้าย</b></div>';
+      return;
+    }
+    if (!st.sel) { el.innerHTML = '<div class="mk-empty"><b>เลือกไอเทมทางซ้าย</b><span>เพื่อดูกราฟราคาและประกาศขาย</span></div>'; return; }
     const it = parse(st.sel.key, st.sel.itemId), v = st.item;
     const head = `<div class="mk-dhead"><span class="mk-ico big r-${it.rarity || 'common'}">${icon(it.base)}</span>
       <div><b>${esc(it.name)}</b><small>${it.rarity ? `<i class="mk-rar r-${it.rarity}">${RAR[it.rarity]}</i>` : ''}<code>${esc(it.base)}</code></small></div>
@@ -401,6 +443,7 @@
     $('mk-sort').innerHTML = (st.view === 'list' ? LSORTS : SORTS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
     $('mk-sort').value = st.view === 'list' ? st.lsort : st.sort;
     if (st.view === 'list') loadListings(); else renderBoard();
+    renderDetail();
   };
   $('mk-reload').onclick = () => (st.view === 'list' ? loadListings() : loadBoard());
   $('mk-cats').onclick = e => { const b = e.target.closest('button[data-cat]'); if (!b) return; st.cat = b.dataset.cat; st.sub = 'all'; st.counts = null; for (const x of $('mk-cats').children) x.classList.toggle('on', x === b); renderFilters(); reload(); };
@@ -425,21 +468,20 @@
     for (const x of $('mk-capf').querySelectorAll('button')) x.classList.toggle('on', x === b);
     loadListings(!!st.lall);   // the pages already loaded for the same filters are reused
   };
-  // a listing card opens the price chart / listings of its kind on the right
+  // a listing card shows that listing's item card on the right
   $('mk-lists').onclick = e => {
     const bb = e.target.closest('button[data-buy]');
     if (bb) { const l = st.listings.find(x => String(x.id) === bb.dataset.buy); if (l) buyListing(l); return; }
     const c = e.target.closest('.mk-lcard'); if (!c) return;
     const l = st.listings.find(x => String(x.id) === c.dataset.lid); if (!l) return;
-    const it = listingItem(l.itemId);
-    st.sel = { key: it.rarity ? `${it.core}|${it.rarity}` : it.core, itemId: l.itemId }; st.item = null;
+    st.lsel = l;
     for (const x of $('mk-lists').children) x.classList.toggle('sel', x === c);
-    loadItem();
+    renderDetail();
   };
   $('mk-detail').addEventListener('change', e => { if (e.target.id === 'mk-buyer') { st.buyerTab = e.target.value; renderDetail(); } });
   $('mk-detail').addEventListener('click', e => {
     const bb = e.target.closest('button[data-buy]'); if (!bb) return;
-    const l = ((st.item && st.item.listings) || []).find(x => String(x.id) === bb.dataset.buy); if (l) buyListing(l);
+    const l = st.view === 'list' ? st.lsel : ((st.item && st.item.listings) || []).find(x => String(x.id) === bb.dataset.buy); if (l) buyListing(l);
   });
   $('mk-detail').onclick = e => { const b = e.target.closest('button[data-range]'); if (!b) return; st.range = b.dataset.range; st.item = null; loadItem(); };
 
