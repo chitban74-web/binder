@@ -11,6 +11,8 @@
 //    farm area = whole map, claim when done → next; at the end AUTO settings go back and you return to the farm spot
 //  • elites: purple skull on the minimap / big map — faded at the spawn point (all maps, computed from the game's map
 //    builder), bright at the live position from the server's census
+//  • World Boss round open (server "worldBoss" message) → warp into the arena → AUTO until the boss is dead / gone →
+//    leave → back to the farm spot (on by default, switch on the farm tab)
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
 // It presses the game's own buttons (warp, world map "go", respawn, sell, AUTO). The messages it sends itself go
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
@@ -20,7 +22,7 @@
   const KEY = 'bth_cfg';
   const DEF = {
     farmMap: '', farmSpot: null, town: '', sellPct: 95, sellAfterDeathPct: 40, deathWaitMs: 3000,
-    quietCh: true, followLeader: true, bossHunt: true, mobIcons: true,
+    quietCh: true, followLeader: true, bossHunt: true, worldBoss: true, mobIcons: true,
     // town trip with selling: salvage Normal / Magic gear whose item level is below salvBelow first (off by default)
     salvOn: false, salvBelow: 30,
     // potions: below `min` (0 = off) -> trip to town; in town always top up to `to`
@@ -71,8 +73,28 @@
       const RP = c && c.Room && c.Room.prototype;
       // re-wrap from the original send on every load, so a reloaded helper gets the outgoing messages too (window.__bthSendHook)
       if (RP) { const orig = RP.__bthSend || RP.send; RP.__bthSend = orig; RP.send = function () { window.__bthRoom = this; try { if (window.__bthSendHook) window.__bthSendHook(arguments[0], arguments[1]); } catch { } return orig.apply(this, arguments); }; }
+      // incoming server events of every room, from its very first message (window.__bthOnServer — World Boss state)
+      if (RP) { const od = RP.__bthDispatch || RP.dispatchMessage; RP.__bthDispatch = od; RP.dispatchMessage = function (type, msg) { if (type === 'server') { try { if (window.__bthOnServer) window.__bthOnServer(msg); } catch { } } return od.apply(this, arguments); }; }
     } catch (e) { console.warn('bth: room hook failed', e); }
   })();
+  // ---- World Boss (Wraithroot Colossus, arena map rootfall_barrow) ----
+  // The server sends "worldBoss" { view: { id, state: idle|live|dead|fled, startAt, endsAt, nextAt, frac, engaged }, mine, need }
+  // when a map is joined and whenever the round changes (never on request). A round is open 20 min; the arena can be
+  // entered 10 min before it starts. Rewards by damage rank (heal / tank count) come by mail.
+  const WB_ARENA = 'rootfall_barrow', WB_OPEN_MS = 20 * 60e3, WB_SOON_MS = 10 * 60e3;
+  const wb = { view: null, mine: 0, need: 0, at: 0, doneId: null };
+  window.__bthOnServer = m => {
+    for (const e of Array.isArray(m) ? m : [m]) if (e && e.type === 'worldBoss' && e.view) {
+      wb.view = e.view; wb.at = Date.now();
+      if (e.mine !== undefined) { wb.mine = Number(e.mine) || 0; wb.need = Number(e.need) || 0; }
+    }
+  };
+  const wbOpen = () => {
+    const v = wb.view, now = Date.now();
+    if (!v) return false;
+    if (v.state === 'live') return !v.endsAt || v.endsAt > now;
+    return v.state === 'idle' && v.startAt > 0 && now >= v.startAt - WB_SOON_MS && now < v.startAt + WB_OPEN_MS;
+  };
   const room = () => { const r = window.__bthRoom; return r && r.state && r.connection && r.connection.isOpen !== false ? r : null; };
   const myPos = () => { const r = room(); const p = r && r.state.players && r.state.players.get(r.sessionId); return p ? { x: +p.x.toFixed(2), y: +p.y.toFixed(2) } : null; };
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -577,6 +599,59 @@
     closeShop();
     return true;
   }
+  // World Boss round open: stop farming, warp into the arena, AUTO until the boss is dead / gone / time is up, leave,
+  // back to the farm spot. Dying there costs nothing: respawn and go back in while the round is still open.
+  const mapId = () => { const r = room(); return (r && r.state && r.state.mapId) || ''; };
+  const wbLeft = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  async function wbEnter() {
+    for (let i = 0; i < 3 && mapId() !== WB_ARENA && cfg.running; i++) {
+      const r = room(); if (r) r.send('input', { type: 'worldBossWarp', enter: true });
+      for (let k = 0; k < 20 && mapId() !== WB_ARENA && cfg.running; k++) await sleep(1000);
+    }
+    return mapId() === WB_ARENA;
+  }
+  async function worldBossTrip() {
+    const id = wb.view.id;
+    setPhase('World Boss: เข้าสนาม');
+    log(`World Boss ${wb.view.state === 'live' ? 'เกิดแล้ว' : 'กำลังจะมา'} — เข้าไปตี`);
+    setAuto(false);
+    if (!await waitForCombatToFinish('วาร์ป')) return;
+    if (!await wbEnter()) { wb.doneId = id; log('เข้าสนาม World Boss ไม่ได้ — กลับไปฟาร์ม'); await backToFarm(); return; }
+    await sleep(1500); setAuto(true);
+    while (cfg.running) {
+      const v = wb.view, now = Date.now();
+      if (!v || v.id !== id || v.state === 'dead' || v.state === 'fled') break;
+      if (v.state === 'live' && v.endsAt && now > v.endsAt + 5000) break;
+      if (v.state === 'idle' && v.startAt && now > v.startAt + WB_OPEN_MS) break;
+      if (isDead()) {
+        setPhase('World Boss: ตาย — เกิดใหม่แล้วเข้าไปใหม่');
+        for (let i = 0; i < 20 && isDead() && cfg.running; i++) { const b = $('#drespawn'); if (b && !b.disabled) click(b, 'เกิดใหม่'); await sleep(1500); }
+        await sleep(2000);
+        continue;
+      }
+      if (mapId() !== WB_ARENA) {   // respawned outside: back in while the round is open
+        if (!wbOpen()) break;
+        setAuto(false);
+        if (!await wbEnter()) break;
+        await sleep(1500); setAuto(true);
+        continue;
+      }
+      if (!autoOn()) setAuto(true);
+      setPhase(v.state === 'live'
+        ? `World Boss: ตี · HP ${v.frac != null ? (v.frac * 100).toFixed(1) + '%' : '?'} · ดาเมจเรา ${wb.mine.toLocaleString()}/${wb.need.toLocaleString()} · เหลือ ${wbLeft(v.endsAt - now)}`
+        : `World Boss: รอในสนาม · เริ่มใน ${wbLeft(v.startAt - now)}`);
+      await sleep(2000);
+    }
+    wb.doneId = id;
+    log(`World Boss จบ (${(wb.view && wb.view.state) || '?'}) · ดาเมจเรา ${wb.mine.toLocaleString()}/${wb.need.toLocaleString()} — ออกจากสนาม`);
+    setAuto(false);
+    if (mapId() === WB_ARENA) {
+      const r = room(); if (r) r.send('input', { type: 'worldBossWarp', enter: false });
+      for (let k = 0; k < 20 && mapId() === WB_ARENA && cfg.running; k++) await sleep(1000);
+    }
+    await sleep(1500);
+    await backToFarm();
+  }
   const stopWith = (why, msg) => { log(msg); cfg.running = false; save(); render(); setPhase('หยุด: ' + why); };
 
   // ---- main loop ----
@@ -596,6 +671,8 @@
         const sell = weightPct() >= cfg.sellAfterDeathPct;
         if (sell || potionPlans().some(p => p.have !== null && p.have < (p.to || 0))) await townTrip('ในเมือง: ขายของ / ซื้อยา', sell);
         await backToFarm();
+      } else if (cfg.worldBoss && wbOpen() && wb.view.id !== wb.doneId) {
+        await worldBossTrip();
       } else if (bagFull()) {
         await townTrip(`ของเต็ม (น้ำหนัก ${weightPct()}%${slotsFull() ? ' / ช่องเต็ม' : ''}) — กลับเมือง`, true);
         // still full after selling (sell filter keeps the rest) -> stop instead of warping again and again
@@ -728,6 +805,8 @@
        <div class="bth-map"><b id="bthmap"></b><button id="bthset" type="button" title="เลือกจุดฟาร์ม: เปิดแผนที่ใหญ่ แล้วแตะจุดที่จะฟาร์ม" aria-label="เลือกจุดฟาร์มบนแผนที่"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mob"/></svg></button></div>
        <label class="bth-inline" for="bthwait"><span>รอก่อนกลับมาเกิด</span><span><input id="bthwait" type="number" min="0" max="60"> วินาที</span></label>
        <label class="bth-switch"><input id="bthboss" type="checkbox"><span class="bth-switch-ui"></span><span>เจอ Boss / Mini-boss ในแมพ ไปตีก่อน</span></label>
+       <label class="bth-switch"><input id="bthwb" type="checkbox"><span class="bth-switch-ui"></span><span>เข้า World Boss อัตโนมัติ (ตีจนจบ แล้วกลับมาฟาร์ม)</span></label>
+       <div class="bth-note" id="bthwbinfo"></div>
        <label class="bth-switch" id="bthmobiconrow"><input id="bthmobicon" type="checkbox"><span class="bth-switch-ui"></span><span>แสดงรูปมอนบนมินิแมพ</span></label>
        <button id="bthrun" type="button" style="width:100%"></button>
      </section>
@@ -955,7 +1034,7 @@
   }
   function render() {
     $('#bthmap').textContent = cfg.farmMap ? cfg.farmMap + (cfg.farmSpot ? ` (${cfg.farmSpot.x.toFixed(0)}, ${cfg.farmSpot.y.toFixed(0)})` : '') : '(ยังไม่ตั้ง)';
-    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthboss').checked = !!cfg.bossHunt; $('#bthmobicon').checked = cfg.mobIcons !== false;
+    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthboss').checked = !!cfg.bossHunt; $('#bthwb').checked = cfg.worldBoss !== false; $('#bthmobicon').checked = cfg.mobIcons !== false;
     $('#bthsalv').checked = !!cfg.salvOn; $('#bthsalvlv').value = cfg.salvBelow;
     for (const k of ['hp', 'mp']) { const b = (cfg.buy || {})[k] || {}; $(`#bth_${k}_item`).value = b.item; $(`#bth_${k}_min`).value = b.min || 0; $(`#bth_${k}_to`).value = b.to || 0; }
     $('#bthrun').textContent = cfg.running ? '■ หยุด' : '▶ เริ่ม';
@@ -992,6 +1071,7 @@
   $('#bthquiet').onchange = e => { cfg.quietCh = e.target.checked; save(); };
   $('#bthlead').onchange = e => { cfg.followLeader = e.target.checked; save(); };
   $('#bthboss').onchange = e => { cfg.bossHunt = e.target.checked; save(); };
+  $('#bthwb').onchange = e => { cfg.worldBoss = e.target.checked; save(); };
   if (!MOB_ICONS) $('#bthmobiconrow').style.display = 'none';
   $('#bthmobicon').onchange = e => { cfg.mobIcons = e.target.checked; save(); };
   for (const k of ['hp', 'mp']) {
@@ -1049,6 +1129,17 @@
   };
   render();
   const timer = setInterval(tick, 1000);
+  // Farm tab: World Boss round as the server last told it
+  const showWbInfo = () => {
+    const el = $('#bthwbinfo'); if (!el) return;
+    const v = wb.view, now = Date.now();
+    const at = t => new Date(t).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const t = !v ? 'World Boss: ยังไม่มีข้อมูล (รู้เมื่อเปลี่ยนแมพ หรือเมื่อรอบเริ่ม)'
+      : v.state === 'live' ? `World Boss เกิดแล้ว · เหลือ ${wbLeft(v.endsAt - now)} · HP ${v.frac != null ? (v.frac * 100).toFixed(1) + '%' : '?'}${v.id === wb.doneId ? ' · รอบนี้ตีแล้ว' : ''}`
+      : v.state === 'idle' && v.startAt > now ? `World Boss รอบถัดไป ${at(v.startAt)} น. (อีก ${wbLeft(v.startAt - now)})`
+      : v.nextAt ? `World Boss ${v.state === 'dead' ? 'ถูกปราบแล้ว' : 'จากไปแล้ว'} · กลับมา ${at(v.nextAt)} น.` : `World Boss: ${v.state}`;
+    if (el.textContent !== t) el.textContent = t;
+  };
   // Channel tab: current channel and what the last channel pick decided
   const showChInfo = () => {
     const el = $('#bthchinfo'); if (!el) return;
@@ -1057,10 +1148,10 @@
     const html = `<b>CH ${ch || '?'}</b> · ${next}${chLast ? `<br><small>ล่าสุด: ${chLast}</small>` : ''}`;
     if (el.innerHTML !== html) el.innerHTML = html;
   };
-  const chInfoTimer = setInterval(showChInfo, 1000);
+  const chInfoTimer = setInterval(() => { showChInfo(); showWbInfo(); }, 1000);
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
