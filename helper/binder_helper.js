@@ -580,13 +580,17 @@
     }
     lastMapId = id;
   }, 500);
+  // arrived = the live room says so. mapName() falls back to the HUD while no open room is captured (the old map's room
+  // closes on a map change and the new one is only caught on its first send), and the HUD is not redrawn in a hidden
+  // tab: 04:31 / 05:03 on 18 Oct it still read Glasswrack on arrival in Shattered Vale, so the trip ended a map early
+  const liveMap = () => { const r = room(); return r && r.state.mapId ? MAP_NAMES[r.state.mapId] || r.state.mapId : ''; };
   async function travelTo(name, still = () => true) {
-    if (mapName() === name) return true;
+    if (liveMap() === name) return true;
     const deadline = Date.now() + 6 * 60e3;
     let lastGo = 0, lastMap = mapName(), lastMapAt = Date.now();
     while (Date.now() < deadline && cfg.running && still()) {
       if (isDead()) return false;
-      if (mapName() === name) return true;
+      if (liveMap() === name) return true;
       if (mapName() !== lastMap) { lastMap = mapName(); lastMapAt = Date.now(); }
       // game asks "วาร์ปไป <town> แล้วเดินต่อ?" when a nearer town has a warp point -> warp, then it walks on by itself
       if (dialogOpen() && /วาร์ป/.test(dialogTitle())) { click($('#bcyes'), 'วาร์ปแล้วเดินต่อ'); lastGo = lastMapAt = Date.now(); await sleep(2000); continue; }
@@ -605,7 +609,7 @@
       }
       await sleep(1000);
     }
-    return mapName() === name;
+    return liveMap() === name;
   }
 
   // town warp (500 G, free with Premium): HUD warp button -> card "วาร์ป" of that town
