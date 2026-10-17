@@ -21,6 +21,42 @@
 // socialQuery, vendorBuy, huntQuery, bountyClaim.
 (() => {
   if (window.__bth) { window.__bth.show(); return 'already running'; }
+  // a minimised / hidden tab runs page timers once a minute, so every step of a trip took minutes; a worker's timers
+  // keep their pace, so the helper's own timers tick from one. Native timers until the worker has answered once
+  // (a blocked worker then just leaves the helper on native timers).
+  const { setTimeout, setInterval, clearTimeout, clearInterval, stopTimers, onWorker } = (() => {
+    const nat = { set: window.setTimeout.bind(window), every: window.setInterval.bind(window), clear: window.clearTimeout.bind(window), clearEvery: window.clearInterval.bind(window) };
+    const recs = new Map(); let n = 0, ready = false, w = null; // id -> { fn, ms, rep, nat: native id while not on the worker }
+    const toWorker = (id, r) => { if (r.nat !== undefined) { (r.rep ? nat.clearEvery : nat.clear)(r.nat); delete r.nat; } w.postMessage([r.rep ? 'i' : 't', id, r.ms]); };
+    try {
+      const src = 'const t={};onmessage=e=>{const[k,id,ms]=e.data;if(k==="c"){clearTimeout(t[id]);clearInterval(t[id]);delete t[id];return}'
+        + 't[id]=(k==="i"?setInterval:setTimeout)(()=>{if(k!=="i")delete t[id];postMessage(id)},ms)}';
+      w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      w.onmessage = e => {
+        if (e.data === 'ping') { // the worker works: move the intervals started meanwhile onto it
+          if (!ready) { ready = true; for (const [id, r] of recs) if (r.rep) toWorker(id, r); }
+          return;
+        }
+        const r = recs.get(e.data); if (!r) return;
+        if (!r.rep) recs.delete(e.data);
+        try { r.fn(); } catch (err) { console.error('[Binder Helper]', err); }
+      };
+      w.postMessage(['t', 'ping', 0]);
+    } catch { w = null; }
+    const add = rep => (fn, ms = 0, ...a) => {
+      const id = 'w' + ++n, r = { fn: () => fn(...a), ms, rep };
+      recs.set(id, r);
+      if (ready) toWorker(id, r);
+      else r.nat = (rep ? nat.every : nat.set)(() => { if (!rep) recs.delete(id); r.fn(); }, ms);
+      return id;
+    };
+    const clear = id => {
+      const r = recs.get(id); if (!r) return;
+      recs.delete(id);
+      if (r.nat !== undefined) (r.rep ? nat.clearEvery : nat.clear)(r.nat); else if (w) w.postMessage(['c', id]);
+    };
+    return { setTimeout: add(false), setInterval: add(true), clearTimeout: clear, clearInterval: clear, stopTimers: () => { for (const id of [...recs.keys()]) clear(id); if (w) w.terminate(); }, onWorker: () => ready };
+  })();
   const KEY = 'bth_cfg';
   const DEF = {
     farmMap: '', farmSpot: null, town: '', sellPct: 95, sellAfterDeathPct: 40, deathWaitMs: 3000,
@@ -1176,6 +1212,7 @@
   };
   render();
   const timer = setInterval(tick, 1000);
+  setTimeout(() => log(onWorker() ? 'ตัวจับเวลาทำงานเต็มความเร็วแม้พับหน้าต่าง' : 'ตัวจับเวลาแบบปกติ — พับหน้าต่างแล้วจะช้าลง'), 2000);
   // Farm tab: World Boss round as the server last told it
   const showWbInfo = () => {
     const el = $('#bthwbinfo'); if (!el) return;
@@ -1237,7 +1274,7 @@
 
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(kickTimer); alive = false; for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bth; }, // running=false also ends a trip in progress
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(kickTimer); stopTimers(); alive = false; for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
