@@ -1173,7 +1173,12 @@
   const bigMapOpen = () => { const m = $('#mmbig'); return !!m && !m.hidden; };
   let pickUntil = 0;
   const setPick = on => { pickUntil = on ? Date.now() + 60e3 : 0; $('#bthset').classList.toggle('pick', on); };
+  // every kind of message sent to the server, logged the first time it shows up (with its content): to find what the
+  // game sends when the character steps into a map exit, which the server needs before it changes the map
+  const sentKinds = new Set();
   window.__bthSendHook = (type, msg) => {
+    const kind = type + ':' + (msg && msg.type || '');
+    if (!sentKinds.has(kind)) { sentKinds.add(kind); let j = ''; try { j = JSON.stringify(msg); } catch { } log(`ส่งถึงเซิร์ฟ (ครั้งแรก) ${kind} ${(j || '').slice(0, 160)}`); }
     if (!pickUntil || type !== 'input' || !msg || msg.type !== 'moveTo' || !bigMapOpen()) return;
     setPick(false);
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปแมพฟาร์มก่อนแล้วเลือกจุดใหม่`); return; }
