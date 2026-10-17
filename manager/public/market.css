@@ -106,3 +106,16 @@
 .mk-rars button.r-normal { --rc: #cbd5e1; }
 .mk-rars button.on { background: color-mix(in srgb, var(--rc) 20%, transparent); border-color: var(--rc); }
 .r-normal { --rc: #cbd5e1; }
+
+/* each listing's own random options (affix · tier · value) */
+.mk-li { display: grid; gap: 6px; grid-template-columns: 1fr; }
+.mk-li-row { display: grid; grid-template-columns: 130px 50px 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.mk-opts { display: flex; flex-wrap: wrap; gap: 5px; }
+.mk-opt { --tc: #94a3b8; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 3px; border-radius: 7px; font-size: 11.5px; color: var(--text-main);
+  background: color-mix(in srgb, var(--tc) 12%, transparent); border: 1px solid color-mix(in srgb, var(--tc) 40%, transparent); }
+.mk-opt b { font: 800 10px var(--font-mono); color: #0b1222; background: var(--tc); border-radius: 5px; padding: 1px 4px; }
+.mk-opt.t1 { --tc: #cbd5e1; } .mk-opt.t2 { --tc: #86efac; } .mk-opt.t3 { --tc: #93c5fd; } .mk-opt.t4 { --tc: #c4b5fd; }
+.mk-opt.t5 { --tc: #fdba74; } .mk-opt.t6 { --tc: #fca5a5; } .mk-opt.t7 { --tc: #f0abfc; } .mk-opt.t8 { --tc: #fde68a; }
+.mk-opt.ins { --tc: #22e3c4; padding-left: 8px; }
+.mk-tsum { margin-left: auto; font: 700 11px var(--font-mono); color: var(--text-muted); padding: 2px 8px; border-radius: 7px; border: 1px dashed var(--line-strong); }
+.mk-list { max-height: 520px; }

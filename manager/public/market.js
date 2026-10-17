@@ -29,6 +29,22 @@
     if (base === 'spirit_card' && sub && !sub.includes(':')) name += ' · ' + sub.replace(/_/g, ' ');
     return { base, rarity, name };
   };
+  // a listing's own item: "sword_t10^ins_x|p_nova:7:7,str:7:13#uuid" = random options affix:tier:value (+ insight)
+  const AFFIX_NAME = Object.fromEntries(AFFIXES);
+  const listingOpts = itemId => {
+    const [head, rest = ''] = String(itemId || '').split('#')[0].split('|');
+    const insight = (head.split('^')[1] || '').replace(/^ins_/, '').replace(/_/g, ' ');
+    const opts = rest.split(',').map(x => x.split(':')).filter(a => a.length === 3 && AFFIX_NAME[a[0]] !== undefined || (a.length === 3 && /^[a-z_]+$/.test(a[0])))
+      .map(([id, t, v]) => ({ id, tier: Number(t) || 0, value: Number(v) || 0 }));
+    return { insight, opts };
+  };
+  const optText = o => { const l = AFFIX_NAME[o.id] || o.id.replace(/^p_/, '').replace(/_/g, ' ');
+    // "ATK%" -> "ATK +5%"; a "%" that belongs to a number ("เกิน 90%") stays and the value goes after it
+    return /[^\d\s]%$/.test(l) ? `${l.slice(0, -1).trim()} +${o.value}%` : `${l} +${o.value}${/%$/.test(l) ? '%' : ''}`; };
+  const optChips = itemId => { const { insight, opts } = listingOpts(itemId);
+    if (!opts.length && !insight) return '';
+    const sum = opts.reduce((a, o) => a + o.tier, 0);
+    return `<div class="mk-opts">${opts.map(o => `<span class="mk-opt t${Math.min(8, o.tier)}" title="Tier ${o.tier}"><b>T${o.tier}</b>${esc(optText(o))}</span>`).join('')}${insight ? `<span class="mk-opt ins">✦ ${esc(insight)}</span>` : ''}${opts.length ? `<span class="mk-tsum" title="Tier รวมของทุกออฟ">ΣT ${sum}</span>` : ''}</div>`; };
   const icon = base => `<img src="${ICON}${encodeURIComponent(base)}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
   const chg = c => c == null || !isFinite(c) ? '' : `<i class="mk-chg ${c > 0.05 ? 'up' : c < -0.05 ? 'down' : 'flat'}">${c > 0.05 ? '▲' : c < -0.05 ? '▼' : '•'} ${Math.abs(c).toFixed(1)}%</i>`;
 
@@ -206,8 +222,9 @@
       <div class="mk-chartbox">${chart(v.series)}</div>
       <h4>ประกาศขาย (${(v.listings || []).length})</h4>
       <div class="mk-list">${(v.listings || []).length ? (v.listings || []).map(l => `<div class="mk-li">
-          <b>${g(Math.round(l.price / Math.max(1, l.qty)))}<small> G/ชิ้น</small></b>
-          <span>×${g(l.qty)}</span><span class="r">${g(l.price)} G</span><span class="mk-seller">${esc(l.seller)}</span><small>${ago(l.at)}</small></div>`).join('')
+          <div class="mk-li-row"><b>${g(Math.round(l.price / Math.max(1, l.qty)))}<small> G/ชิ้น</small></b>
+          <span>×${g(l.qty)}</span><span class="r">${g(l.price)} G</span><span class="mk-seller">${esc(l.seller)}</span><small>${ago(l.at)}</small></div>
+          ${optChips(l.itemId)}</div>`).join('')
         : '<div class="mk-empty small">ไม่มีประกาศขาย</div>'}</div>`;
   }
 
