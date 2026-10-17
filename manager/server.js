@@ -186,7 +186,39 @@ const server = http.createServer(async (req, res) => {
         return json(res, r && r.ok ? 200 : 502, r || { ok: false, error: 'อ่านไม่สำเร็จ' });
       } catch (e) { return json(res, 502, { ok: false, error: e.message }); } finally { release(); }
     }
+    // characters that can buy from the market: every game tab with the helper (name + Gold)
+    if (req.method === 'GET' && url.pathname === '/api/market/buyers') {
+      const list = [];
+      for (const t of tabs.values()) if (t.state === 'helper' && !t.tab.closed) {
+        try {
+          const r = await t.tab.eval(`(() => { const room = window.__bthRoom; const me = room && room.state && room.state.players && room.state.players.get(room.sessionId);
+            return me ? { name: me.name, gold: Number(me.silver ?? me.gold ?? 0) } : null; })()`);
+          if (r) list.push({ tabId: t.id, browser: t.browser, ...r });
+        } catch { }
+      }
+      return json(res, 200, { ok: true, buyers: list });
+    }
     if (req.method !== 'POST') return json(res, 404, { error: 'not found' });
+    // buy one market listing with the character of a game tab (the game's own marketBuy; the item arrives by mail)
+    if (url.pathname === '/api/market/buy') {
+      const body = await new Promise(r => { let d = ''; req.on('data', c => { d += c; if (d.length > 1e4) req.destroy(); }); req.on('end', () => { try { r(JSON.parse(d || '{}')); } catch { r(null); } }); });
+      const id = Math.floor(Number(body && body.id)), qty = Math.floor(Number(body && body.qty)) || 0;
+      const t = body && tabs.get(String(body.tabId));
+      if (!t || t.state !== 'helper' || !(id > 0)) return json(res, 400, { ok: false, error: 'ข้อมูลการซื้อไม่ครบ' });
+      const prev = marketQueue; let release; marketQueue = new Promise(r => { release = r; });
+      await prev;
+      try {
+        const msg = qty > 0 ? { type: 'marketBuy', id, qty } : { type: 'marketBuy', id };
+        const r = await t.tab.eval(`(async () => {
+          const room = window.__bthRoom; if (!room) return { ok: false, error: 'helper ยังไม่ได้จับห้องเกม' };
+          const reply = await new Promise(res => { let off; const tm = setTimeout(() => { off && off(); res(null); }, 8000);
+            off = room.onMessage('server', m => { const e = (Array.isArray(m) ? m : [m]).find(x => x && x.type === 'marketResult'); if (e) { clearTimeout(tm); off && off(); res(e); } });
+            room.send('input', ${JSON.stringify(msg)}); });
+          return reply ? { ok: !!reply.ok, error: reply.ok ? '' : (reply.reason || 'ซื้อไม่สำเร็จ') } : { ok: false, error: 'ตลาดไม่ตอบ (ไม่แน่ใจว่าซื้อได้หรือไม่ — ดูในจดหมาย / ประวัติ)' };
+        })()`);
+        return json(res, 200, r);
+      } catch (e) { return json(res, 502, { ok: false, error: e.message }); } finally { release(); }
+    }
     let m;
     if ((m = url.pathname.match(/^\/api\/browser\/(\w+)\/open$/))) return json(res, 200, { ok: true, msg: await openBrowser(m[1]) });
     if ((m = url.pathname.match(/^\/api\/tab\/([\w-]+)\/(toggle|reload)$/))) {
