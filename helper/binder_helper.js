@@ -603,7 +603,6 @@
   // closes on a map change and the new one is only caught on its first send), and the HUD is not redrawn in a hidden
   // tab: 04:31 / 05:03 on 18 Oct it still read Glasswrack on arrival in Shattered Vale, so the trip ended a map early
   const liveMap = () => { const r = room(); return r && r.state.mapId ? MAP_NAMES[r.state.mapId] || r.state.mapId : ''; };
-  const WALK_EXITS = false;
   async function travelTo(name, still = () => true) {
     if (liveMap() === name) return true;
     const deadline = Date.now() + 6 * 60e3;
@@ -614,10 +613,9 @@
       if (mapName() !== lastMap) { lastMap = mapName(); lastMapAt = Date.now(); }
       // game asks "วาร์ปไป <town> แล้วเดินต่อ?" when a nearer town has a warp point -> warp, then it walks on by itself
       if (dialogOpen() && /วาร์ป/.test(dialogTitle())) { click($('#bcyes'), 'วาร์ปแล้วเดินต่อ'); lastGo = lastMapAt = Date.now(); await sleep(2000); continue; }
-      // hidden tab: walk exit to exit ourselves (unless that already failed in the last 10 min). Off: since the timers run
-      // at full speed in a hidden tab the game's own route walk moves there too (18 Oct 18:50 Sanctum -> Umbral Depths in
-      // 15 s, minimised), while our zones.json exits sent us out the wrong way (18:51-18:57 Sanctum <-> Cloudspire Ruins)
-      if (WALK_EXITS && document.hidden && Date.now() - lastMapAt > 8e3) {
+      // hidden tab: walk exit to exit ourselves (unless that already failed in the last 10 min): the game's own route
+      // walk does not go on in a minimised window
+      if (document.hidden && Date.now() - lastMapAt > 8e3) {
         if (await walkExits(name, still)) { lastMap = mapName(); lastMapAt = Date.now(); continue; }
       }
       // (re)start the game's own route walk when nothing has changed for a while
