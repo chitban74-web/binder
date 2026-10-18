@@ -579,16 +579,20 @@
     // the game leaves for Cloudspire Ruins) -> leave this leg to the game's own route walk
     if (!live && !known && Object.entries(exitsSeen[from] || {}).some(([to, s]) => to !== next && dist(s, spot) <= 1.5)) return false;
     log(`หน้าต่างพับอยู่ — เดินเองไปทางออก ${MAP_NAMES[next] || next} (${spot.x}, ${spot.y}) · เส้นทาง ${path.map(m => MAP_NAMES[m] || m).join(' → ')}`);
-    const deadline = Date.now() + 90e3; let lastSend = 0, atExit = 0;
+    const deadline = Date.now() + 90e3; let lastSend = 0, atExit = 0, lastP = null;
     while (Date.now() < deadline && cfg.running && still()) {
       const r = room(), p = myPos();
       if (r && r.state.mapId && r.state.mapId !== from) {
+        // where we were last seen on the old map and where we came out: to find out why an exit leads elsewhere
+        const np = myPos(), f = q => q ? `(${q.x.toFixed(1)}, ${q.y.toFixed(1)})` : '(?)';
+        log(`ออกจาก ${MAP_NAMES[from] || from} ล่าสุดที่ ${f(lastP)} → เข้า ${MAP_NAMES[r.state.mapId] || r.state.mapId} ที่ ${f(np)}`);
         // a different map than this exit should lead to: never walk to that spot for this leg again for 10 min, else the
         // way back brings us here and we walk out the same wrong exit again (18 Oct 18:51-18:57, Sanctum <-> Cloudspire Ruins)
         if (r.state.mapId !== next) { exitWalkFailed[key] = Date.now(); log(`ทางออก (${spot.x}, ${spot.y}) พาไป ${MAP_NAMES[r.state.mapId] || r.state.mapId} ไม่ใช่ ${MAP_NAMES[next] || next} — ไม่ใช้ทางออกนี้ 10 นาที`); }
         return true; // the caller's loop goes on from the map we are on now
       }
       if (!r || !p) { await sleep(1000); continue; }
+      lastP = p;
       if (dist(p, spot) <= 1.2) {
         if (!atExit) atExit = Date.now();
         if (Date.now() - atExit > 10e3) {
