@@ -536,9 +536,33 @@
   // still in Sanctum), so then walk exit to exit with moveTo, like walkToSpot. Exits from data/maps/zones.json
   // (map id -> [to, x, y] centre of the exit area). Not yet seen working: logs each step, gives up after 10 s at an exit.
   const EXITS = {'southvale_field':[['valebrook',29.5,2.0],['honeyrill',27.5,2.0]],'valebrook':[['southvale_field',21.5,42.5],['whispering_woods',21.5,2.0],['riverside',42.0,25.0],['old_quarry',2.0,30.0]],'whispering_woods':[['valebrook',27.5,54.0],['ancient_ruins',27.5,2.0],['bloomcrown_glade',42.5,2.0],['bracken_sink',32.5,54.0]],'riverside':[['valebrook',2.0,34.5],['honeyrill',2.0,26.0]],'old_quarry':[['valebrook',54.0,32.0],['verdigris_rise',2.0,28.0]],'ancient_ruins':[['whispering_woods',27.5,54.0],['sunfield_plains',27.5,2.0]],'sunfield_plains':[['ancient_ruins',27.5,54.0],['ashford',26.5,2.0],['gloomroot_forest',54.0,29.0],['bracken_sink',2.0,29.0]],'ashford':[['sunfield_plains',24.0,46.0],['gloomroot_forest',46.0,34.0],['ember_hollow',24.0,2.0],['mistmire_swamp',2.0,40.0],['duskgate_pass',45.5,2.0]],'gloomroot_forest':[['sunfield_plains',53.5,28.5],['ashford',26.5,54.0],['pitchwood',28.5,2.0]],'ember_hollow':[['ashford',25.5,54.0],['mistmire_swamp',2.0,26.5],['cinder_eyrie',54.0,22.5],['yellowlick_flats',54.0,28.0]],'mistmire_swamp':[['ashford',25.5,2.0],['ember_hollow',53.5,44.5],['duskgate_pass',40.5,2.0],['lotus_hollow',2.0,42.5],['peatcut_bog',2.0,28.0]],'duskgate_pass':[['mistmire_swamp',28.5,54.0],['stormwall_city',31.5,2.0],['ashford',12.0,2.0]],'stormwall_city':[['duskgate_pass',23.5,46.0],['frostpeak_slopes',2.0,28.0],['frozen_mere',24.0,2.0],['howling_steppes',46.0,23.0],['cloudspire_ruins',39.5,2.0]],'frostpeak_slopes':[['stormwall_city',54.0,27.5],['sledrun_gully',28.5,2.0]],'frozen_mere':[['stormwall_city',26.5,54.0],['aurora_hollow',2.0,24.5],['brinecrust_shoals',54.0,28.0]],'howling_steppes':[['stormwall_city',2.0,27.0],['cloudspire_ruins',42.5,2.0],['brinecrust_shoals',28.5,54.0]],'cloudspire_ruins':[['howling_steppes',26.5,54.0],['sanctum',26.5,2.0],['stormwall_city',2.0,12.0],['tempest_aerie',27.5,2.0],['kitewind_terraces',28.5,54.0]],'sanctum':[['cloudspire_ruins',22.0,42.5],['shattered_vale',2.0,26.0],['umbral_depths',22.0,2.0],['throne_of_warden',42.0,21.0],['rustbell_barracks',32.0,42.0]],'shattered_vale':[['sanctum',54.0,26.5],['opalweb_grotto',39.5,54.0],['glasswrack',2.0,28.0]],'umbral_depths':[['sanctum',27.5,54.0],['throne_of_warden',27.5,2.0],['marrowdeep',2.0,28.0]],'throne_of_warden':[['umbral_depths',24.5,46.0],['sanctum',32.0,2.0],['wardens_seat',24.5,46.0]],'training_grounds':[],'rootfall_barrow':[],'honeyrill':[['southvale_field',27.5,54.0],['riverside',54.0,26.0]],'bracken_sink':[['whispering_woods',28.5,2.0],['sunfield_plains',54.0,32.0]],'verdigris_rise':[['old_quarry',54.0,28.0]],'pitchwood':[['gloomroot_forest',28.5,54.0]],'yellowlick_flats':[['ember_hollow',2.0,28.0]],'peatcut_bog':[['mistmire_swamp',54.0,28.0]],'sledrun_gully':[['frostpeak_slopes',28.5,54.0]],'brinecrust_shoals':[['frozen_mere',2.0,28.0],['howling_steppes',28.5,2.0]],'kitewind_terraces':[['cloudspire_ruins',28.5,2.0]],'glasswrack':[['shattered_vale',54.0,28.0]],'marrowdeep':[['umbral_depths',54.0,28.0]],'rustbell_barracks':[['sanctum',28.5,2.0]]};
+  // the exits the game's own route walk uses: its map table in the live bundle (/assets/main-*.js, map objects
+  // {id:"sanctum",name:...,exits:[{to,rect:{x0,y0,x1,y1}}]}), walked to at the rect centre + 0.5 like the game does.
+  // EXITS above is a copy from an older bundle (Sanctum -> Umbral Depths (22, 2) took us to Cloudspire Ruins on 18 Oct)
+  let liveExits = null;
+  (async () => {
+    try {
+      await sleep(0); // log() is set up further down this file
+      const src = [...document.querySelectorAll('script[src]')].map(e => e.src).find(u => /\/assets\/main-/.test(u));
+      if (!src) { log('ไม่เจอไฟล์เกม main-*.js — ใช้ทางออกจาก zones.json'); return; }
+      const text = await (await fetch(src)).text(), out = {};
+      const heads = [...text.matchAll(/\{id:"([a-z_]+)",name:"[^"]*",region:"/g)];
+      heads.forEach((h, i) => {
+        const body = text.slice(h.index, i + 1 < heads.length ? heads[i + 1].index : h.index + 200000);
+        const ex = [...body.matchAll(/\{to:"([a-z_]+)",rect:\{x0:(-?[\d.]+),y0:(-?[\d.]+),x1:(-?[\d.]+),y1:(-?[\d.]+)\}/g)]
+          .map(m => [m[1], (+m[2] + +m[4]) / 2 + 0.5, (+m[3] + +m[5]) / 2 + 0.5]);
+        if (ex.length && !out[h[1]]) out[h[1]] = ex;
+      });
+      if (!Object.keys(out).length) { log('อ่านทางออกจากไฟล์เกมไม่ได้ — ใช้ทางออกจาก zones.json'); return; }
+      liveExits = out;
+      const s = (out.sanctum || []).map(e => `${MAP_NAMES[e[0]] || e[0]} (${e[1]}, ${e[2]})`).join(', ');
+      log(`อ่านทางออกจากไฟล์เกมแล้ว ${Object.keys(out).length} แมพ · Sanctum: ${s}`);
+    } catch (e) { log('อ่านทางออกจากไฟล์เกมไม่ได้ (' + e.message + ') — ใช้ทางออกจาก zones.json'); }
+  })();
+  const exitsOf = m => (liveExits && liveExits[m]) || EXITS[m] || [];
   const routeTo = (from, to) => {
     const prev = { [from]: null }, q = [from];
-    while (q.length) { const m = q.shift(); if (m === to) break; for (const [n] of EXITS[m] || []) if (!(n in prev)) { prev[n] = m; q.push(n); } }
+    while (q.length) { const m = q.shift(); if (m === to) break; for (const [n] of exitsOf(m)) if (!(n in prev)) { prev[n] = m; q.push(n); } }
     if (!(to in prev)) return null;
     const path = []; for (let m = to; m; m = prev[m]) path.unshift(m); return path;
   };
@@ -547,12 +571,13 @@
     const r0 = room(); const from = r0 && r0.state.mapId;
     const path = target && from && routeTo(from, target);
     if (!path || path.length < 2) return false;
-    const [, next] = path, ex = (EXITS[from] || []).find(e => e[0] === next), known = (exitsSeen[from] || {})[next];
+    const [, next] = path, live = liveExits && liveExits[from] ? liveExits[from].find(e => e[0] === next) : null;
+    const ex = live || (EXITS[from] || []).find(e => e[0] === next), known = live ? null : (exitsSeen[from] || {})[next];
     const spot = known || { x: ex[1], y: ex[2] }, key = from + '>' + next;
     if (Date.now() - (exitWalkFailed[key] || 0) < 10 * 60e3) return false; // this exit did not work a moment ago
     // zones.json's spot already seen leading to another map (18 Oct 18:51: Sanctum's "Umbral Depths" exit (22, 2) is where
     // the game leaves for Cloudspire Ruins) -> leave this leg to the game's own route walk
-    if (!known && Object.entries(exitsSeen[from] || {}).some(([to, s]) => to !== next && dist(s, spot) <= 1.5)) return false;
+    if (!live && !known && Object.entries(exitsSeen[from] || {}).some(([to, s]) => to !== next && dist(s, spot) <= 1.5)) return false;
     log(`หน้าต่างพับอยู่ — เดินเองไปทางออก ${MAP_NAMES[next] || next} (${spot.x}, ${spot.y}) · เส้นทาง ${path.map(m => MAP_NAMES[m] || m).join(' → ')}`);
     const deadline = Date.now() + 90e3; let lastSend = 0, atExit = 0;
     while (Date.now() < deadline && cfg.running && still()) {
@@ -568,7 +593,7 @@
         if (!atExit) atExit = Date.now();
         if (Date.now() - atExit > 10e3) {
           exitWalkFailed[key] = Date.now();
-          log(`ถึงทางออก (${spot.x}, ${spot.y}) แล้วแต่แมพไม่เปลี่ยนใน 10 วิ${known ? '' : ' (จุดนี้มาจาก zones.json ยังไม่เคยเห็นเกมเดินผ่าน)'} — ใช้ปุ่มเดินทางของเกมแทน ไม่ลองทางออกนี้ 10 นาที`);
+          log(`ถึงทางออก (${spot.x}, ${spot.y}) แล้วแต่แมพไม่เปลี่ยนใน 10 วิ${known ? '' : live ? ' (จุดจากไฟล์เกม)' : ' (จุดนี้มาจาก zones.json ยังไม่เคยเห็นเกมเดินผ่าน)'} — ใช้ปุ่มเดินทางของเกมแทน ไม่ลองทางออกนี้ 10 นาที`);
           return false;
         }
       } else if (Date.now() - lastSend > 4000) { lastSend = Date.now(); r.send('input', { type: 'moveTo', x: spot.x, y: spot.y }); }
@@ -589,7 +614,7 @@
   const exitTimer = setInterval(() => {
     const r = room(), id = r && r.state && r.state.mapId; if (!id) return;
     if (lastMapId && id !== lastMapId && lastMove && lastMove.map === lastMapId && Date.now() - lastMove.at < 15e3
-      && (EXITS[lastMapId] || []).some(e => e[0] === id)) {
+      && exitsOf(lastMapId).some(e => e[0] === id)) {
       const was = (exitsSeen[lastMapId] || {})[id];
       if (!was || was.x !== lastMove.x || was.y !== lastMove.y) {
         exitsSeen[lastMapId] = { ...(exitsSeen[lastMapId] || {}), [id]: { x: lastMove.x, y: lastMove.y } };
