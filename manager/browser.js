@@ -1,5 +1,5 @@
-// Chromium browsers (own profile + remote debugging) and a tiny CDP client.
-// Only Runtime.evaluate is used (no Runtime.enable), like Pelican's browser_mode.js.
+// Managed Chromium profiles, the shared-window browser mode, and a small CDP client.
+// Legacy per-browser profiles stay readable so already-running game tabs remain managed.
 const fs = require('fs'), path = require('path'), { spawn } = require('child_process');
 
 const GAME_URL = 'https://play.bindertowngame.com/';

@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="market.css">
 </head>
 <body>
-  <!-- layout follows Pelican Manager (manager/public/index.html); buttons marked "soon" are placeholders for now -->
+  <!-- Binder Town manager UI; visual layout uses the provided reference, while features and data remain Binder Town-specific. -->
   <div class="app-container">
     <!-- TOP HEADER -->
     <header class="app-header">
@@ -39,11 +39,11 @@
           <span class="captcha-chevron">▼</span>
         </div>
         <div class="btn-group">
-          <button id="btn-launch-all" class="btn btn-success" title="เปิดเกมในทุกเบราว์เซอร์ที่มีในเครื่อง"><span class="icon">🚀</span> เปิดทุกจอ</button>
-          <button class="btn btn-danger soon" data-soon="ปิดทุกจอ" title="ปิดเบราว์เซอร์เกมทุกตัว"><span class="icon">⏹️</span> ปิดทุกจอ</button>
+          <button id="btn-launch-all" class="btn btn-success" title="เปิดจอเกมทุกโปรไฟล์ที่บันทึกไว้"><span class="icon">🚀</span> เปิดทุกจอ</button>
+          <button id="btn-close-all" class="btn btn-danger" title="ปิดหน้าต่างเกมทั้งหมดที่ Manager เปิด"><span class="icon">⏹️</span> ปิดทุกจอ</button>
         </div>
-        <button id="btn-add-profile" class="btn btn-primary" title="เปิดเกมในเบราว์เซอร์อื่น (1 เบราว์เซอร์ = 1 ไอดี)"><span class="icon">➕</span> เพิ่มโปรไฟล์</button>
-        <button class="btn btn-patcher soon" data-soon="ติดตั้งสคริปต์เกม" title="สถานะ helper ในแท็บเกม">
+        <button id="btn-add-profile" class="btn btn-primary" title="ตั้งค่าโปรไฟล์ก่อนเปิดหน้าต่าง"><span class="icon">➕</span> เพิ่มหน้าต่าง</button>
+        <button id="btn-script-game" class="btn btn-patcher" title="ตั้งค่าการเปิดเกมและตรวจสอบ Binder Helper">
           <span class="icon">⚡</span> <span>สคริปต์เกม</span> <span id="helper-badge" class="badge patcher-badge">…</span>
         </button>
         <button id="btn-update" class="btn" title="เช็กอัปเดตจาก GitHub" style="display: inline-flex; align-items: center; gap: 6px;">
@@ -97,7 +97,6 @@
             <button type="button" class="tab-btn" data-tab="market" role="tab"><span class="icon">🏪</span> ตลาด</button>
             <button type="button" class="tab-btn" data-tab="zeny" role="tab"><span class="icon">💰</span> ระบบรวมเงิน</button>
             <button type="button" class="tab-btn" data-tab="screens" role="tab"><span class="icon">📺</span> ดูจอเกม</button>
-            <button type="button" class="tab-btn" data-tab="browsers" role="tab"><span class="icon">🌐</span> เบราว์เซอร์ <span class="tab-count" id="tab-count-browsers">0</span></button>
           </nav>
           <span class="live-pill"><i></i> Realtime Sync · 2s</span>
         </div>
@@ -156,12 +155,43 @@
         <div class="soon-pane"><span class="big">📺</span><b>ดูจอเกม</b><span>ภาพสดของทุกแท็บเกมในหน้าเดียว · เร็วๆ นี้</span></div>
       </section>
 
-      <!-- TAB: BROWSERS -->
-      <section class="tab-pane" data-pane="browsers">
-        <div class="br-grid" id="browsers"></div>
-        <p class="sc-off" style="margin-top: 12px;">แต่ละเบราว์เซอร์ใช้โปรไฟล์ของตัวเองในโฟลเดอร์ profiles ล็อกอินครั้งแรกครั้งเดียว ถ้าใช้คนละไอดี ให้แยกเบราว์เซอร์</p>
-      </section>
     </main>
+  </div>
+  <div id="game-profiles-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="game-profiles-title">
+    <div class="modal-card game-profiles-card">
+      <div class="modal-header"><div><h3 id="game-profiles-title">➕ เพิ่มโปรไฟล์จอเกมใหม่</h3><small class="script-modal-subtitle">ตั้งค่าจอและบันทึกโปรไฟล์ก่อนเปิดเกม</small></div><button id="btn-game-profiles-close" class="modal-close" aria-label="ปิด">×</button></div>
+      <form id="game-profile-form" class="game-profile-form">
+        <label for="game-profile-name">ชื่อจอ / โปรไฟล์</label>
+        <div class="game-profile-create"><input id="game-profile-name" class="form-input" maxlength="48" placeholder="เช่น ตัวหลัก, ตัวฟาร์มไม้" required>
+          <label class="game-profile-count-label" for="game-profile-count">จำนวนจอ</label><input id="game-profile-count" class="form-input game-profile-count" type="number" min="1" max="50" value="1" required>
+          <button type="submit" class="btn btn-primary">💾 บันทึกโปรไฟล์</button></div>
+        <div class="lm-hint game-profile-form-hint">บันทึกแล้วโปรไฟล์จะแสดงเป็นการ์ดบนหน้าหลัก และยังไม่เปิดเกมจนกด “เปิดจอเกม” · เลือกเบราว์เซอร์ได้ที่ “สคริปต์เกม”</div>
+      </form>
+      <div class="lm-hint">แต่ละโปรไฟล์มี cache, cookie และข้อมูลเกมแยกกัน</div>
+    </div>
+  </div>
+  <div id="script-game-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="script-game-title">
+    <div class="modal-card script-modal-card">
+      <div class="modal-header">
+        <div><h3 id="script-game-title">⚡ สคริปต์เกม</h3><small class="script-modal-subtitle">ตั้งค่าการเปิดเกมและตรวจสอบ Binder Helper</small></div>
+        <button id="btn-script-game-close" class="modal-close" aria-label="ปิด">×</button>
+      </div>
+      <div class="script-modal-body">
+        <section class="lm-card">
+          <div class="lm-title">🖥️ วิธีเปิดจอเกม</div>
+          <div class="lm-options">
+            <div class="lm-opt selected"><span class="lm-radio">●</span><span><b>เบราว์เซอร์</b><small>เปิดหลายหน้าต่างเกมด้วย Chrome, Edge หรือ Brave</small></span></div>
+          </div>
+          <div class="lm-row"><span>เบราว์เซอร์:</span><select id="lm-browser-kind" class="form-select"><option value="chrome">Chrome</option><option value="edge">Edge</option><option value="brave">Brave</option></select><small id="lm-browser-path"></small></div>
+          <div id="lm-browser-status" class="lm-hint">ทุกหน้าต่างใช้เบราว์เซอร์ที่เลือก และตั้งค่า helper แยกตามหน้าต่าง</div>
+        </section>
+        <section class="lm-card script-helper-card">
+          <div class="lm-title">🧩 Binder Helper</div>
+          <div class="script-helper-status"><span>แท็บที่พร้อมใช้งาน</span><b id="script-helper-count">กำลังโหลด…</b></div>
+          <div class="lm-hint">สคริปต์จะโหลดเข้าเกมอัตโนมัติเมื่อเปิดหน้าต่างเกมผ่านตัวจัดการ</div>
+        </section>
+      </div>
+    </div>
   </div>
   <div id="bt-toast" role="status" aria-live="polite"></div>
 
@@ -182,6 +212,15 @@ async function post(url, quiet) {
 const HUE = { edge: 205, chrome: 35, brave: 15, vivaldi: 0 };
 const ui = { filter: 'all', q: '', compact: false, offClosed: false };
 let last = null;
+let gameProfiles = [];
+let openProfileMenuId = '';
+
+function renderGameProfiles(profiles = [], activeIds = []) {
+  gameProfiles = profiles;
+  const list = $('#game-profile-list');
+  if (!list) return;
+  list.innerHTML = profiles.length ? profiles.map(p => { const active = activeIds.includes(p.id); return `<div class="game-profile-row"><div class="game-profile-info"><b>${esc(p.name)}</b><small>${active ? 'เปิดอยู่ · cache และข้อมูลแยกเฉพาะโปรไฟล์นี้' : 'cache และข้อมูลเกมแยกเฉพาะโปรไฟล์นี้'}</small></div><div class="game-profile-actions"><button class="btn ${active ? 'btn-secondary' : 'btn-success'} btn-sm" data-open-profile="${esc(p.id)}">${active ? '▣ นำหน้าจอ' : '▶ เปิดจอ'}</button><button class="btn btn-icon btn-sm" data-delete-profile="${esc(p.id)}" title="ลบโปรไฟล์">✕</button></div></div>`; }).join('') : '<div class="game-profile-empty">ยังไม่มีโปรไฟล์ · ตั้งชื่อและบันทึกด้านล่างก่อนเปิดจอ</div>';
+}
 
 function renderUpdate(u) {
   if (!u) return;
@@ -193,53 +232,98 @@ function renderUpdate(u) {
   b.title = u.error || (u.incoming || []).join('\n') || 'กดเพื่อเช็กอัปเดตจาก GitHub';
   b.className = 'btn ' + (u.behind ? 'btn-primary' : '');
 }
-function renderBrowsers(list) {
-  $('#tab-count-browsers').textContent = list.filter(b => b.running).length;
-  $('#browsers').innerHTML = list.map(b => `<article class="sc ${b.running ? 'st-farm' : b.installed ? 'st-off' : 'st-bad'}" style="--h:${HUE[b.key] ?? 220}">
-    <div class="sc-hd"><span class="sc-pt letter" style="background:hsl(${HUE[b.key] ?? 220},70%,45%)">${esc(b.name[0])}<span class="dot"></span></span>
-      <div class="sc-who"><b>${esc(b.name)}</b><small><span>port ${b.port}</span><span class="sc-cls">${b.tabs.length} แท็บเกม</span></small></div></div>
-    <div class="sc-ft"><span class="sc-mode"><span class="p"></span>${b.running ? 'เปิดอยู่' : b.installed ? 'ปิดอยู่' : 'ไม่มีในเครื่อง'}</span>
-      <button class="sc-btn ${b.running ? 'menu' : 'start'}" data-open="${b.key}" ${b.installed ? '' : 'disabled'}>${b.running ? '➕ เปิดแท็บเกมเพิ่ม' : '▶ เปิดเกม'}</button></div>
-  </article>`).join('');
+function renderBrowserMode(mode) {
+  const select = $('#lm-browser-kind');
+  if (select && mode) { select.value = mode.kind; select.disabled = !!mode.running; }
+  const path = $('#lm-browser-path');
+  if (path && mode) path.textContent = mode.path || (mode.installed ? 'พบเบราว์เซอร์ในเครื่อง' : 'ไม่พบเบราว์เซอร์');
+  const state = $('#lm-browser-status');
+  if (state && mode) state.textContent = mode.running ? `กำลังใช้ ${mode.name} · ${mode.tabs} หน้าต่าง` : mode.installed ? 'พร้อมเปิดเกมด้วยเบราว์เซอร์นี้' : 'ไม่พบเบราว์เซอร์ที่เลือกในเครื่อง';
 }
 
-// one card per game tab, same structure as Pelican Manager's profile card (.sc)
+// One game tab per card, using the profile-card layout from the reference Manager.
 function card(t) {
   const s = t.status, hue = HUE[t.key] ?? 220;
+  const profileName = t.profileName || t.browser || 'โปรไฟล์';
+  const characterName = s?.characterName?.trim() || '';
+  const classId = s?.characterClass || '';
+  const className = (window.BT_WEAPON?.jobs && window.BT_WEAPON.jobs[classId]) || classId;
+  const avatarFallback = className ? className.slice(0, 1).toUpperCase() : profileName.slice(0, 1);
+  const avatar = `${s?.characterImage ? `<img src="${esc(s.characterImage)}" alt="${esc(className || 'รูปตัวละคร')}" onerror="this.remove();this.parentElement.classList.add('no-img')">` : ''}<span class="avatar-fallback">${esc(avatarFallback || '?')}</span>`;
   const st = !s ? 'st-off' : s.dead ? 'st-bad' : !s.running ? 'st-idle' : s.weight >= 90 ? 'st-warn' : /ฟาร์ม/.test(s.phase) ? 'st-farm' : 'st-busy';
-  const head = `<div class="sc-hd"><button class="sc-pt letter soon-pt" style="background:hsl(${hue},70%,45%)" data-soon="ดูตัวละคร / อุปกรณ์" title="ดูตัวละคร / อุปกรณ์ (เร็วๆ นี้)">${esc(t.browser[0])}<span class="dot"></span>${s && s.level ? `<span class="lv">${s.level}</span>` : ''}</button>
-    <div class="sc-who"><b title="${esc(t.browser)}">${esc(t.browser)}</b><small><span class="n">${s ? 'Lv ' + (s.level || '?') : 'ยังไม่เข้าเกม'}</span>${s && s.town ? `<span class="sc-cls">${esc(s.town)}</span>` : ''}</small></div>
-    ${s ? `<span class="sc-ch">CH ${s.channel || '?'}</span>` : ''}</div>`;
-  if (!s) return `<article class="sc st-off" style="--h:${hue}">${head}<div class="sc-off">${esc(t.title || 'รอโหลดเกม')}<br>เข้าเกมแล้ว helper จะโหลดเอง</div></article>`;
+  const stateClass = s ? 'is-online' : 'is-offline';
+  const head = `<div class="card-hero">
+    <div class="avatar ${s?.characterImage ? '' : 'no-img'}">${avatar}<span class="avatar-dot ${s ? 'online' : ''}"></span>${s && s.level ? `<span class="avatar-lv">${s.level}</span>` : ''}</div>
+    <div class="card-identity"><div class="card-title-row"><h3 class="profile-title" title="${esc(profileName)}">${esc(profileName)}</h3></div>
+      <div class="card-subline">${characterName ? `<span class="char-live-name">👤 ${esc(characterName)}</span>` : ''}<span class="profile-acc">${s ? `Lv ${s.level || '?'}` : 'ยังไม่เข้าเกม'}</span></div>
+      <div class="card-class-row">${s && className ? `<span class="chip chip-class">${esc(className)}</span>` : s && s.town ? `<span class="chip chip-class">${esc(s.town)}</span>` : ''}</div></div>
+    <div class="card-meta"><div class="card-meta-top"><span class="chip chip-port">${s ? `CH ${s.channel || '?'}` : 'CH —'}</span>${t.profileId ? `<div class="card-top-menu ${openProfileMenuId === t.profileId ? 'is-open' : ''}"><button class="btn-card-menu" data-profile-menu="${esc(t.profileId)}" title="จัดการโปรไฟล์">☰</button><div class="card-menu-dropdown ${openProfileMenuId === t.profileId ? 'is-open' : ''}"><div class="card-menu-header">จัดการจอ: ${esc(profileName)}</div><button class="card-menu-item cm-danger" data-delete-profile="${esc(t.profileId)}"><span class="cm-icon">🗑️</span><span>ลบโปรไฟล์</span></button></div></div>` : ''}</div></div>
+  </div>`;
+  if (!s) return `<article class="profile-card ${t.profileId && openProfileMenuId === t.profileId ? 'menu-open' : ''} is-offline" data-card-key="${esc(t.profileId || t.id)}" style="--h:${hue}">${head}<div class="card-status-row"><span class="activity-pill tone-offline"><i></i>${esc(t.state === 'closed' ? 'ออฟไลน์' : t.title || 'กำลังเชื่อมต่อ')}</span></div><div class="card-offline-note">${t.state === 'closed' ? 'โปรไฟล์นี้พร้อมเปิดเกม' : 'Binder Helper จะโหลดเมื่อเข้าเกม'}</div>${t.profileId ? `<div class="card-action-row main-actions"><button class="btn btn-sm btn-success" data-open-profile="${esc(t.profileId)}"><span>▶️</span> เปิดจอเกม</button><button class="btn btn-sm btn-bot-menu soon" data-soon="เมนูบอท" title="เปิดเมนูบอทของโปรไฟล์นี้"><span>🎮</span> เมนูบอท</button></div>` : ''}</article>`;
   const w = s.weight || 0;
-  const pots = (s.potions || []).slice(0, 2).map(p => {
-    const low = p.min && p.have !== null && p.have < p.min;
-    return `<i title="${esc(p.name)}">${esc((p.k || "ยา").toUpperCase())}</i><div class="sc-t pot ${low ? 'low' : ''}"><u style="width:${pct(p.have || 0, Math.max(p.to || 0, p.have || 0, 1))}%"></u></div><em${low ? ' style="color:#fca5a5"' : ''}>${p.have ?? '?'}</em>`;
-  }).join('');
   const b = s.bounty;
-  const alert = s.dead ? `<div class="sc-alert bad">💀 ตัวละครตาย helper จะเกิดใหม่และกลับไปฟาร์มเอง</div>`
-    : !s.running ? `<div class="sc-alert warn">⏸ helper หยุดอยู่<button class="act" data-toggle="${t.id}">▶ เริ่ม</button></div>`
-    : w >= 90 ? `<div class="sc-alert warn">🎒 กระเป๋าใกล้เต็ม (${w}%)</div>` : '';
-  return `<article class="sc ${st}" style="--h:${hue}">${head}${alert}
-    <div class="sc-bars"><i>WT</i><div class="sc-t wt ${w >= 90 ? 'full' : w >= 70 ? 'hot' : ''}"><u style="width:${Math.min(100, w)}%"></u></div><em>${w}%</em>${pots}</div>
-    ${b ? `<div class="sc-exp"><div style="grid-column:1/-1"><span>ค่าหัว ${esc(b.mob)} (${b.done + 1}/${b.total}) <em>${b.prog}/${b.need}</em></span><div class="sc-t bq"><u style="width:${pct(b.prog, b.need)}%"></u></div></div></div>` : ''}
-    <div class="sc-info"><div class="map"><small>แมพ</small><b title="${esc(s.map)}">${esc(s.map || '—')}</b></div>
-      <div class="k"><small>จุดฟาร์ม</small><b>${s.farmSpot ? `${s.farmSpot.x.toFixed(0)}, ${s.farmSpot.y.toFixed(0)}` : '—'}</b></div>
-      <div class="k"><small>Gold</small><b class="gold">—</b></div></div>
-    ${(s.log || [])[0] ? `<div class="sc-log" title="${esc((s.log || []).join('\n'))}">📝 ${esc(s.log[0])}</div>` : ''}
-    <div class="sc-ft"><span class="sc-mode" title="${esc(s.phase)}"><span class="p"></span>${esc(s.phase)}</span>
-      <button class="sc-btn ${s.running ? 'stop' : 'start'}" data-toggle="${t.id}" title="${s.running ? 'หยุด helper (เกมยังเปิด)' : 'เริ่ม helper'}">${s.running ? '⏸ หยุด' : '▶ เริ่ม'}</button>
-      <button class="sc-btn menu soon" data-soon="เมนูบอทบนเว็บ" title="เมนูบอท (เร็วๆ นี้)">🎮 เมนู</button>
-      <button class="sc-btn ic" data-reload="${t.id}" title="โหลด helper ใหม่ในแท็บนี้">♻</button></div>
+  const statusTone = s.dead ? 'tone-danger' : w >= 90 ? 'tone-warn' : !s.running ? 'tone-idle' : /ฟาร์ม/.test(s.phase) ? 'tone-farm' : 'tone-travel';
+  const alert = s.dead ? '💀 ตัวละครตาย · Helper จะพากลับไปฟาร์ม' : !s.running ? '⏸ Helper หยุดอยู่' : w >= 90 ? `🎒 กระเป๋าใกล้เต็ม (${w}%)` : '';
+  const potions = (s.potions || []).slice(0, 2).map(p => `<div class="tab-card-pot" title="${esc(p.name)}"><span>${esc((p.k || 'ยา').toUpperCase())}</span><b>${p.have ?? '?'}</b></div>`).join('');
+  return `<article class="profile-card ${t.profileId && openProfileMenuId === t.profileId ? 'menu-open' : ''} ${stateClass} ${s.running ? 'is-farming' : ''} ${st}" data-card-key="${esc(t.profileId || t.id)}" style="--h:${hue}">${head}
+    <div class="card-status-row"><span class="activity-pill ${statusTone}" title="${esc(s.phase)}"><i></i>${esc(s.phase || 'พร้อม')}</span>${alert ? `<span class="tab-card-alert">${alert}</span>` : ''}</div>
+    <div class="char-gauges tab-card-gauges"><div class="gauge-row"><span class="gauge-lbl wt">WT</span><div class="gauge-track"><div class="gauge-fill wt ${w >= 90 ? 'full' : ''}" style="width:${Math.min(100, w)}%"></div></div><span class="gauge-val">${w}%</span></div>${potions}</div>
+    ${b ? `<div class="exp-row"><div class="exp-item"><span class="exp-lbl">ค่าหัว · ${esc(b.mob)}</span><span class="exp-val">${b.prog}/${b.need}</span><div class="gauge-track thin"><div class="gauge-fill exp" style="width:${pct(b.prog, b.need)}%"></div></div></div></div>` : ''}
+    <div class="card-body tab-card-body"><div class="stat-item"><span class="stat-lbl">แมพ</span><span class="stat-val stat-map" title="${esc(s.map)}">${esc(s.map || '—')}</span></div>
+      <div class="stat-item"><span class="stat-lbl">จุดฟาร์ม</span><span class="stat-val">${s.farmSpot ? `${s.farmSpot.x.toFixed(0)}, ${s.farmSpot.y.toFixed(0)}` : '—'}</span></div>
+      <div class="stat-item"><span class="stat-lbl">Gold</span><span class="stat-val">—</span></div></div>
+    ${s.log?.[0] ? `<div class="tab-card-log" title="${esc((s.log || []).join('\n'))}">📝 ${esc(s.log[0])}</div>` : ''}
+    <div class="card-footer-controls"><div class="card-action-row main-actions"><button class="btn btn-sm ${s.running ? 'btn-bot-toggle is-stop' : 'btn-bot-toggle is-start'}" data-toggle="${t.id}" title="${s.running ? 'หยุด helper (เกมยังเปิด)' : 'เริ่ม helper'}">${s.running ? '⏸ หยุดบอท' : '▶ เริ่มบอท'}</button>
+      <button class="btn btn-sm btn-bot-menu soon" data-soon="เมนูบอท" title="เมนูบอท">🎮 เมนูบอท</button></div><div class="card-action-row sub-actions">
+      ${t.key === 'shared' ? `<button class="btn btn-icon btn-sm" data-window="focus" data-target="${t.id}" title="นำหน้าต่างนี้ขึ้นมา">▣</button><button class="btn btn-icon btn-sm" data-window="minimize" data-target="${t.id}" title="ย่อหน้าต่างนี้">—</button><button class="btn btn-icon btn-sm" data-close="${t.id}" title="ปิดหน้าต่างเกมนี้">✕</button>` : ''}
+      <button class="btn btn-icon btn-sm" data-reload="${t.id}" title="โหลด helper ใหม่ในแท็บนี้">♻</button></div></div>
   </article>`;
 }
-function renderTabs(list) {
-  const all = list.flatMap(b => b.tabs.map(t => ({ ...t, browser: b.name, key: b.key })));
+function morphNode(oldNode, newNode) {
+  if (oldNode.isEqualNode(newNode)) return;
+  if (oldNode.nodeType !== newNode.nodeType || oldNode.nodeName !== newNode.nodeName || oldNode.childNodes.length !== newNode.childNodes.length) {
+    oldNode.replaceWith(newNode);
+    return;
+  }
+  if (oldNode.nodeType === Node.TEXT_NODE || oldNode.nodeType === Node.COMMENT_NODE) {
+    oldNode.nodeValue = newNode.nodeValue;
+    return;
+  }
+  Array.from(oldNode.attributes).forEach(attr => { if (!newNode.hasAttribute(attr.name)) oldNode.removeAttribute(attr.name); });
+  Array.from(newNode.attributes).forEach(attr => { if (oldNode.getAttribute(attr.name) !== attr.value) oldNode.setAttribute(attr.name, attr.value); });
+  const nextChildren = Array.from(newNode.childNodes);
+  Array.from(oldNode.childNodes).forEach((child, index) => morphNode(child, nextChildren[index]));
+}
+function morphMarkup(container, markup) {
+  const template = document.createElement('template');
+  template.innerHTML = markup;
+  const oldChildren = Array.from(container.childNodes), newChildren = Array.from(template.content.childNodes);
+  if (oldChildren.length !== newChildren.length || oldChildren.some((node, i) => node.nodeType !== newChildren[i].nodeType || node.nodeName !== newChildren[i].nodeName)) {
+    container.replaceChildren(...newChildren);
+    return;
+  }
+  oldChildren.forEach((node, index) => morphNode(node, newChildren[index]));
+}
+function renderTabs(list, profiles = gameProfiles) {
+  const liveTabs = list.flatMap(b => b.tabs.map(t => ({ ...t, browser: b.name, key: b.key })));
+  const savedProfiles = Array.isArray(profiles) ? profiles : [];
+  const savedIds = new Set(savedProfiles.map(p => p.id));
+  const profileCards = savedProfiles.map(profile => {
+    const live = liveTabs.find(t => t.key === 'shared' && t.profileId === profile.id);
+    return live ? { ...live, profileName: profile.name } : {
+      id: `saved-${profile.id}`, title: profile.name, browser: 'หน้าต่างเกมร่วม', key: 'shared',
+      profileId: profile.id, profileName: profile.name, state: 'closed', status: null,
+    };
+  });
+  const otherTabs = liveTabs.filter(t => t.key !== 'shared' || !savedIds.has(t.profileId));
+  const all = [...profileCards, ...otherTabs];
   const on = all.filter(t => t.status), run = on.filter(t => t.status.running), att = on.filter(t => t.status.dead || !t.status.running || t.status.weight >= 90);
   $('#metric-total').textContent = all.length; $('#tab-count-profiles').textContent = all.length;
   $('#metric-online').textContent = on.length; $('#metric-online-of').textContent = '/ ' + all.length; $('#metric-online-bar').style.width = pct(on.length, all.length) + '%';
   $('#metric-farming').textContent = run.length; $('#metric-farming-of').textContent = '/ ' + all.length; $('#metric-farming-bar').style.width = pct(run.length, all.length) + '%';
   $('#helper-badge').textContent = `พร้อม ${on.length}/${all.length}`;
+  const helperCount = $('#script-helper-count');
+  if (helperCount) helperCount.textContent = `พร้อม ${on.length} / ${all.length} แท็บ`;
   $('#f-all').textContent = all.length; $('#f-run').textContent = run.length; $('#f-att').textContent = att.length;
   const q = ui.q.toLowerCase();
   const pass = t => (ui.filter === 'all' || (ui.filter === 'run' ? run.includes(t) : att.includes(t)))
@@ -247,16 +331,22 @@ function renderTabs(list) {
   const groups = [['att', '⚠️ ต้องดู', att.filter(pass)], ['ok', 'ทำงานปกติ', run.filter(t => !att.includes(t)).filter(pass)], ['off', 'ยังไม่เข้าเกม', all.filter(t => !t.status).filter(pass)]];
   const g = $('#profiles-grid');
   g.classList.toggle('compact', ui.compact);
-  g.innerHTML = all.length ? groups.filter(([, , l]) => l.length).map(([k, label, l]) =>
+  const visibleAll = all.filter(pass);
+  const markup = savedProfiles.length
+    ? visibleAll.length ? `<div class="sc-grid">${visibleAll.map(card).join('')}</div>` : '<div class="sc-empty">ไม่มีโปรไฟล์ที่ตรงกับตัวกรอง</div>'
+    : all.length ? groups.filter(([, , l]) => l.length).map(([k, label, l]) =>
     `<div class="sc-group ${k}${k === 'off' && ui.offClosed ? ' closed' : ''}" ${k === 'off' ? 'data-off="1"' : ''}>${k === 'off' ? '<span class="car">▾</span>' : ''}${label} <span class="n">${l.length}</span><span class="line"></span></div>
      ${k === 'off' && ui.offClosed ? '' : `<div class="sc-grid">${l.map(card).join('')}</div>`}`).join('') || '<div class="sc-empty">ไม่มีแท็บที่ตรงกับตัวกรอง</div>'
-    : `<div class="sc-empty">ยังไม่มีแท็บเกม กด "🚀 เปิดทุกจอ" หรือ "➕ เพิ่มโปรไฟล์" แล้วล็อกอินเข้าเกม helper จะโหลดเองเมื่อเข้าเกมแล้ว</div>`;
+    : '<div class="sc-empty">ยังไม่มีโปรไฟล์หน้าต่างเกม กด “➕ เพิ่มหน้าต่าง” เพื่อตั้งค่าและเตรียมจอแรก</div>';
+  morphMarkup(g, markup);
 }
 let lastOk = true;
 async function refresh() {
   try {
     const j = await (await fetch('/api/status')).json(); last = j;
-    renderUpdate(j.update); renderBrowsers(j.browsers); renderTabs(j.browsers);
+    renderUpdate(j.update); renderBrowserMode(j.browserMode);
+    const activeProfiles = j.browsers.flatMap(browser => browser.tabs).map(tab => tab.profileId).filter(Boolean);
+    renderGameProfiles(j.gameProfiles || [], activeProfiles); renderTabs(j.browsers, j.gameProfiles || []);
     if (!lastOk) say(''); lastOk = true;
   } catch { if (lastOk) say('ติดต่อตัวจัดการไม่ได้ หน้าต่างดำ (Start_Binder.bat) ยังเปิดอยู่ไหม?', true); lastOk = false; }
 }
@@ -266,6 +356,55 @@ function showTab(name) {
   $('.toolbar').style.display = name === 'profiles' ? '' : 'none';
 }
 const allTabs = () => last ? last.browsers.flatMap(b => b.tabs) : [];
+$('#lm-browser-kind').addEventListener('change', async e => {
+  try {
+    const response = await fetch('/api/browser-mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: e.target.value }) });
+    const result = await response.json();
+    if (!response.ok) {
+      const message = result.error || 'บันทึกการตั้งค่าไม่สำเร็จ';
+      if (e.target.value === 'brave' && /เลือก Chrome หรือ Edge/.test(message)) {
+        throw new Error('ตัวจัดการที่กำลังทำงานเป็นเวอร์ชันเก่า กรุณาปิดแล้วเปิด Binder Town Manager ใหม่ก่อนเลือก Brave');
+      }
+      throw new Error(message);
+    }
+    say(`บันทึก ${result.name} แล้ว`); refresh();
+  } catch (error) { say(error.message, true); refresh(); }
+});
+$('#game-profile-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const input = $('#game-profile-name'), name = input.value.trim();
+  const countInput = $('#game-profile-count'), count = Math.max(1, Math.min(50, Number.parseInt(countInput.value, 10) || 1));
+  if (!name) return input.focus();
+  const button = e.submitter || $('#game-profile-form button[type="submit"]');
+  const buttonLabel = button?.textContent || '';
+  if (button) button.disabled = true;
+  try {
+    let made = 0;
+    const failed = [];
+    for (let i = 0; i < count; i++) {
+      const profileName = count === 1 ? name : `${name} ${String(i + 1).padStart(2, '0')}`;
+      if (button) button.textContent = `⏳ กำลังสร้าง ${i + 1}/${count}`;
+      try {
+        const response = await fetch('/api/profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: profileName }) });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 404) {
+            failed.push('Manager ที่เปิดอยู่ไม่รู้จัก API บันทึกโปรไฟล์ กรุณาปิดและเปิด Binder Town Manager ใหม่');
+            break;
+          }
+          throw new Error(result.error || result.msg || `HTTP ${response.status}`);
+        }
+        made++;
+      } catch (error) { failed.push(`${profileName}: ${error.message}`); }
+    }
+    if (!made) throw new Error(failed[0] || 'บันทึกโปรไฟล์ไม่สำเร็จ');
+    input.value = ''; countInput.value = '1';
+    $('#game-profiles-modal').classList.remove('active');
+    await refresh();
+    say(failed.length ? `เพิ่มโปรไฟล์สำเร็จ ${made}/${count} จอ\n${failed.join('\n')}` : `เพิ่มโปรไฟล์สำเร็จ ${made} จอ — การ์ดแสดงบนหน้าหลัก`, failed.length > 0);
+  } catch (error) { say(error.message, true); }
+  finally { if (button) { button.disabled = false; button.textContent = buttonLabel; } }
+});
 async function each(list, url, verb) {
   if (!list.length) return say(`ไม่มีแท็บที่ต้อง${verb}`);
   for (const t of list) await post(url(t), true);
@@ -273,25 +412,70 @@ async function each(list, url, verb) {
 }
 $('#sc-search').addEventListener('input', e => { ui.q = e.target.value; if (last) renderTabs(last.browsers); });
 document.addEventListener('click', async e => {
+  if (!e.target.closest('.card-top-menu') && openProfileMenuId) {
+    openProfileMenuId = '';
+    if (last) renderTabs(last.browsers);
+  }
   const soon = e.target.closest('[data-soon]');
   if (soon) { e.preventDefault(); return say(`"${soon.dataset.soon}" ยังไม่พร้อมใช้งาน — กำลังทำ เร็วๆ นี้`); }
   const off = e.target.closest('[data-off]');
   if (off) { ui.offClosed = !ui.offClosed; return renderTabs(last.browsers); }
   const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.id === 'btn-add-profile' || (b.id === 'btn-launch-all' && !gameProfiles.length)) {
+    $('#game-profiles-modal').classList.add('active'); setTimeout(() => $('#game-profile-name').focus(), 0); return;
+  }
+  if (b.id === 'btn-launch-all') {
+    b.disabled = true;
+    const failed = [];
+    try {
+      for (let i = 0; i < gameProfiles.length; i++) {
+        say(`กำลังเปิดจอ ${i + 1}/${gameProfiles.length}: ${gameProfiles[i].name}`);
+        const response = await fetch(`/api/browser/shared/open/${gameProfiles[i].id}`, { method: 'POST' });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.ok) failed.push(`${gameProfiles[i].name}: ${result.error || result.msg || 'เปิดไม่สำเร็จ'}`);
+      }
+      say(failed.length ? `เปิดจอเสร็จแล้ว มี ${failed.length} โปรไฟล์ที่เปิดไม่สำเร็จ\n${failed.join('\n')}` : `สั่งเปิดจอครบ ${gameProfiles.length} โปรไฟล์แล้ว` , failed.length > 0);
+      await refresh();
+    } catch (error) { say(`เปิดจอไม่สำเร็จ: ${error.message}`, true); }
+    finally { b.disabled = false; }
+    return;
+  }
+  if (b.id === 'btn-game-profiles-close') { $('#game-profiles-modal').classList.remove('active'); return; }
+  if (b.dataset.profileMenu) {
+    openProfileMenuId = openProfileMenuId === b.dataset.profileMenu ? '' : b.dataset.profileMenu;
+    if (last) renderTabs(last.browsers);
+    return;
+  }
+  if (b.dataset.openProfile) {
+    b.disabled = true;
+    const result = await post(`/api/browser/shared/open/${b.dataset.openProfile}`);
+    if (result.ok) { say(result.msg || 'กำลังเปิดหน้าต่างเกมแยกโปรไฟล์'); setTimeout(refresh, 600); }
+    else say(result.error || result.msg || 'เปิดหน้าต่างเกมไม่สำเร็จ', true);
+    b.disabled = false; return;
+  }
+  if (b.dataset.deleteProfile) {
+    b.disabled = true;
+    try {
+      const response = await fetch(`/api/profiles/${b.dataset.deleteProfile}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'ลบโปรไฟล์ไม่สำเร็จ');
+      openProfileMenuId = '';
+      renderGameProfiles(result.profiles); await refresh(); say('ลบโปรไฟล์แล้ว');
+    } catch (error) { say(error.message, true); }
+    b.disabled = false; return;
+  }
+  if (b.id === 'btn-script-game') { $('#script-game-modal').classList.add('active'); refresh(); return; }
+  if (b.id === 'btn-script-game-close') { $('#script-game-modal').classList.remove('active'); return; }
   if (b.dataset.tab) return showTab(b.dataset.tab);
   if (b.dataset.filter) { ui.filter = b.dataset.filter; for (const c of document.querySelectorAll('[data-filter]')) c.classList.toggle('on', c === b); return renderTabs(last.browsers); }
   if (b.dataset.size) { ui.compact = b.dataset.size === 'compact'; for (const c of document.querySelectorAll('[data-size]')) c.classList.toggle('on', c === b); return renderTabs(last.browsers); }
   b.disabled = true;
   try {
-    if (b.dataset.open) { say('กำลังเปิด…'); await post(`/api/browser/${b.dataset.open}/open`); }
-    else if (b.dataset.toggle) await post(`/api/tab/${b.dataset.toggle}/toggle`);
+    if (b.dataset.toggle) await post(`/api/tab/${b.dataset.toggle}/toggle`);
     else if (b.dataset.reload) await post(`/api/tab/${b.dataset.reload}/reload`);
-    else if (b.id === 'btn-launch-all') {
-      const list = last ? last.browsers.filter(x => x.installed && !x.running) : [];
-      if (!list.length) say('ทุกเบราว์เซอร์ที่มีในเครื่องเปิดอยู่แล้ว');
-      for (const x of list) { say('กำลังเปิด ' + x.name + '…'); await post(`/api/browser/${x.key}/open`); }
-    }
-    else if (b.id === 'btn-add-profile') { showTab('browsers'); say('เลือกเบราว์เซอร์ที่จะเปิดเกม (1 เบราว์เซอร์ = 1 ไอดี)'); }
+    else if (b.dataset.window) await post(`/api/browser/shared/window/${b.dataset.target}?action=${b.dataset.window}`);
+    else if (b.dataset.close) { await post(`/api/browser/shared/close/${b.dataset.close}`); say('ปิดหน้าต่างเกมแล้ว'); }
+    else if (b.id === 'btn-close-all') { const result = await post('/api/browser/shared/close-all'); say(`ปิดหน้าต่างเกมแล้ว ${result.count || 0} จอ`); }
     else if (b.id === 'btn-start-bot-all') await each(allTabs().filter(t => t.status && !t.status.running), t => `/api/tab/${t.id}/toggle`, 'เริ่ม');
     else if (b.id === 'btn-stop-bot-all') await each(allTabs().filter(t => t.status && t.status.running), t => `/api/tab/${t.id}/toggle`, 'หยุด');
     else if (b.id === 'btn-reload-all') await each(allTabs().filter(t => t.status), t => `/api/tab/${t.id}/reload`, 'โหลด helper ใหม่');
@@ -302,6 +486,9 @@ document.addEventListener('click', async e => {
   } finally { b.disabled = false; }
   refresh();
 });
+$('#script-game-modal').addEventListener('click', e => { if (e.target.id === 'script-game-modal') e.currentTarget.classList.remove('active'); });
+$('#game-profiles-modal').addEventListener('click', e => { if (e.target.id === 'game-profiles-modal') e.currentTarget.classList.remove('active'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('#script-game-modal').classList.remove('active'); $('#game-profiles-modal').classList.remove('active'); } });
 refresh(); setInterval(refresh, 2000);
 </script>
 <script src="item_names.js"></script>

@@ -14,8 +14,6 @@
 //  • World Boss round open (server "worldBoss" message) → warp into the arena → AUTO until the boss is dead / gone →
 //    leave → back to the farm spot (on by default, switch on the farm tab)
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
-//  • kicked for idling ("หลุดจากเกม · ไม่ได้เล่นนานเกินไป") → press เชื่อมต่อใหม่ → after the reload ▶ goes on (AUTO only, if no farm spot is saved yet)
-//    (needs the manager, which loads the helper again after the reload)
 //  • when the server sends idleWarn while automation is running → answer with stillHere
 // It presses the game's own buttons (warp, world map "go", respawn, sell, AUTO). The messages it sends itself go
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
@@ -177,16 +175,24 @@
       <label class="bth-switch"><input id="bthsalv" type="checkbox"><span class="bth-switch-ui"></span><span>แยกชิ้นอุปกรณ์ Normal / Magic ก่อนขาย</span></label>
       <label class="bth-inline" for="bthsalvlv"><span>เฉพาะเลเวลไอเทมต่ำกว่า</span><span>Lv <input id="bthsalvlv" type="number" min="2" max="99" style="width:48px"></span></label>
       <div class="bth-note">ไม่แยกชิ้น Rare / Epic / Unique / ของตีบวก / ของล็อก</div>
+      <button id="bthdebugtown" type="button" style="width:100%">ทดสอบ: ขาย / ซื้อยา / คลัง</button>
     </section>`,
     render: ({ $, cfg, TOWN_IDS }) => {
       $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct;
       $('#bthsalv').checked = !!cfg.salvOn; $('#bthsalvlv').value = cfg.salvBelow;
     },
-    bind: ({ $, cfg, save, log }) => {
+    bind: ({ $, cfg, save, log, simulateTownTrip }) => {
       $('#bthtown').onchange = e => { cfg.town = e.target.value; save(); log('เมืองขาย: ' + cfg.town); };
       $('#bthpct').onchange = e => { cfg.sellPct = Math.max(10, Math.min(100, +e.target.value || 95)); save(); };
       $('#bthsalv').onchange = e => { cfg.salvOn = e.target.checked; save(); log(cfg.salvOn ? `เปิดแยกชิ้น Normal / Magic เลเวลต่ำกว่า ${cfg.salvBelow}` : 'ปิดแยกชิ้น'); };
       $('#bthsalvlv').onchange = e => { cfg.salvBelow = Math.max(2, Math.min(99, Math.round(+e.target.value) || 30)); e.target.value = cfg.salvBelow; save(); };
+      const debug = $('#bthdebugtown');
+      debug.onclick = async () => {
+        if (debug.disabled) return;
+        debug.disabled = true; debug.textContent = 'กำลังทดสอบ full routine…';
+        try { await simulateTownTrip(); }
+        finally { debug.disabled = false; debug.textContent = 'ทดสอบ: ขาย / ซื้อยา / คลัง'; }
+      };
     },
   };
 })();
@@ -222,42 +228,8 @@
     console.error('[Binder Helper] menu modules missing; load helper/pages/*.js through the manager');
     return 'helper menu modules missing';
   }
-  // a minimised / hidden tab runs page timers once a minute, so every step of a trip took minutes; a worker's timers
-  // keep their pace, so the helper's own timers tick from one. Native timers until the worker has answered once
-  // (a blocked worker then just leaves the helper on native timers).
-  const { setTimeout, setInterval, clearTimeout, clearInterval, stopTimers, onWorker } = (() => {
-    const nat = { set: window.setTimeout.bind(window), every: window.setInterval.bind(window), clear: window.clearTimeout.bind(window), clearEvery: window.clearInterval.bind(window) };
-    const recs = new Map(); let n = 0, ready = false, w = null; // id -> { fn, ms, rep, nat: native id while not on the worker }
-    const toWorker = (id, r) => { if (r.nat !== undefined) { (r.rep ? nat.clearEvery : nat.clear)(r.nat); delete r.nat; } w.postMessage([r.rep ? 'i' : 't', id, r.ms]); };
-    try {
-      const src = 'const t={};onmessage=e=>{const[k,id,ms]=e.data;if(k==="c"){clearTimeout(t[id]);clearInterval(t[id]);delete t[id];return}'
-        + 't[id]=(k==="i"?setInterval:setTimeout)(()=>{if(k!=="i")delete t[id];postMessage(id)},ms)}';
-      w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
-      w.onmessage = e => {
-        if (e.data === 'ping') { // the worker works: move the intervals started meanwhile onto it
-          if (!ready) { ready = true; for (const [id, r] of recs) if (r.rep) toWorker(id, r); }
-          return;
-        }
-        const r = recs.get(e.data); if (!r) return;
-        if (!r.rep) recs.delete(e.data);
-        try { r.fn(); } catch (err) { console.error('[Binder Helper]', err); }
-      };
-      w.postMessage(['t', 'ping', 0]);
-    } catch { w = null; }
-    const add = rep => (fn, ms = 0, ...a) => {
-      const id = 'w' + ++n, r = { fn: () => fn(...a), ms, rep };
-      recs.set(id, r);
-      if (ready) toWorker(id, r);
-      else r.nat = (rep ? nat.every : nat.set)(() => { if (!rep) recs.delete(id); r.fn(); }, ms);
-      return id;
-    };
-    const clear = id => {
-      const r = recs.get(id); if (!r) return;
-      recs.delete(id);
-      if (r.nat !== undefined) (r.rep ? nat.clearEvery : nat.clear)(r.nat); else if (w) w.postMessage(['c', id]);
-    };
-    return { setTimeout: add(false), setInterval: add(true), clearTimeout: clear, clearInterval: clear, stopTimers: () => { for (const id of [...recs.keys()]) clear(id); if (w) w.terminate(); }, onWorker: () => ready };
-  })();
+  const setTimeout = window.setTimeout.bind(window), setInterval = window.setInterval.bind(window);
+  const clearTimeout = window.clearTimeout.bind(window), clearInterval = window.clearInterval.bind(window);
   const KEY = 'bth_cfg';
   const clearResumeMarkers = () => { try { localStorage.removeItem('bth_resume'); localStorage.removeItem('bth_alive'); } catch { } };
   const DEF = {
@@ -281,9 +253,14 @@
   }));
   cfg.gathering = { enabled: false, type: 'tree', tier: 5, pvp: false, gold: false, preferredMap: '', scanChannels: false, rotateMaps: false, ...(cfg.gathering || {}) };
   if (cfg.gathering.sweep) { cfg.gathering.scanChannels = true; cfg.gathering.rotateMaps = true; delete cfg.gathering.sweep; }
-  // the saved flag is still true when the page went away while running (reload, game update, kick); ■ saves false
-  const wasRunning = cfg.running;
-  cfg.running = false; cfg.gathering.enabled = false; // start stopped; resumed below only when the last page was running a moment ago
+  // Keep the selected automation mode across game page reloads and tabs in this profile.
+  // Older configs have only the two booleans, so infer the mode once for migration.
+  cfg.mode = ['farm', 'gathering', 'stopped'].includes(cfg.mode)
+    ? cfg.mode : cfg.gathering.enabled ? 'gathering' : cfg.running ? 'farm' : 'stopped';
+  cfg.running = cfg.mode !== 'stopped';
+  cfg.gathering.enabled = cfg.mode === 'gathering';
+  if (cfg.mode === 'farm') cfg.gathering.enabled = false;
+  save();
   // +1 whenever you set a new farm map / spot: a trip still heading for the old one sees it and gives up
   let farmGen = 0;
 
@@ -375,7 +352,7 @@
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
   // walk back to the saved farm spot (server-side pathing, same message as click-to-move)
-  async function walkToSpot(spot, still = () => true) {
+  async function walkToSpot(spot, still = () => true, label = 'จุดฟาร์ม') {
     if (!spot) return true;
     const deadline = Date.now() + 90e3;
     let lastSend = 0, last = myPos(), lastMoveAt = Date.now();
@@ -384,12 +361,12 @@
       if (isDead()) return false;
       const p = myPos(), r = room();
       if (!p || !r) { await sleep(1000); continue; }
-      if (dist(p, spot) <= 1.5) { log(`ถึงจุดฟาร์ม (${spot.x.toFixed(1)}, ${spot.y.toFixed(1)})`); return true; }
+      if (dist(p, spot) <= 1.5) { log(`ถึง${label} (${spot.x.toFixed(1)}, ${spot.y.toFixed(1)})`); return true; }
       if (last && dist(p, last) > 0.3) { last = p; lastMoveAt = Date.now(); }
       if (Date.now() - lastSend > 8000 || Date.now() - lastMoveAt > 4000) {
         lastSend = Date.now(); lastMoveAt = Date.now();
         r.send('input', { type: 'moveTo', x: spot.x, y: spot.y });
-        log(`เดินไปจุดฟาร์ม (${spot.x.toFixed(1)}, ${spot.y.toFixed(1)}) · ห่าง ${dist(p, spot).toFixed(1)}`);
+        log(`เดินไป${label} (${spot.x.toFixed(1)}, ${spot.y.toFixed(1)}) · ห่าง ${dist(p, spot).toFixed(1)}`);
       }
       await sleep(700);
     }
@@ -478,12 +455,10 @@
     return base.sort((a,b) => (a === cfg.gathering.preferredMap ? -1 : b === cfg.gathering.preferredMap ? 1 : (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999)));
   };
   const liveGatherNodes = () => { const r = room(), nodes = r && r.state && r.state.nodes; if (!nodes) return []; if (typeof nodes.entries === 'function') return [...nodes.entries()].map(([id,node]) => ({ id, node })); if (Array.isArray(nodes)) return nodes.map((node,id) => ({ id: String(id), node })); return Object.entries(nodes).map(([id,node]) => ({ id, node })); };
-  const gatherNodeKey = n => `${mapId()}:${n.nodeType}:${(+n.x).toFixed(1)},${(+n.y).toFixed(1)}`;
-  const gatherNodeProgress = new Map(), gatherNodeBlacklist = new Map();
+  const gatherNodeProgress = new Map();
   const suitableGatherNode = () => {
-    const now = Date.now();
-    for (const [key, until] of gatherNodeBlacklist) if (until <= now) gatherNodeBlacklist.delete(key);
-    return liveGatherNodes().find(({node:n}) => n && n.nodeType === cfg.gathering.type && +n.tier === +cfg.gathering.tier && n.available === true && +n.charges > 0 && (!cfg.gathering.gold || n.golden) && !gatherNodeBlacklist.has(gatherNodeKey(n)));
+    const candidates = liveGatherNodes().filter(({node:n}) => n && n.nodeType === cfg.gathering.type && +n.tier === +cfg.gathering.tier && n.available === true && +n.charges > 0);
+    return (cfg.gathering.gold ? candidates.filter(({node:n}) => n.golden) : candidates.find(({node:n}) => n.golden) ? candidates.filter(({node:n}) => n.golden) : candidates)[0];
   };
   // send one game message and wait for the server reply that matches (server events can come batched in an array)
   function request(msg, match, timeout = 3000) {
@@ -586,19 +561,12 @@
   }
 
   // where to farm right now: the bounty's map (whole map) while a bounty runs, else the saved farm map + spot
-  let tripFailed = false;
   async function backToFarm(t = tgt()) {
-    tripFailed = false;
     if (!t.map) return false;
     const g = farmGen, still = () => g === farmGen;
     const changed = () => { if (still()) return false; log('เปลี่ยนจุดฟาร์มแล้ว — เลิกไปจุดเดิม'); return true; };
     setPhase('กลับไปฟาร์ม ' + t.map);
-    if (!await travelTo(t.map, still)) {
-      // our own trip did not get there (wrong exit, the game's walk stuck in a hidden tab): the next tick tries again
-      // instead of taking it for "you moved yourself" and pausing (18 Oct 21:23, stuck in Sanctum)
-      if (!changed() && cfg.running && !isDead()) { tripFailed = true; log(`ไป ${t.map} ไม่สำเร็จ — ลองใหม่`); }
-      return false;
-    }
+    if (!await travelTo(t.map, still)) { changed(); return false; }
     await sleep(1500);
     if (changed()) return false;
     setAuto(false);
@@ -800,112 +768,31 @@
   // still in Sanctum), so then walk exit to exit with moveTo, like walkToSpot. Exits from data/maps/zones.json
   // (map id -> [to, x, y] centre of the exit area). Not yet seen working: logs each step, gives up after 10 s at an exit.
   const EXITS = {'southvale_field':[['valebrook',29.5,2.0],['honeyrill',27.5,2.0]],'valebrook':[['southvale_field',21.5,42.5],['whispering_woods',21.5,2.0],['riverside',42.0,25.0],['old_quarry',2.0,30.0]],'whispering_woods':[['valebrook',27.5,54.0],['ancient_ruins',27.5,2.0],['bloomcrown_glade',42.5,2.0],['bracken_sink',32.5,54.0]],'riverside':[['valebrook',2.0,34.5],['honeyrill',2.0,26.0]],'old_quarry':[['valebrook',54.0,32.0],['verdigris_rise',2.0,28.0]],'ancient_ruins':[['whispering_woods',27.5,54.0],['sunfield_plains',27.5,2.0]],'sunfield_plains':[['ancient_ruins',27.5,54.0],['ashford',26.5,2.0],['gloomroot_forest',54.0,29.0],['bracken_sink',2.0,29.0]],'ashford':[['sunfield_plains',24.0,46.0],['gloomroot_forest',46.0,34.0],['ember_hollow',24.0,2.0],['mistmire_swamp',2.0,40.0],['duskgate_pass',45.5,2.0]],'gloomroot_forest':[['sunfield_plains',53.5,28.5],['ashford',26.5,54.0],['pitchwood',28.5,2.0]],'ember_hollow':[['ashford',25.5,54.0],['mistmire_swamp',2.0,26.5],['cinder_eyrie',54.0,22.5],['yellowlick_flats',54.0,28.0]],'mistmire_swamp':[['ashford',25.5,2.0],['ember_hollow',53.5,44.5],['duskgate_pass',40.5,2.0],['lotus_hollow',2.0,42.5],['peatcut_bog',2.0,28.0]],'duskgate_pass':[['mistmire_swamp',28.5,54.0],['stormwall_city',31.5,2.0],['ashford',12.0,2.0]],'stormwall_city':[['duskgate_pass',23.5,46.0],['frostpeak_slopes',2.0,28.0],['frozen_mere',24.0,2.0],['howling_steppes',46.0,23.0],['cloudspire_ruins',39.5,2.0]],'frostpeak_slopes':[['stormwall_city',54.0,27.5],['sledrun_gully',28.5,2.0]],'frozen_mere':[['stormwall_city',26.5,54.0],['aurora_hollow',2.0,24.5],['brinecrust_shoals',54.0,28.0]],'howling_steppes':[['stormwall_city',2.0,27.0],['cloudspire_ruins',42.5,2.0],['brinecrust_shoals',28.5,54.0]],'cloudspire_ruins':[['howling_steppes',26.5,54.0],['sanctum',26.5,2.0],['stormwall_city',2.0,12.0],['tempest_aerie',27.5,2.0],['kitewind_terraces',28.5,54.0]],'sanctum':[['cloudspire_ruins',22.0,42.5],['shattered_vale',2.0,26.0],['umbral_depths',22.0,2.0],['throne_of_warden',42.0,21.0],['rustbell_barracks',32.0,42.0]],'shattered_vale':[['sanctum',54.0,26.5],['opalweb_grotto',39.5,54.0],['glasswrack',2.0,28.0]],'umbral_depths':[['sanctum',27.5,54.0],['throne_of_warden',27.5,2.0],['marrowdeep',2.0,28.0]],'throne_of_warden':[['umbral_depths',24.5,46.0],['sanctum',32.0,2.0],['wardens_seat',24.5,46.0]],'training_grounds':[],'rootfall_barrow':[],'honeyrill':[['southvale_field',27.5,54.0],['riverside',54.0,26.0]],'bracken_sink':[['whispering_woods',28.5,2.0],['sunfield_plains',54.0,32.0]],'verdigris_rise':[['old_quarry',54.0,28.0]],'pitchwood':[['gloomroot_forest',28.5,54.0]],'yellowlick_flats':[['ember_hollow',2.0,28.0]],'peatcut_bog':[['mistmire_swamp',54.0,28.0]],'sledrun_gully':[['frostpeak_slopes',28.5,54.0]],'brinecrust_shoals':[['frozen_mere',2.0,28.0],['howling_steppes',28.5,2.0]],'kitewind_terraces':[['cloudspire_ruins',28.5,2.0]],'glasswrack':[['shattered_vale',54.0,28.0]],'marrowdeep':[['umbral_depths',54.0,28.0]],'rustbell_barracks':[['sanctum',28.5,2.0]]};
-  // the exits the game's own route walk uses. Its bundle (/assets/main-*.js) has each map's exits ({id:"sanctum",..,w,h,
-  // exits:[{to,rect,side}]}), but at start-up the game moves them: every exit goes on the side its target lies on the world
-  // map (position table: the one read by `const n=X[t],s=X[e];if(!n||!s)return;`), spread evenly along that side, then
-  // the map is scaled (table read by `X[t.id],[w,v]=g??[1,1]`). Same steps here, so the spots match what the game walks to
-  // (checked on the 15 Oct bundle against its own walks: Sanctum -> Shattered Vale (2, 15), Shattered Vale -> Glasswrack
-  // (2, 42), Umbral Depths -> Marrowdeep (2, 43); Sanctum -> Umbral Depths is (2, 29) on the west side, (22, 2) north is
-  // Cloudspire Ruins: why the walk kept ending up there on 18 Oct). Walked to at the rect centre + 0.5 like the game does.
-  let liveExits = null;
-  (async () => {
-    try {
-      await sleep(0); // log() is set up further down this file
-      const src = [...document.querySelectorAll('script[src]')].map(e => e.src).find(u => /\/assets\/main-/.test(u));
-      if (!src) { log('ไม่เจอไฟล์เกม main-*.js — ใช้ทางออกจาก zones.json'); return; }
-      const text = await (await fetch(src)).text();
-      const table = name => {
-        const i = name ? text.search(new RegExp('[,;{ ]' + name.replace(/\$/g, '\\$') + '=\\{')) : -1; if (i < 0) return null;
-        const st = text.indexOf('{', i); let d = 0, j = st;
-        for (; j < text.length; j++) { if (text[j] === '{') d++; else if (text[j] === '}' && !--d) break; }
-        const o = {}; for (const m of text.slice(st, j + 1).matchAll(/([a-z_]+):\[(-?[\d.]+),(-?[\d.]+)\]/g)) o[m[1]] = [+m[2], +m[3]];
-        return o;
-      };
-      const W = table((text.match(/const n=([\w$]+)\[t\],s=\1\[e\];if\(!n\|\|!s\)return;/) || [])[1]);
-      const SC = table((text.match(/([\w$]+)\[t\.id\],\[[\w$]+,[\w$]+\]=[\w$]+\?\?\[1,1\]/) || [])[1]);
-      if (!W || !SC) { log('อ่านตารางตำแหน่ง / ขนาดแมพจากไฟล์เกมไม่ได้ — ใช้ทางออกจาก zones.json'); return; }
-      const maps = {}, heads = [...text.matchAll(/\{id:"([a-z_]+)",name:"[^"]*",region:"/g)];
-      heads.forEach((h, i) => {
-        const body = text.slice(h.index, i + 1 < heads.length ? heads[i + 1].index : h.index + 200000), wh = body.match(/,w:(\d+),h:(\d+),/);
-        const ex = [...body.matchAll(/\{to:"([a-z_]+)",rect:\{x0:(-?[\d.]+),y0:(-?[\d.]+),x1:(-?[\d.]+),y1:(-?[\d.]+)\},side:"([NSEW])"/g)]
-          .map(m => ({ to: m[1], rect: { x0: +m[2], y0: +m[3], x1: +m[4], y1: +m[5] }, side: m[6] }));
-        if (wh && ex.length && !maps[h[1]]) maps[h[1]] = { w: +wh[1], h: +wh[2], exits: ex };
-      });
-      const sideOf = (a, b) => { const n = W[a], s = W[b]; if (!n || !s) return; const x = s[0] - n[0], y = s[1] - n[1]; return Math.abs(x) >= Math.abs(y) ? (x >= 0 ? 'E' : 'W') : (y >= 0 ? 'S' : 'N'); };
-      const out = {};
-      for (const [id, t] of Object.entries(maps)) {
-        const e = t.exits, sides = e.map(a => sideOf(id, a.to) || a.side);
-        let ex = e.map((a, o) => {
-          const i = sides[o], k = i === 'N' || i === 'S' ? 0 : 1;
-          const r = e.map((x, f) => ({ i: f, other: x })).filter(x => sides[x.i] === i).sort((x, y) => ((W[x.other.to] || [])[k] || 0) - ((W[y.other.to] || [])[k] || 0));
-          if (i === a.side && r.length === 1) return a;
-          const l = r.findIndex(x => x.i === o) + 1, c = k === 0 ? t.w : t.h;
-          const d = Math.min(8, Math.max(3, a.rect.x1 - a.rect.x0 + 1, a.rect.y1 - a.rect.y0 + 1)), u = Math.max(1, Math.min(c - d - 1, Math.round(c * l / (r.length + 1) - d / 2)));
-          const p = i === 'N' ? { x0: u, x1: u + d - 1, y0: 1, y1: 2 } : i === 'S' ? { x0: u, x1: u + d - 1, y0: t.h - 3, y1: t.h - 2 } : i === 'E' ? { x0: t.w - 3, x1: t.w - 2, y0: u, y1: u + d - 1 } : { x0: 1, x1: 2, y0: u, y1: u + d - 1 };
-          return { ...a, side: i, rect: p };
-        });
-        const sc = SC[id];
-        if (sc) {
-          const [fx, fy] = sc, A = Math.round(t.w * fx), O = Math.round(t.h * fy);
-          ex = ex.map(y => {
-            const g = (y.rect.x0 + y.rect.x1 + 1) / 2, w = (y.rect.y0 + y.rect.y1 + 1) / 2, v = (y.rect.x1 - y.rect.x0) / 2, M = (y.rect.y1 - y.rect.y0) / 2;
-            const nsX = { x0: Math.round(g * fx - v - 0.5), x1: Math.round(g * fx + v - 0.5) }, ewY = { y0: Math.round(w * fy - M - 0.5), y1: Math.round(w * fy + M - 0.5) };
-            const x = y.side === 'N' ? { ...nsX, y0: y.rect.y0, y1: y.rect.y1 } : y.side === 'S' ? { ...nsX, y0: O - (t.h - y.rect.y0), y1: O - (t.h - y.rect.y1) }
-              : y.side === 'E' ? { x0: A - (t.w - y.rect.x0), x1: A - (t.w - y.rect.x1), ...ewY } : { x0: y.rect.x0, x1: y.rect.x1, ...ewY };
-            return { ...y, rect: x };
-          });
-        }
-        out[id] = ex.map(y => [y.to, (y.rect.x0 + y.rect.x1) / 2 + 0.5, (y.rect.y0 + y.rect.y1) / 2 + 0.5]);
-      }
-      if (!Object.keys(out).length) { log('อ่านทางออกจากไฟล์เกมไม่ได้ — ใช้ทางออกจาก zones.json'); return; }
-      liveExits = out;
-      const s = (out.sanctum || []).map(e => `${MAP_NAMES[e[0]] || e[0]} (${e[1]}, ${e[2]})`).join(', ');
-      log(`อ่านทางออกจากไฟล์เกมแล้ว ${Object.keys(out).length} แมพ · Sanctum: ${s}`);
-    } catch (e) { log('อ่านทางออกจากไฟล์เกมไม่ได้ (' + e.message + ') — ใช้ทางออกจาก zones.json'); }
-  })();
-  const exitsOf = m => (liveExits && liveExits[m]) || EXITS[m] || [];
-  // skipBad: leave out the exits that just failed (not changing the map / leading to another map), so the walk takes
-  // another way round (Sanctum -> Umbral Depths keeps leading to Cloudspire Ruins: go Sanctum -> Throne -> Umbral Depths)
-  const routeTo = (from, to, skipBad) => {
-    const bad = (a, b) => skipBad && Date.now() - (exitWalkFailed[a + '>' + b] || 0) < 10 * 60e3;
+  const routeTo = (from, to) => {
     const prev = { [from]: null }, q = [from];
-    while (q.length) { const m = q.shift(); if (m === to) break; for (const [n] of exitsOf(m)) if (!(n in prev) && !bad(m, n)) { prev[n] = m; q.push(n); } }
+    while (q.length) { const m = q.shift(); if (m === to) break; for (const [n] of EXITS[m] || []) if (!(n in prev)) { prev[n] = m; q.push(n); } }
     if (!(to in prev)) return null;
     const path = []; for (let m = to; m; m = prev[m]) path.unshift(m); return path;
   };
   async function walkExits(name, still) {
     const target = Object.keys(MAP_NAMES).find(id => MAP_NAMES[id] === name);
     const r0 = room(); const from = r0 && r0.state.mapId;
-    const path = target && from && routeTo(from, target, true);
+    const path = target && from && routeTo(from, target);
     if (!path || path.length < 2) return false;
-    const [, next] = path, live = liveExits && liveExits[from] ? liveExits[from].find(e => e[0] === next) : null;
-    const ex = live || (EXITS[from] || []).find(e => e[0] === next), known = live ? null : (exitsSeen[from] || {})[next];
+    const [, next] = path, ex = (EXITS[from] || []).find(e => e[0] === next), known = (exitsSeen[from] || {})[next];
     const spot = known || { x: ex[1], y: ex[2] }, key = from + '>' + next;
     if (Date.now() - (exitWalkFailed[key] || 0) < 10 * 60e3) return false; // this exit did not work a moment ago
-    // zones.json's spot already seen leading to another map (18 Oct 18:51: Sanctum's "Umbral Depths" exit (22, 2) is where
-    // the game leaves for Cloudspire Ruins) -> leave this leg to the game's own route walk
-    if (!live && !known && Object.entries(exitsSeen[from] || {}).some(([to, s]) => to !== next && dist(s, spot) <= 1.5)) return false;
     log(`หน้าต่างพับอยู่ — เดินเองไปทางออก ${MAP_NAMES[next] || next} (${spot.x}, ${spot.y}) · เส้นทาง ${path.map(m => MAP_NAMES[m] || m).join(' → ')}`);
-    const deadline = Date.now() + 90e3; let lastSend = 0, atExit = 0, lastP = null;
+    const deadline = Date.now() + 90e3; let lastSend = 0, atExit = 0;
     while (Date.now() < deadline && cfg.running && still()) {
       const r = room(), p = myPos();
-      if (r && r.state.mapId && r.state.mapId !== from) {
-        // where we were last seen on the old map and where we came out: to find out why an exit leads elsewhere
-        const np = myPos(), f = q => q ? `(${q.x.toFixed(1)}, ${q.y.toFixed(1)})` : '(?)';
-        log(`ออกจาก ${MAP_NAMES[from] || from} ล่าสุดที่ ${f(lastP)} → เข้า ${MAP_NAMES[r.state.mapId] || r.state.mapId} ที่ ${f(np)}`);
-        // a different map than this exit should lead to: never walk to that spot for this leg again for 10 min, else the
-        // way back brings us here and we walk out the same wrong exit again (18 Oct 18:51-18:57, Sanctum <-> Cloudspire Ruins)
-        // (stamped 50 min ahead: counts as failed for an hour, it is not going to start working by itself)
-        if (r.state.mapId !== next) { exitWalkFailed[key] = Date.now() + 50 * 60e3; log(`ทางออก (${spot.x}, ${spot.y}) พาไป ${MAP_NAMES[r.state.mapId] || r.state.mapId} ไม่ใช่ ${MAP_NAMES[next] || next} — ไม่ใช้ทางออกนี้ 1 ชั่วโมง หาทางอื่นแทน`); }
-        return true; // the caller's loop goes on from the map we are on now
-      }
+      if (r && r.state.mapId !== from) return true; // next map: the caller's loop goes on from there
       if (!r || !p) { await sleep(1000); continue; }
-      lastP = p;
       if (dist(p, spot) <= 1.2) {
         if (!atExit) atExit = Date.now();
         if (Date.now() - atExit > 10e3) {
           exitWalkFailed[key] = Date.now();
-          log(`ถึงทางออก (${spot.x}, ${spot.y}) แล้วแต่แมพไม่เปลี่ยนใน 10 วิ${known ? '' : live ? ' (จุดจากไฟล์เกม)' : ' (จุดนี้มาจาก zones.json ยังไม่เคยเห็นเกมเดินผ่าน)'} — ใช้ปุ่มเดินทางของเกมแทน ไม่ลองทางออกนี้ 10 นาที`);
+          log(`ถึงทางออก (${spot.x}, ${spot.y}) แล้วแต่แมพไม่เปลี่ยนใน 10 วิ${known ? '' : ' (จุดนี้มาจาก zones.json ยังไม่เคยเห็นเกมเดินผ่าน)'} — ใช้ปุ่มเดินทางของเกมแทน ไม่ลองทางออกนี้ 10 นาที`);
           return false;
         }
       } else if (Date.now() - lastSend > 4000) { lastSend = Date.now(); r.send('input', { type: 'moveTo', x: spot.x, y: spot.y }); }
@@ -926,7 +813,7 @@
   const exitTimer = setInterval(() => {
     const r = room(), id = r && r.state && r.state.mapId; if (!id) return;
     if (lastMapId && id !== lastMapId && lastMove && lastMove.map === lastMapId && Date.now() - lastMove.at < 15e3
-      && exitsOf(lastMapId).some(e => e[0] === id)) {
+      && (EXITS[lastMapId] || []).some(e => e[0] === id)) {
       const was = (exitsSeen[lastMapId] || {})[id];
       if (!was || was.x !== lastMove.x || was.y !== lastMove.y) {
         exitsSeen[lastMapId] = { ...(exitsSeen[lastMapId] || {}), [id]: { x: lastMove.x, y: lastMove.y } };
@@ -950,8 +837,7 @@
       if (mapName() !== lastMap) { lastMap = mapName(); lastMapAt = Date.now(); }
       // game asks "วาร์ปไป <town> แล้วเดินต่อ?" when a nearer town has a warp point -> warp, then it walks on by itself
       if (dialogOpen() && /วาร์ป/.test(dialogTitle())) { click($('#bcyes'), 'วาร์ปแล้วเดินต่อ'); lastGo = lastMapAt = Date.now(); await sleep(2000); continue; }
-      // hidden tab: walk exit to exit ourselves (unless that already failed in the last 10 min): the game's own route
-      // walk does not go on in a minimised window
+      // hidden tab: walk exit to exit ourselves (unless that already failed in the last 10 min)
       if (document.hidden && Date.now() - lastMapAt > 8e3) {
         if (await walkExits(name, still)) { lastMap = mapName(); lastMapAt = Date.now(); continue; }
       }
@@ -1089,6 +975,46 @@
       log(now < have ? `ขาย ${potName(id)} ×${have - now} (เหลือ ${now})` : `ขาย ${potName(id)} ×${q} ไม่สำเร็จ (ยังมี ${now})`);
     }
   }
+  // Deposit materials after a sale. The game exposes the exact "ฝากวัตถุดิบทั้งหมด" button
+  // in the bank UI; its own filter excludes locked items and keeps equipment/consumables out.
+  const BANK_NPCS = {
+    Valebrook: { id: 'spirit_broker', x: 32, y: 26 },
+    Ashford: { id: 'spirit_broker_a', x: 26, y: 31 },
+    'Stormwall City': { id: 'spirit_broker_c', x: 23, y: 29 },
+    Sanctum: { id: 'spirit_broker_s', x: 26, y: 23 },
+  };
+  const bankOpen = () => { const w = $('#bankwin'); return !!w && w.style.display === 'block'; };
+  async function depositMaterials() {
+    const town = liveMap(), npc = BANK_NPCS[town];
+    if (!npc) { log(`ไม่มีข้อมูล NPC คลังใน ${town || 'เมืองนี้'} — ข้ามการฝากวัตถุดิบ`); return false; }
+    const r = room();
+    if (!r) { log('ไม่ได้เชื่อมต่อเกม — ข้ามการเปิดคลัง'); return false; }
+    // The bank service button opens a rented remote bank anywhere; no NPC walk is needed.
+    if (!bankOpen()) click($('button[data-svc="bank"]'), 'เปิดหน้าคลัง');
+    for (let i = 0; i < 10 && cfg.running && !bankOpen(); i++) await sleep(500);
+    // Keep a talk fallback for accounts without remote access when already in a town.
+    if (!bankOpen()) {
+      r.send('input', { type: 'talk', npcId: npc.id });
+      for (let i = 0; i < 20 && cfg.running && !bankOpen(); i++) await sleep(500);
+    }
+    if (!bankOpen()) { log(`เปิดคลังกับ NPC ${npc.id} ไม่สำเร็จ`); return false; }
+    const btn = $('#bankmats');
+    if (!visible(btn)) { log('ไม่พบปุ่มฝากวัตถุดิบทั้งหมดในคลัง'); return false; }
+    const batchesToWait = Math.ceil(document.querySelectorAll('#bankbag .slot.act').length / 15) + 4;
+    click(btn, 'ฝากวัตถุดิบทั้งหมด');
+    for (let i = 0; i < 10 && cfg.running && !dialogOpen(); i++) await sleep(200);
+    if (dialogOpen() && /ฝากวัตถุดิบทั้งหมด/.test(dialogTitle())) {
+      click($('#bcyes'), 'ยืนยันฝากวัตถุดิบทั้งหมด');
+      // The game's button sends at most 15 stacks every 700 ms; wait for the current bag size.
+      for (let i = 0; i < batchesToWait && cfg.running; i++) await sleep(700);
+      log('ส่งคำสั่งฝากวัตถุดิบทั้งหมดแล้ว');
+    } else {
+      log('ไม่มีวัตถุดิบให้ฝาก หรือหน้าต่างยืนยันไม่เปิด');
+    }
+    const close = $('#bankwin .close');
+    if (bankOpen() && close) click(close, 'ปิดหน้าคลัง');
+    return true;
+  }
   // one trip: town -> shop -> (sell) -> top up potions
   async function townTrip(why, sell) {
     setPhase(why); log(why); setAuto(false); await sleep(800);
@@ -1101,6 +1027,7 @@
     await sellSparePotions();
     await buyPotions();
     closeShop();
+    if (sell) await depositMaterials();
     return true;
   }
   // World Boss round open: stop farming, warp into the arena, AUTO until the boss is dead / gone / time is up, leave,
@@ -1191,12 +1118,12 @@
     await sleep(1500);
     await backToFarm();
   }
-  const stopWith = (why, msg) => { log(msg); cfg.running = false; cfg.gathering.enabled = false; clearResumeMarkers(); save(); render(); setPhase('หยุด: ' + why); };
+  const stopWith = (why, msg) => { log(msg); cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); save(); render(); setPhase('หยุด: ' + why); };
   let lastGatherCommand = 0;
   async function gatherNodeStep(found) {
     const {id, node} = found, p = myPos(), r = room();
     if (!p || !r) return;
-    const now = Date.now(), key = gatherNodeKey(node);
+    const now = Date.now(), key = `${mapId()}:${node.nodeType}:${(+node.x).toFixed(1)},${(+node.y).toFixed(1)}`;
     let progress = gatherNodeProgress.get(key);
     if (!progress) { progress = { charges: +node.charges, lastChargeAt: now, startedAt: now, lastResultAt: 0, lastMoveAt: 0 }; gatherNodeProgress.set(key, progress); }
     else if (+node.charges < progress.charges) { progress.charges = +node.charges; progress.lastChargeAt = now; }
@@ -1204,11 +1131,6 @@
     if (recentGatherResult && recentGatherResult.at > progress.startedAt && recentGatherResult.at > progress.lastResultAt
       && (recentGatherResult.nodeId === String(id) || (recentGatherResult.nodeId == null && recentGatherResult.nodeType === node.nodeType))) {
       progress.lastChargeAt = recentGatherResult.at; progress.lastResultAt = recentGatherResult.at;
-    }
-    if (now - progress.lastChargeAt >= 120_000) {
-      gatherNodeBlacklist.set(key, now + 30_000); gatherNodeProgress.delete(key);
-      log(`node ${node.nodeType} T${node.tier} ที่ (${node.x.toFixed(1)}, ${node.y.toFixed(1)}) charge ไม่ลด 120 วิ — พัก node นี้ 30 วิ แล้วหา node อื่น`);
-      return;
     }
     const target = { x: +node.x, y: +node.y };
     setAuto(false);
@@ -1270,7 +1192,7 @@
   }
 
   // ---- main loop ----
-  let busy = false, phase = 'stopped', startCheck = false;
+  let busy = false, phase = 'stopped', startCheck = cfg.mode === 'farm';
   async function tick() {
     if (!cfg.running || busy) return;
     busy = true;
@@ -1307,9 +1229,9 @@
         await finishBounty('ค่าหัวจบแล้ว — กลับไปฟาร์มแมพปกติ');
       } else if (mapName() !== tgt().map) {
         // during a bounty the helper moves you between bounty maps itself
-        if (startCheck || curBounty() || tripFailed) { startCheck = false; setAuto(false); await backToFarm(); } // you pressed ▶ elsewhere / our trip failed -> go there
+        if (startCheck || curBounty()) { startCheck = false; setAuto(false); await backToFarm(); } // you pressed ▶ elsewhere -> go there
         // not caused by the helper (its own trips return inside the same tick): you moved yourself -> pause, don't drag you back
-        else if (mapName()) { cfg.running = false; cfg.gathering.enabled = false; clearResumeMarkers(); save(); render(); setPhase('หยุดชั่วคราว: คุณย้ายแมพเอง'); log(`ย้ายไป ${mapName()} เอง — หยุดไว้ก่อน · กด "จำจุดนี้" ที่จุดใหม่ แล้วกด ▶`); }
+        else if (mapName()) { cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); save(); render(); setPhase('หยุดชั่วคราว: คุณย้ายแมพเอง'); log(`ย้ายไป ${mapName()} เอง — หยุดไว้ก่อน · กด "จำจุดนี้" ที่จุดใหม่ แล้วกด ▶`); }
       } else if (bq.active) {
         startCheck = false;
         await bountyStep();
@@ -1362,7 +1284,7 @@
     #bth select { max-width:100%; }
     #bth select option { background:#141c2b; color:#fff; }
     #bth input:focus, #bth select:focus { outline:2px solid rgba(47,116,224,.8); outline-offset:1px; }
-    .bth-section { display:grid; gap:7px; padding:9px; border:1px solid rgba(255,255,255,.1); border-radius:8px; background:linear-gradient(90deg,rgba(90,140,255,.14),rgba(90,140,255,.04)); }
+    .bth-section { display:grid; gap:7px; padding:9px; border:1px solid rgba(255,255,255,.1); border-radius:8px; background:rgba(90,140,255,.14); }
     .bth-section-title { display:flex; align-items:center; gap:7px; color:#fff; font-weight:600; font-size:12px; }
     .bth-section-title small { color:#8fa2bb; font:600 9.5px Kanit,sans-serif; letter-spacing:.8px; }
     .bth-map { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; min-height:32px; }
@@ -1393,7 +1315,7 @@
     .bth-chinfo { padding:6px 8px; border-radius:6px; background:rgba(255,255,255,.06); font-size:11px; }
     #bthqnote { padding:7px 9px; border:1px solid rgba(255,210,122,.25); border-radius:6px; background:rgba(255,210,122,.07); color:#ffd27a!important; }
     #bthqlist { max-height:min(38vh,300px)!important; overflow:auto; scrollbar-width:thin; scrollbar-color:rgba(143,162,187,.4) transparent; }
-    #bthqlist > div, #bthqlist label { padding:6px 8px!important; margin-bottom:3px; border-radius:6px; background:linear-gradient(90deg,rgba(90,140,255,.32),rgba(90,140,255,.08)); }
+    #bthqlist > div, #bthqlist label { padding:6px 8px!important; margin-bottom:3px; border-radius:6px; background:rgba(90,140,255,.32); }
     #bth #bthset { display:grid; place-items:center; width:32px; min-height:32px; height:32px; padding:0; border-color:rgba(229,72,77,.65); background:rgba(229,72,77,.16); }
     #bth #bthset svg { width:20px; height:20px; fill:#e5484d; }
     #bth #bthset:hover { background:rgba(229,72,77,.3); }
@@ -1457,7 +1379,16 @@
     if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy) * 1.25) { suppressTabClick = true; showBthTabSlide(bthTabSlideIndex + (dx < 0 ? 1 : -1)); setTimeout(() => { suppressTabClick = false; }, 0); }
   }, true);
   bthTabViewport.addEventListener('pointercancel', () => { tabPointer = null; });
-  bthTabViewport.addEventListener('wheel', e => { if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 12) { e.preventDefault(); showBthTabSlide(bthTabSlideIndex + (e.deltaX > 0 ? 1 : -1)); } }, { passive:false });
+  let lastTabWheelAt = 0;
+  bthTabViewport.addEventListener('wheel', e => {
+    const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (Math.abs(delta) <= 12) return;
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastTabWheelAt < 500) return;
+    lastTabWheelAt = now;
+    showBthTabSlide(bthTabSlideIndex + (delta > 0 ? 1 : -1));
+  }, { passive:false });
   const bthPages = [...box.querySelectorAll('[data-bth-page]')];
   let bqAll = [], bqPick = new Set(), bqLoaded = false;
   const selectBthTab = name => {
@@ -1675,6 +1606,25 @@
     cfg.farmMap = mapName(); cfg.farmSpot = myPos(); farmGen++; save(); render(); log(cfg.farmSpot ? `จำจุดฟาร์ม ${cfg.farmMap} (${cfg.farmSpot.x.toFixed(1)}, ${cfg.farmSpot.y.toFixed(1)})` : 'จำแมพแล้ว แต่ยังอ่านพิกัดไม่ได้ — ขยับตัวแล้วกดใหม่'); };
   // pick the farm spot on the game's big map: a tap there makes the game send moveTo {x, y} -> that is the new spot
   const bigMapOpen = () => { const m = $('#mmbig'); return !!m && !m.hidden; };
+  const openFarmPickerMap = () => {
+    if (bigMapOpen()) return true;
+    const mm = $('#minimap');
+    if (!mm) { log('เปิดแผนที่ไม่ได้ — ไม่พบมินิแมพในหน้าเกม'); return false; }
+    const rect = mm.getBoundingClientRect();
+    const point = { bubbles: true, cancelable: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, button: 0, buttons: 1 };
+    try {
+      mm.dispatchEvent(new PointerEvent('pointerdown', { ...point, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
+      mm.dispatchEvent(new PointerEvent('pointerup', { ...point, pointerId: 1, pointerType: 'mouse', isPrimary: true, buttons: 0 }));
+    } catch { }
+    // The game has used both PointerEvent and click handlers for the minimap.
+    // Only send the click fallback if the big map did not open from pointer input.
+    if (!bigMapOpen()) {
+      setTimeout(() => {
+        if (pickUntil && !bigMapOpen()) mm.dispatchEvent(new MouseEvent('click', { ...point, buttons: 0 }));
+      }, 80);
+    }
+    return true;
+  };
   let pickUntil = 0;
   const setPick = on => { pickUntil = on ? Date.now() + 60e3 : 0; $('#bthset').classList.toggle('pick', on); };
   // every kind of message sent to the server, logged the first time it shows up (with its content): to find what the
@@ -1697,7 +1647,7 @@
     if (pickUntil) { setPick(false); if (bigMapOpen()) click($('#mmbigx'), 'ปิดแผนที่ใหญ่'); log('ยกเลิกเลือกจุดฟาร์ม'); return; }
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปแมพฟาร์มก่อนแล้วเลือกจุด`); return; }
     setPick(true);
-    if (!bigMapOpen()) { const mm = $('#minimap'); if (mm) mm.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse', button: 0 })); }
+    if (!bigMapOpen() && !openFarmPickerMap()) { setPick(false); return; }
     log('แตะจุดบนแผนที่ใหญ่ที่จะฟาร์ม');
   };
   const toggleFarm = () => {
@@ -1707,6 +1657,7 @@
     cfg.gathering.enabled = false;
     if (switchingFromGathering) { cfg.running = true; startCheck = true; setAuto(false); }
     else { cfg.running = !cfg.running; startCheck = cfg.running; }
+    cfg.mode = cfg.running ? 'farm' : 'stopped';
     clearResumeMarkers();
     if (cfg.running) stoppedLogged = false; save(); render(); log(switchingFromGathering ? 'หยุด Gathering แล้วเริ่มฟาร์ม' : cfg.running ? 'เริ่มฟาร์ม' : 'หยุดฟาร์ม');
   };
@@ -1720,10 +1671,40 @@
   const toggleGather = () => {
     if (cfg.gathering.enabled) { cfg.gathering.enabled = false; if (!bq.active) cfg.running = false; }
     else { cfg.gathering.enabled = true; cfg.running = true; startCheck = false; gatherMapIndex = 0; gatherScannedMap = ''; gatherChannelOrder = []; setAuto(false); stoppedLogged = false; }
+    cfg.mode = cfg.running ? (cfg.gathering.enabled ? 'gathering' : 'farm') : 'stopped';
     clearResumeMarkers(); save(); render(); log(cfg.gathering.enabled ? `หยุดฟาร์มแล้วเริ่ม Gathering ${cfg.gathering.type} Tier ${cfg.gathering.tier}` : 'หยุด Gathering');
   };
   const reachable = b => !b.claimed && b.lo <= myLevel() + (+bq.maxAbove || 0);
   function renderBq() { if (pageContext) PAGE_MODULES.bounty?.render?.(pageContext); }
+  async function simulateTownTrip() {
+    if (busy) { log('มี routine อื่นกำลังทำงาน — ยังเริ่มทดสอบไม่ได้'); return false; }
+    const wasRunning = cfg.running, wasAuto = autoOn(), town = cfg.town || 'Ashford';
+    let completed = false;
+    busy = true;
+    cfg.running = true; // travelTo / townTrip use this as their cancellation signal
+    try {
+      log('เริ่มทดสอบ full routine จริง: เปิดร้าน → ขายตามตัวกรอง → ซื้อยา → เปิดคลัง → ฝากวัตถุดิบ');
+      setAuto(false);
+      if (!BANK_NPCS[town]) throw new Error(`ไม่มีข้อมูล NPC คลังใน ${town}`);
+      if (!TOWN_IDS[mapName()] && !(await warpToTown(town) || await travelTo(town))) throw new Error(`ไป ${town} ไม่สำเร็จ`);
+      if (!await townTrip('ทดสอบ full routine: ขายของ / ซื้อยา / ฝากคลัง', true)) throw new Error('routine ร้านค้า / คลังทำไม่ครบ');
+      if (cfg.farmMap) {
+        if (!await backToFarm(tgt())) throw new Error(`กลับไปฟาร์ม ${tgt().map} ไม่สำเร็จ`);
+      } else log('ยังไม่ได้บันทึกจุดฟาร์ม — จบการทดสอบที่เมือง');
+      completed = true;
+      log('ทดสอบ full routine เสร็จ: ขาย / ซื้อยา / ฝากคลัง' + (cfg.farmMap ? ' / กลับฟาร์ม' : ''));
+      return true;
+    } catch (e) {
+      log('ทดสอบ routine ไม่สำเร็จ: ' + e.message);
+      return false;
+    } finally {
+      cfg.running = wasRunning;
+      if (wasAuto && (completed || mapName() === tgt().map)) setAuto(true);
+      else setAuto(false);
+      busy = false;
+      if (!wasRunning) { save(); render(); setPhase('หยุดอยู่'); }
+    }
+  }
   async function refreshBq() {
     $('#bthqnote').textContent = 'กำลังอ่านค่าหัว…';
     bqAll = await readBounties(); bqPick = new Set(bqAll.filter(reachable).map(b => b.id)); renderBq();
@@ -1740,14 +1721,14 @@
   };
   pageContext = {
     $, cfg, save, log, TOWN_IDS, POTIONS, MAP_NAMES, GATHER_MAPS, GATHER_MAP_LEVEL, GATHER_PVP_MAPS, gatherMaps, mobIcons: MOB_ICONS,
-    room, chOf, randomChannel, pickFarm, toggleFarm, updateGather, updatePreferredMap, toggleGather,
+    room, chOf, randomChannel, pickFarm, onPickFarm: pickFarm, toggleFarm, updateGather, updatePreferredMap, toggleGather,
     bq, getBqAll: () => bqAll, getBqPick: () => bqPick, setBqPick: v => { bqPick = v; },
-    myLevel, reachable, curBounty, saveBq, refreshBq, renderBq, startBounty,
+    myLevel, reachable, curBounty, saveBq, refreshBq, renderBq, startBounty, simulateTownTrip,
   };
   for (const name of ['farm', 'return', 'supply', 'travel', 'bounty', 'gathering']) PAGE_MODULES[name]?.bind?.(pageContext);
   render();
   const timer = setInterval(tick, 1000);
-  setTimeout(() => log(onWorker() ? 'ตัวจับเวลาทำงานเต็มความเร็วแม้พับหน้าต่าง' : 'ตัวจับเวลาแบบปกติ — พับหน้าต่างแล้วจะช้าลง'), 2000);
+  setTimeout(() => log('ระบบ timer ใช้ตามการจัดการของเบราว์เซอร์ · idleWarn จะตอบ stillHere เมื่อ helper ทำงาน'), 2000);
   // Farm tab: World Boss round as the server last told it
   const showWbInfo = () => {
     const el = $('#bthwbinfo'); if (!el) return;
@@ -1769,53 +1750,20 @@
   };
   const chInfoTimer = setInterval(() => { showChInfo(); showWbInfo(); }, 1000);
 
-  // ---- kicked for idling: the game's window "หลุดจากเกม · ไม่ได้เล่นนานเกินไป" (close code 4007) ----
-  // its button "เชื่อมต่อใหม่" reloads the page (the manager loads the helper again once back in the world and that
-  // helper turns ▶ / AUTO on again from the note below) or reconnects in place (this helper turns it on again itself).
-  // Other kicks (playing in another tab, staff) are left alone.
-  const RESUME_KEY = 'bth_resume', ALIVE_KEY = 'bth_alive';
-  let lastAuto = false, kickAt = 0, alive = true;
-  // ▶ again if a farm spot is saved, else AUTO again
-  const resume = why => {
-    if (!alive) return;
-    if (cfg.farmMap) { if (!cfg.running) $('#bthrun').click(); log(why + ' — เปิด helper ต่อ'); }
-    else { setAuto(true); log(why + ' — เปิด AUTO ต่อ (ยังไม่ได้ตั้งจุดฟาร์ม)'); }
-  };
-  const kickTimer = setInterval(() => {
-    if (cfg.running) try { localStorage.setItem(ALIVE_KEY, String(Date.now())); } catch { }
-    const title = [...document.querySelectorAll('.wbveil .cwtitle')].find(e => /ไม่ได้เล่นนานเกินไป/.test(e.textContent));
-    if (!title) {
-      // the game reconnected in place (no page reload, so this helper is still here): turn it on again ourselves
-      if (kickAt && mapName() && Date.now() - kickAt > 8e3) { kickAt = 0; try { localStorage.removeItem(RESUME_KEY); } catch { } setTimeout(() => resume('เชื่อมต่อใหม่แล้ว'), 3000); }
-      else if (!kickAt) lastAuto = autoOn();
-      return;
-    }
-    if (Date.now() - kickAt < 15e3) return; // reload already under way
-    kickAt = Date.now();
-    try { localStorage.setItem(RESUME_KEY, JSON.stringify({ at: kickAt, running: cfg.running, auto: lastAuto })); } catch { }
-    log('หลุดจากเกม (ไม่ได้เล่นนานเกินไป) — เชื่อมต่อใหม่แล้วเปิด helper ต่อ');
-    cfg.running = false; // not saved: ends a trip in progress on the dead room
-    const card = title.closest('.bcard'), btn = card && card.querySelector('.bcact button');
-    if (!click(btn, 'เชื่อมต่อใหม่') && typeof window.__hardReload === 'function') window.__hardReload();
-  }, 2000);
-  // just reloaded after such a kick (note younger than 10 min): always ▶ (default on), or AUTO if no farm spot is saved yet.
-  // Same after any other reload (game update, connection lost, the manager reloading the tab) while ▶ was on a moment ago.
-  (() => {
-    let r = null, at = 0;
-    try { r = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); localStorage.removeItem(RESUME_KEY); at = +localStorage.getItem(ALIVE_KEY) || 0; } catch { }
-    const kicked = !!r && Date.now() - r.at < 10 * 60e3, reloaded = wasRunning && Date.now() - at < 10 * 60e3;
-    if (kicked || reloaded) setTimeout(() => resume(kicked ? 'เชื่อมต่อใหม่แล้ว' : 'หน้าเกมโหลดใหม่'), 3000);
-  })();
-
   window.__bth = {
-    cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; cfg.gathering.enabled = false; clearResumeMarkers(); save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(kickTimer); clearInterval(exitTimer); stopTimers(); alive = false; for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bthPageModules; delete window.__bth; }, // running=false also ends a trip in progress
+    cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); save(); render(); },
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(exitTimer); for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bthPageModules; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
       const b = curBounty(), r = room();
+      const me = r && r.state && r.state.players && r.state.players.get(r.sessionId);
+      const classValue = me && (me.job ?? me.class ?? me.className ?? me.jobName);
+      const imageValue = me && (me.classImage ?? me.jobImage ?? me.portrait ?? me.avatar ?? me.faceImage ?? me.image);
+      const characterImage = typeof imageValue === 'string' && /^(https?:|data:image\/|blob:|\/)/i.test(imageValue) ? imageValue : '';
       return {
-        running: cfg.running, phase, map: mapName(), channel: chOf(r), level: myLevel(), weight: weightPct(), auto: autoOn(), dead: isDead(),
+        running: cfg.running, mode: cfg.mode, gathering: { enabled: cfg.gathering.enabled }, phase, map: mapName(), channel: chOf(r), level: myLevel(), characterName: me && typeof me.name === 'string' ? me.name : '',
+        characterClass: classValue == null ? '' : String(classValue), characterImage, weight: weightPct(), auto: autoOn(), dead: isDead(),
         farmMap: cfg.farmMap, farmSpot: cfg.farmSpot, town: cfg.town,
         potions: potionPlans().map(p => ({ k: p.k, name: potName(p.item), have: p.have, min: p.min, to: p.to })),
         bounty: bq.active ? { done: bq.i, total: bq.list.length, mob: b && b.mob, map: b && b.mapName, prog: b && b.prog, need: b && b.need } : null,
