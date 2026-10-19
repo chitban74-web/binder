@@ -161,6 +161,7 @@ async function loop() {
 // ---------------- git update ----------------
 const git = (...args) => new Promise(resolve => execFile('git', args, { cwd: ROOT, windowsHide: true, timeout: 60000 }, (err, stdout, stderr) =>
   resolve({ ok: !err, out: String(stdout).trim(), err: String(stderr || (err && err.message) || '').trim() })));
+const UPDATE_REPO_URL = 'https://github.com/chitban74-web/binder.git';
 const update = { isRepo: false, branch: '', commit: '', date: '', behind: 0, incoming: [], checkedAt: 0, error: '' };
 async function checkUpdate(fetchFirst = true) {
   const repo = await git('rev-parse', '--is-inside-work-tree');
@@ -170,10 +171,16 @@ async function checkUpdate(fetchFirst = true) {
   const head = await git('log', '-1', '--format=%h|%cd', '--date=format:%Y-%m-%d %H:%M');
   [update.commit, update.date] = head.out.split('|');
   if (fetchFirst) {
-    const f = await git('fetch', '--quiet', 'origin');
-    // GitHub wants a login: this PC needs the read-only token (set_token.bat in the Binder_Town folder)
+    // Always use the public repository URL and ignore saved credentials; no token is needed.
+    const remote = await git('remote', 'set-url', 'origin', UPDATE_REPO_URL);
+    if (!remote.ok) {
+      update.error = 'ตั้งค่า GitHub URL ไม่สำเร็จ: ' + remote.err;
+      update.checkedAt = Date.now();
+      return update;
+    }
+    const f = await git('-c', 'credential.helper=', 'fetch', '--quiet', 'origin');
     const auth = /could not read Username|Invalid username or token|Authentication failed|terminal prompts disabled/i.test(f.err);
-    update.error = f.ok ? '' : auth ? 'GitHub ต้องใช้ token — ดับเบิลคลิก set_token.bat ในโฟลเดอร์ Binder_Town แล้ววาง token' : 'git fetch ไม่สำเร็จ: ' + f.err;
+    update.error = f.ok ? '' : auth ? 'ดาวน์โหลดไม่ได้ — ตรวจว่า repository เปิดเป็นสาธารณะ: ' + UPDATE_REPO_URL : 'git fetch ไม่สำเร็จ: ' + f.err;
   }
   const up = await git('rev-list', '--count', 'HEAD..@{u}');
   update.behind = up.ok ? +up.out || 0 : 0;
@@ -186,7 +193,7 @@ async function pullUpdate() {
   const before = (await git('rev-parse', 'HEAD')).out;
   const st = await git('status', '--porcelain', '--untracked-files=no');
   if (st.out) return { ok: false, msg: 'มีไฟล์ที่แก้ในเครื่องยังไม่ได้ commit — อัปเดตไม่ได้:\n' + st.out };
-  const p = await git('pull', '--ff-only');
+  const p = await git('-c', 'credential.helper=', 'pull', '--ff-only');
   if (!p.ok) return { ok: false, msg: 'git pull ไม่สำเร็จ: ' + p.err };
   const after = (await git('rev-parse', 'HEAD')).out;
   if (before === after) return { ok: true, msg: 'เป็นเวอร์ชันล่าสุดแล้ว' };
