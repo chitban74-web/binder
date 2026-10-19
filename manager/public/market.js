@@ -181,8 +181,9 @@
     </div>`;
   }
   const MAX_ALL_PAGES = 80;   // "every page" stops here (8,000 listings) — narrow the filters for more
-  async function listingsPage(page) {
+  async function listingsPage(page, q) {
     const p = filterParams(); p.set('sort', st.lsort); p.set('p', page);
+    if (q !== undefined) p.set('q', q);
     let err = null;
     for (let i = 0; i < 3; i++) {
       try { const r = await (await fetch('/api/market/listings?' + p)).json(); if (r.ok) return r; err = new Error(r.error || 'อ่านประกาศไม่สำเร็จ'); } catch (e) { err = e; }
@@ -215,6 +216,13 @@
     if (st.sel) loadItem();
     if (st.view === 'list') { renderDetail(); loadListings(!!st.lall); }
   }
+  // the listings sort of the game, for listings merged from several searches
+  function sortListings(rows) {
+    const unit = l => l.price / Math.max(1, l.qty), it = l => listingItem(l.itemId), tsum = l => it(l).opts.reduce((a, o) => a + o.tier, 0);
+    const cmp = { def: (a, b) => (b.at || 0) - (a.at || 0), asc: (a, b) => a.price - b.price, desc: (a, b) => b.price - a.price, unit: (a, b) => unit(a) - unit(b),
+      tier: (a, b) => tsum(b) - tsum(a), lvhi: (a, b) => it(b).lv - it(a).lv, lvlo: (a, b) => it(a).lv - it(b).lv }[st.lsort] || (() => 0);
+    return rows.sort(cmp);
+  }
   async function loadListings(keepAll) {
     const my = ++st.req;
     st.lloading = true; st.lerror = ''; st.lprog = ''; renderListings();
@@ -226,19 +234,34 @@
         if (my !== st.req) return;
         st.listings = r.listings || []; st.ltotal = r.total || 0;
       } else {
-        if (!keepAll || !st.lall) {
-          const first = await listingsPage(0), pages = Math.min(MAX_ALL_PAGES, Math.ceil((first.total || 0) / 100));
-          const all = [...(first.listings || [])];
-          for (let pg = 1; pg < pages; pg++) {
+        // with Inscriptions picked, ask the game for each one by name (its search matches the ✒ line) instead of
+        // reading every page of the category, which stops at MAX_ALL_PAGES
+        const key = st.ins.length ? 'ins:' + [...st.ins].sort().join(',') : 'all';
+        if (!keepAll || !st.lall || st.lall.key !== key) {
+          const all = new Map();
+          let total = 0, cut = false;
+          const queries = st.ins.length ? st.ins.map(id => INS_NAME[id]) : [undefined];
+          for (let qi = 0; qi < queries.length; qi++) {
             if (my !== st.req) return;
-            st.lprog = `ดึงประกาศทุกหน้า… ${pg + 1}/${pages}`; renderListings();
-            await new Promise(z => setTimeout(z, 350));
-            all.push(...((await listingsPage(pg)).listings || []));
+            const first = await listingsPage(0, queries[qi]), pages = Math.min(MAX_ALL_PAGES, Math.ceil((first.total || 0) / 100));
+            for (const l of first.listings || []) all.set(l.id, l);
+            total += first.total || 0; cut = cut || Math.ceil((first.total || 0) / 100) > MAX_ALL_PAGES;
+            for (let pg = 1; pg < pages; pg++) {
+              if (my !== st.req) return;
+              st.lprog = `ดึงประกาศ${queries.length > 1 ? ` Inscription ${qi + 1}/${queries.length}` : ''} ทุกหน้า… ${pg + 1}/${pages}`; renderListings();
+              await new Promise(z => setTimeout(z, 350));
+              for (const l of (await listingsPage(pg, queries[qi])).listings || []) all.set(l.id, l);
+            }
+            if (queries.length > 1) { st.lprog = `ดึงประกาศ Inscription ${qi + 1}/${queries.length}…`; renderListings(); await new Promise(z => setTimeout(z, 350)); }
           }
           if (my !== st.req) return;
-          st.lall = { rows: all, total: first.total || 0, cut: Math.ceil((first.total || 0) / 100) > MAX_ALL_PAGES };
+          let rows = [...all.values()];
+          if (st.ins.length) rows = sortListings(rows);   // several searches merged: put them back in the picked order
+          st.lall = { key, rows, total, cut };
         }
-        const rows = st.lall.rows.filter(l => { const it = listingItem(l.itemId); return (!st.capF || it.cap === st.capF) && wantOk(it) && insOk(it); });
+        // the search box text went to the Inscription searches' place: match it against the item name here
+        const q = st.ins.length && st.q ? st.q.toLowerCase() : '';
+        const rows = st.lall.rows.filter(l => { const it = listingItem(l.itemId); return (!st.capF || it.cap === st.capF) && wantOk(it) && insOk(it) && (!q || it.name.toLowerCase().includes(q)); });
         st.ltotal = rows.length; st.listings = rows.slice(st.lpage * 100, st.lpage * 100 + 100);
       }
       st.lat = Date.now();
