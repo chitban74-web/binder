@@ -8,6 +8,8 @@ Binder Town Manager
 การควบคุม
 - ดับเบิลคลิก Start_Binder.bat เพื่อเปิด Manager
 - ดับเบิลคลิก Stop_Binder.bat เพื่อหยุด Manager และหน้าต่างเกมที่เปิดโดยโปรแกรม
+- เครื่องลูกจะเก็บการแก้ไขไฟล์ที่ติดตามโดย Git ไว้ใน Git stash ก่อนเปิด Manager; เครื่องหลักที่มี .binder-main จะข้ามขั้นตอนนี้
+- ดูรายการสำรองด้วย git stash list และกู้คืนรายการล่าสุดด้วย git stash pop
 
 สิ่งที่รวมมาในชุดนี้
 - Start_Binder.bat และ Stop_Binder.bat สำหรับเปิดและหยุด Manager
