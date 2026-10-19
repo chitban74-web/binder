@@ -310,10 +310,10 @@ async function performPullUpdate() {
   if (!(await isGitInstall())) return pullZipUpdate();
   const before = (await git('rev-parse', 'HEAD')).out;
   const st = await git('status', '--porcelain', '--untracked-files=no');
-  if (st.out && !IS_MAIN) {
-    // Preserve child-machine edits in a stash, then allow the update to continue.
-    const saved = await git('stash', 'push', '-m', 'Binder Town auto-update backup');
-    if (!saved.ok) return { ok: false, msg: 'บันทึกไฟล์ที่แก้ในเครื่องลง Git stash ไม่สำเร็จ — อัปเดตไม่ได้:\n' + saved.err };
+  if (!IS_MAIN) {
+    // Preserve tracked edits and untracked files that could block incoming paths.
+    const saved = await git('stash', 'push', '--include-untracked', '-m', 'Binder Town auto-update backup');
+    if (!saved.ok) return { ok: false, msg: 'บันทึกไฟล์ในเครื่องลง Git stash ไม่สำเร็จ — อัปเดตไม่ได้:\n' + saved.err };
   } else if (st.out) {
     return { ok: false, msg: 'มีไฟล์ที่แก้ในเครื่องยังไม่ได้ commit — อัปเดตไม่ได้:\n' + st.out };
   }

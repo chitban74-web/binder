@@ -93,11 +93,12 @@ git -C "%BT_ROOT%" diff --quiet --ignore-submodules --
 if errorlevel 1 goto SAVE_CHILD_CHANGES
 git -C "%BT_ROOT%" diff --cached --quiet --ignore-submodules --
 if errorlevel 1 goto SAVE_CHILD_CHANGES
+for /f "delims=" %%L in ('git -C "%BT_ROOT%" status --porcelain --untracked-files=normal') do goto SAVE_CHILD_CHANGES
 exit /b 0
 
 :SAVE_CHILD_CHANGES
 echo [INFO] Saving local changes to Git stash before startup...
-git -C "%BT_ROOT%" stash push -m "Binder Town auto-update backup"
+git -C "%BT_ROOT%" stash push --include-untracked -m "Binder Town auto-update backup"
 exit /b %errorlevel%
 
 :STASH_FAILED
