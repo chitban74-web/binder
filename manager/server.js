@@ -304,8 +304,9 @@ const server = http.createServer(async (req, res) => {
       const sort = ['def', 'vol', 'asc', 'desc', 'up', 'down'].includes(qp('sort')) ? qp('sort') : 'def';
       const msg = url.pathname === '/api/market/board' ? { type: 'marketBoard', ...filters, bsort: sort }
         : url.pathname === '/api/market/counts' ? { type: 'marketQuery', ...filters, sort: 'def' }
-        // all listings (the game's "ประกาศทั้งหมด"): 100 per page, page index p
-        : url.pathname === '/api/market/listings' ? { type: 'marketQuery', ...filters, p: num('p', 10000),
+        // all listings (the game's "ประกาศทั้งหมด"): 100 per page, page index p; the game pages by row offset `off`
+        // (it ignores `p` and always answers the first 100)
+        : url.pathname === '/api/market/listings' ? { type: 'marketQuery', ...filters, off: num('p', 10000) * 100,
           sort: ['def', 'asc', 'desc', 'unit', 'tier', 'lvhi', 'lvlo'].includes(qp('sort')) ? qp('sort') : 'def' }
         : { type: 'marketItem', itemId: qp('id').slice(0, 300), range: ['7d', '30d'].includes(qp('range')) ? qp('range') : '7d' };
       const want = msg.type === 'marketQuery' ? 'market' : msg.type;
