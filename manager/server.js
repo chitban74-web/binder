@@ -192,7 +192,13 @@ async function checkUpdate(fetchFirst = true) {
 async function pullUpdate() {
   const before = (await git('rev-parse', 'HEAD')).out;
   const st = await git('status', '--porcelain', '--untracked-files=no');
-  if (st.out) return { ok: false, msg: 'มีไฟล์ที่แก้ในเครื่องยังไม่ได้ commit — อัปเดตไม่ได้:\n' + st.out };
+  if (st.out && !IS_MAIN) {
+    // Preserve child-machine edits in a stash, then allow the update to continue.
+    const saved = await git('stash', 'push', '-m', 'Binder Town auto-update backup');
+    if (!saved.ok) return { ok: false, msg: 'บันทึกไฟล์ที่แก้ในเครื่องลง Git stash ไม่สำเร็จ — อัปเดตไม่ได้:\n' + saved.err };
+  } else if (st.out) {
+    return { ok: false, msg: 'มีไฟล์ที่แก้ในเครื่องยังไม่ได้ commit — อัปเดตไม่ได้:\n' + st.out };
+  }
   const p = await git('-c', 'credential.helper=', 'pull', '--ff-only');
   if (!p.ok) return { ok: false, msg: 'git pull ไม่สำเร็จ: ' + p.err };
   const after = (await git('rev-parse', 'HEAD')).out;
