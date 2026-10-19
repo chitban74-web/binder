@@ -169,7 +169,7 @@ const UPDATE_REPO_API = 'https://api.github.com/repos/chitban74-web/binder';
 const ZIP_VERSION_FILE = path.join(DATA_ROOT, 'profiles', '.binder-zip-version.json');
 const update = { isRepo: false, branch: '', commit: '', date: '', behind: 0, incoming: [], checkedAt: 0, error: '' };
 async function latestZipCommit() {
-  const r = await fetch(`${UPDATE_REPO_API}/commits/main`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Binder-Town-Updater' } });
+  const r = await fetch(`${UPDATE_REPO_API}/commits/main`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Binder-Town-Updater' }, signal: AbortSignal.timeout(15000) });
   if (!r.ok) throw new Error(`GitHub API ตอบกลับ HTTP ${r.status}`);
   const c = await r.json();
   if (!/^[a-f0-9]{40}$/i.test(c.sha || '')) throw new Error('อ่าน commit ล่าสุดจาก GitHub ไม่สำเร็จ');
@@ -204,6 +204,7 @@ function runPowerShell(args, env) {
 function copyZipFiles(source, destination, backupRoot) {
   const preserve = new Set(['.git', '.binder-main', 'bin', 'profiles', 'raw', 'data']);
   let copied = 0, backedUp = 0;
+  const changedFiles = [], createdFiles = [];
   function visit(src, rel = '') {
     const name = path.basename(src);
     const nextRel = rel ? path.join(rel, name) : name;
@@ -224,13 +225,28 @@ function copyZipFiles(source, destination, backupRoot) {
         const backup = path.join(backupRoot, nextRel);
         fs.mkdirSync(path.dirname(backup), { recursive: true });
         fs.copyFileSync(dst, backup);
+        changedFiles.push({ dst, backup });
         backedUp++;
       }
+    } else {
+      createdFiles.push(dst);
     }
     fs.copyFileSync(src, dst);
     copied++;
   }
-  for (const child of fs.readdirSync(source)) visit(path.join(source, child));
+  try {
+    for (const child of fs.readdirSync(source)) visit(path.join(source, child));
+  } catch (e) {
+    const rollbackErrors = [];
+    for (const file of changedFiles.reverse()) {
+      try { fs.copyFileSync(file.backup, file.dst); } catch (rollbackError) { rollbackErrors.push(rollbackError.message); }
+    }
+    for (const file of createdFiles.reverse()) {
+      try { fs.rmSync(file, { force: true }); } catch (rollbackError) { rollbackErrors.push(rollbackError.message); }
+    }
+    if (rollbackErrors.length) throw new Error(`${e.message}; rollback incomplete: ${rollbackErrors.join('; ')}`);
+    throw e;
+  }
   return { copied, backedUp };
 }
 async function pullZipUpdate() {
@@ -241,13 +257,13 @@ async function pullZipUpdate() {
     try { installed = JSON.parse(fs.readFileSync(ZIP_VERSION_FILE, 'utf8')).sha || ''; } catch { }
     if (installed === latest.sha) return { ok: true, msg: 'เป็นเวอร์ชันล่าสุดแล้ว' };
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'binder-town-update-'));
-    const response = await fetch(`https://codeload.github.com/chitban74-web/binder/zip/${latest.sha}`, { headers: { 'User-Agent': 'Binder-Town-Updater' } });
+    const response = await fetch(`https://codeload.github.com/chitban74-web/binder/zip/${latest.sha}`, { headers: { 'User-Agent': 'Binder-Town-Updater' }, signal: AbortSignal.timeout(120000) });
     if (!response.ok) throw new Error(`ดาวน์โหลด ZIP ไม่สำเร็จ (HTTP ${response.status})`);
     const archive = path.join(tempDir, 'source.zip');
     fs.writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
     const extracted = path.join(tempDir, 'extracted');
     fs.mkdirSync(extracted);
-    await runPowerShell(['-NoProfile', '-NonInteractive', '-Command', 'Expand-Archive -LiteralPath $env:BINDER_UPDATE_ARCHIVE -DestinationPath $env:BINDER_UPDATE_EXTRACTED -Force'], {
+    await runPowerShell(['-NoProfile', '-NonInteractive', '-Command', '$ErrorActionPreference="Stop"; Expand-Archive -LiteralPath $env:BINDER_UPDATE_ARCHIVE -DestinationPath $env:BINDER_UPDATE_EXTRACTED -Force; if (!$?) { exit 1 }'], {
       BINDER_UPDATE_ARCHIVE: archive, BINDER_UPDATE_EXTRACTED: extracted,
     });
     const root = fs.readdirSync(extracted).map(n => path.join(extracted, n)).find(p => fs.statSync(p).isDirectory());
@@ -261,7 +277,7 @@ async function pullZipUpdate() {
   } catch (e) {
     return { ok: false, msg: 'อัปเดตจาก GitHub ZIP ไม่สำเร็จ: ' + e.message };
   } finally {
-    if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
+    if (tempDir) { try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { } }
   }
 }
 async function checkUpdate(fetchFirst = true) {
@@ -290,7 +306,7 @@ async function checkUpdate(fetchFirst = true) {
   update.checkedAt = Date.now();
   return update;
 }
-async function pullUpdate() {
+async function performPullUpdate() {
   if (!(await isGitInstall())) return pullZipUpdate();
   const before = (await git('rev-parse', 'HEAD')).out;
   const st = await git('status', '--porcelain', '--untracked-files=no');
@@ -313,6 +329,12 @@ async function pullUpdate() {
   const restart = changed.some(f => f.startsWith('manager/'));
   if (restart) setTimeout(() => { log('ตัวจัดการถูกอัปเดต — รีสตาร์ต'); process.exit(RESTART_CODE); }, 800);
   return { ok: true, msg: `อัปเดตแล้ว ${before.slice(0, 7)} → ${after.slice(0, 7)} (${changed.length} ไฟล์)` + (reloaded ? ` · โหลด helper ใหม่ ${reloaded} แท็บ` : '') + (restart ? ' · ตัวจัดการกำลังรีสตาร์ต' : ''), changed, restart };
+}
+let pullInProgress = null;
+async function pullUpdate() {
+  if (pullInProgress) return pullInProgress;
+  pullInProgress = performPullUpdate();
+  try { return await pullInProgress; } finally { pullInProgress = null; }
 }
 
 // ---------------- http ----------------
