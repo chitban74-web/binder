@@ -1,6 +1,6 @@
 // Binder Town manager — web dashboard on http://localhost:3889
 //  • opens Edge / Chrome / Brave / Vivaldi (own profile + debug port) on the game
-//  • keeps helper/binder_helper.js loaded in every game tab (first load and every page reload)
+//  • loads helper/binder_helper.js and its per-menu modules in every game tab
 //  • shows each tab's helper status, start / stop / reload helper from the web
 //  • updates from git (fetch / pull --ff-only); after a pull the helper is reloaded in every tab,
 //    and if manager/ itself changed the server exits with code 3 so Start_Binder.bat restarts it
@@ -10,6 +10,7 @@ const { GAME_URL, ROOT, BROWSERS, exeOf, targets, openBrowser, Tab } = require('
 
 const PORT = +process.env.BINDER_PORT || 3889;
 const HELPER = path.join(ROOT, 'helper', 'binder_helper.js');
+const HELPER_PAGES = path.join(ROOT, 'helper', 'pages');
 const PUBLIC = path.join(__dirname, 'public');
 const CHECK_MS = 3000, UPDATE_CHECK_MS = 3 * 60e3;
 // main machine (has the git-ignored file .binder-main): pushes, never fetches / pulls by itself.
@@ -32,8 +33,14 @@ const STATE_JS = `(() => ({ helper: !!window.__bth, inWorld: !!(document.getElem
 const RETRY_JS = `(() => { const b = ${RETRY_BTN}; if (b) b.click(); return !!b; })()`;
 
 async function inject(t, keepRunning) {
-  const code = fs.readFileSync(HELPER, 'utf8'); // read every time: updates apply on the next load
-  const r = await t.tab.eval(code);
+  // Menu modules run before the controller so they can register markup, renderers, and page-specific controls.
+  const pageFiles = fs.readdirSync(HELPER_PAGES).filter(f => f.endsWith('.js')).sort();
+  // Run each page module as a separate script so its registration is complete
+  // before the main controller checks for the required menu modules.
+  for (const file of pageFiles) {
+    await t.tab.eval(fs.readFileSync(path.join(HELPER_PAGES, file), 'utf8'));
+  }
+  const r = await t.tab.eval(fs.readFileSync(HELPER, 'utf8'));
   if (keepRunning) await t.tab.eval(`window.__bth && !window.__bth.cfg.running && window.__bth.toggle()`);
   log(`[${t.browser}] ${t.id.slice(0, 6)}: โหลด helper แล้ว (${r})`);
 }

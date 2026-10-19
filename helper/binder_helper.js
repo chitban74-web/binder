@@ -16,11 +16,212 @@
 //  • boss / mini-boss alive on the farm map → AUTO off → walk to it → AUTO on next to it (its target chip on) → dies → back to the farm spot
 //  • kicked for idling ("หลุดจากเกม · ไม่ได้เล่นนานเกินไป") → press เชื่อมต่อใหม่ → after the reload ▶ goes on (AUTO only, if no farm spot is saved yet)
 //    (needs the manager, which loads the helper again after the reload)
+//  • when the server sends idleWarn while automation is running → answer with stillHere
 // It presses the game's own buttons (warp, world map "go", respawn, sell, AUTO). The messages it sends itself go
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
-// socialQuery, vendorBuy, huntQuery, bountyClaim.
+// socialQuery, vendorBuy, huntQuery, bountyClaim, stillHere.
 (() => {
   if (window.__bth) { window.__bth.show(); return 'already running'; }
+  // BEGIN GENERATED PAGE MODULES
+  // bounty.js
+(() => {
+  const pages = window.__bthPageModules || (window.__bthPageModules = Object.create(null));
+  pages.bounty = {
+    markup: () => `<section class="bth-section bth-page" role="tabpanel" data-bth-page="bounty" hidden>
+      <div class="bth-section-title"><small>DAILY</small><span>ค่าหัววันนี้</span></div>
+      <label class="bth-inline" for="bthqabove"><span>เลเวลคุณ <b id="bthqlv">?</b></span><span>เผื่อเลเวล <input id="bthqabove" type="number" min="0" max="30" style="width:48px"></span></label>
+      <div id="bthqlist" style="margin:2px 0;max-height:220px;overflow:auto"></div>
+      <div id="bthqnote" style="color:#8fa2bb;font-size:11px"></div>
+      <div style="display:flex;gap:7px;margin-top:2px"><button id="bthqgo" type="button" style="flex:2"></button><button id="bthqref" type="button" style="flex:1">↻ รีเฟรช</button></div>
+      <div class="bth-note">Auto จะล่ามอนค่าหัวในทั้งแมพ เมื่อครบจะคืนค่าตั้งเดิมและกลับไปจุดฟาร์ม</div>
+    </section>`,
+    render: ({ $, bq, getBqAll, getBqPick, myLevel, reachable, curBounty }) => {
+      const bqAll = getBqAll(), bqPick = getBqPick();
+      $('#bthqlv').textContent = myLevel() || '?'; $('#bthqabove').value = bq.maxAbove;
+      const cur = curBounty();
+      if (bq.active) {
+        $('#bthqlist').innerHTML = bq.list.map((b, i) => `<div style="padding:3px 0;${i === bq.i ? 'color:#ffd27a;font-weight:600' : b.claimed ? 'color:#9fd0ff' : ''}">${i < bq.i || b.claimed ? '✓' : i === bq.i ? '▶' : '·'} ${b.mob} ${b.prog}/${b.need} <small style="color:#8fa2bb">${b.mapName}</small></div>`).join('');
+        $('#bthqnote').textContent = cur ? `กำลังทำ ${cur.mob} ที่ ${cur.mapName}` : '';
+        $('#bthqgo').textContent = '■ หยุดค่าหัว'; return;
+      }
+      const show = bqAll.filter(reachable), hidden = bqAll.filter(b => !reachable(b));
+      $('#bthqlist').innerHTML = show.length ? show.map(b => `<label style="display:block;padding:3px 0"><input type="checkbox" data-bq="${b.id}" ${bqPick.has(b.id) ? 'checked' : ''}> <b>${b.mob}</b> ${b.prog}/${b.need} <small style="color:#8fa2bb">${b.mapName} · Lv ${b.lo}–${b.hi}</small></label>`).join('')
+        : '<div style="color:#8fa2bb">ไม่มีค่าหัวที่ไปได้ (กด ↻ รีเฟรช)</div>';
+      $('#bthqnote').textContent = hidden.length ? `ซ่อน ${hidden.length} ตัว: ${hidden.map(b => b.claimed ? b.mob + ' (รับแล้ว)' : `${b.mob} (Lv ${b.lo}+)`).join(', ')}` : '';
+      $('#bthqgo').textContent = '▶ เริ่มล่าค่าหัว';
+      for (const c of document.querySelectorAll('#bthqlist [data-bq]')) c.onchange = e => { const picks = getBqPick(); e.target.checked ? picks.add(e.target.dataset.bq) : picks.delete(e.target.dataset.bq); };
+    },
+    bind: ({ $, bq, saveBq, reachable, getBqAll, setBqPick, refreshBq, renderBq, startBounty }) => {
+      $('#bthqref').onclick = () => { if (!bq.active) refreshBq(); else renderBq(); };
+      $('#bthqabove').onchange = e => { bq.maxAbove = Math.max(0, +e.target.value || 0); saveBq(); if (!bq.active) { setBqPick(new Set(getBqAll().filter(reachable).map(b => b.id))); renderBq(); } };
+      $('#bthqgo').onclick = startBounty;
+    },
+  };
+})();
+
+  // channel.js
+(() => {
+  const pages = window.__bthPageModules || (window.__bthPageModules = Object.create(null));
+  pages.travel = {
+    markup: () => `<section class="bth-section bth-page" role="tabpanel" data-bth-page="travel" hidden>
+      <div class="bth-section-title"><small>TRAVEL</small><span>การเลือก Channel</span></div>
+      <div id="bthchinfo" class="bth-chinfo"></div>
+      <button id="bthrandomch" type="button" style="width:100%">สุ่ม CH (ข้าม PvP)</button>
+      <label class="bth-switch"><input id="bthlockch" type="checkbox"><span class="bth-switch-ui"></span><span>ล็อก Channel</span></label>
+      <label class="bth-inline" for="bthlockchnum"><span>อยู่เฉพาะ CH</span><span><button id="bthlockchcur" type="button">ใช้ CH ตอนนี้</button><input id="bthlockchnum" type="number" min="1" max="99" style="width:48px"></span></label>
+      <div class="bth-note bth-subnote">เปิดอยู่ → ไม่ตามหัวตี้ ไม่ย้ายหา CH คนน้อย · ย้ายไป CH ที่ล็อกตอนกด ▶ และตอนกลับมาแมพฟาร์มเท่านั้น</div>
+      <label class="bth-switch"><input id="bthlead" type="checkbox"><span class="bth-switch-ui"></span><span>ตาม Channel ของหัวตี้ก่อน</span></label>
+      <div class="bth-note bth-subnote">หัวตี้ออนไลน์และอยู่แมพเดียวกัน → ย้ายไป CH เดียวกับหัวตี้ · ถ้าหัวตี้อยู่ CH PvP จะไม่ตาม</div>
+      <label class="bth-switch"><input id="bthquiet" type="checkbox"><span class="bth-switch-ui"></span><span>ถ้าไม่เจอ ให้เลือก Channel คนน้อยสุด</span></label>
+      <div class="bth-note bth-subnote">นับคนในแมพจากเมนู Channel · ถ้าไปไม่ได้ก็เดินเข้าเมือง</div>
+      <div class="bth-note">ไม่เลือก CH PvP (CH10) · เมนู Channel ของเกมแสดงจำนวนคนในแมพทางขวาของแต่ละแถว</div>
+    </section>`,
+    render: ({ $, cfg }) => {
+      $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthlockch').checked = !!cfg.lockCh; $('#bthlockchnum').value = cfg.lockChNum;
+      $('#bthlead').disabled = $('#bthquiet').disabled = !!cfg.lockCh;
+    },
+    bind: ({ $, cfg, save, log, room, chOf, randomChannel }) => {
+      $('#bthquiet').onchange = e => { if (cfg.lockCh) { e.target.checked = !!cfg.quietCh; return; } cfg.quietCh = e.target.checked; save(); };
+      $('#bthlead').onchange = e => { if (cfg.lockCh) { e.target.checked = !!cfg.followLeader; return; } cfg.followLeader = e.target.checked; save(); };
+      $('#bthlockch').onchange = e => { cfg.lockCh = e.target.checked; save(); $('#bthlead').disabled = $('#bthquiet').disabled = cfg.lockCh; log(cfg.lockCh ? `ล็อก CH${cfg.lockChNum} · ปิดการย้าย CH อัตโนมัติ` : 'ปลดล็อก CH'); };
+      $('#bthlockchnum').onchange = e => { cfg.lockChNum = Math.max(1, Math.min(99, Math.round(+e.target.value) || 1)); e.target.value = cfg.lockChNum; save(); if (cfg.lockCh) log(`ล็อก CH${cfg.lockChNum}`); };
+      $('#bthlockchcur').onclick = () => { const ch = chOf(room()); if (!ch) return; $('#bthlockchnum').value = ch; $('#bthlockchnum').onchange({ target: $('#bthlockchnum') }); };
+      $('#bthrandomch').onclick = () => randomChannel();
+    },
+  };
+})();
+
+  // farm.js
+(() => {
+  const pages = window.__bthPageModules || (window.__bthPageModules = Object.create(null));
+  pages.farm = {
+    markup: () => `<section class="bth-section bth-page active" role="tabpanel" data-bth-page="farm">
+      <div class="bth-section-title"><small>FARM</small><span>จุดฟาร์ม</span></div>
+      <div class="bth-map"><b id="bthmap"></b><button id="bthset" type="button" title="เลือกจุดฟาร์ม: เปิดแผนที่ใหญ่ แล้วแตะจุดที่จะฟาร์ม" aria-label="เลือกจุดฟาร์มบนแผนที่"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mob"/></svg></button></div>
+      <label class="bth-inline" for="bthwait"><span>รอก่อนกลับมาเกิด</span><span><input id="bthwait" type="number" min="0" max="60"> วินาที</span></label>
+      <label class="bth-switch"><input id="bthboss" type="checkbox"><span class="bth-switch-ui"></span><span>เจอ Boss / Mini-boss ในแมพ ไปตีก่อน</span></label>
+      <label class="bth-switch"><input id="bthwb" type="checkbox"><span class="bth-switch-ui"></span><span>เข้า World Boss อัตโนมัติ (ตีจนจบ แล้วกลับมาฟาร์ม)</span></label>
+      <div class="bth-note" id="bthwbinfo"></div>
+      <label class="bth-switch" id="bthmobiconrow"><input id="bthmobicon" type="checkbox"><span class="bth-switch-ui"></span><span>แสดงรูปมอนบนมินิแมพ</span></label>
+      <button id="bthrun" type="button" style="width:100%"></button>
+    </section>`,
+    render: ({ $, cfg, mobIcons }) => {
+      $('#bthmap').textContent = cfg.farmMap ? cfg.farmMap + (cfg.farmSpot ? ` (${cfg.farmSpot.x.toFixed(0)}, ${cfg.farmSpot.y.toFixed(0)})` : '') : '(ยังไม่ตั้ง)';
+      $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthboss').checked = !!cfg.bossHunt; $('#bthwb').checked = cfg.worldBoss !== false; $('#bthmobicon').checked = cfg.mobIcons !== false;
+      $('#bthrun').textContent = cfg.running && !cfg.gathering.enabled ? '■ หยุดฟาร์ม' : '▶ เริ่มฟาร์ม';
+      if (!mobIcons) $('#bthmobiconrow').style.display = 'none';
+    },
+    bind: ({ $, cfg, save, log, toggleFarm, onPickFarm }) => {
+      $('#bthset').onclick = onPickFarm;
+      $('#bthwait').onchange = e => { cfg.deathWaitMs = Math.max(0, +e.target.value || 0) * 1000; save(); };
+      $('#bthboss').onchange = e => { cfg.bossHunt = e.target.checked; save(); };
+      $('#bthwb').onchange = e => { cfg.worldBoss = e.target.checked; save(); };
+      $('#bthmobicon').onchange = e => { cfg.mobIcons = e.target.checked; save(); };
+      $('#bthrun').onclick = toggleFarm;
+    },
+  };
+})();
+
+  // gathering.js
+(() => {
+  const pages = window.__bthPageModules || (window.__bthPageModules = Object.create(null));
+  pages.gathering = {
+    data: {
+      maps: {
+        tree: {1:['southvale_field','valebrook','whispering_woods','riverside','honeyrill'],2:['bracken_sink','verdigris_rise','sunfield_plains'],3:['ashford','gloomroot_forest','pitchwood','peatcut_bog'],4:['stormwall_city','frostpeak_slopes','sledrun_gully','brinecrust_shoals'],5:['howling_steppes','sanctum','kitewind_terraces']},
+        rock: {1:['southvale_field','valebrook','riverside','honeyrill'],2:['old_quarry','ancient_ruins','bracken_sink','verdigris_rise','sunfield_plains'],3:['ashford','ember_hollow','mistmire_swamp','duskgate_pass','pitchwood','yellowlick_flats'],4:['stormwall_city','frostpeak_slopes','frozen_mere','sledrun_gully','brinecrust_shoals'],5:['howling_steppes','cloudspire_ruins','sanctum','shattered_vale','umbral_depths','kitewind_terraces','glasswrack','marrowdeep','rustbell_barracks']},
+        herb: {1:['southvale_field','valebrook','whispering_woods','riverside','honeyrill'],2:['old_quarry','ancient_ruins','bracken_sink','verdigris_rise','sunfield_plains'],3:['ashford','gloomroot_forest','ember_hollow','mistmire_swamp','duskgate_pass','pitchwood','yellowlick_flats','peatcut_bog'],4:['stormwall_city','frostpeak_slopes','frozen_mere','sledrun_gully','brinecrust_shoals'],5:['howling_steppes','cloudspire_ruins','sanctum','shattered_vale','umbral_depths','throne_of_warden','kitewind_terraces','glasswrack','marrowdeep','rustbell_barracks']},
+        fish: {1:['riverside','honeyrill'],2:['old_quarry','ancient_ruins','sunfield_plains'],3:['mistmire_swamp','yellowlick_flats','peatcut_bog'],4:['frozen_mere','brinecrust_shoals'],5:['howling_steppes','kitewind_terraces','glasswrack']},
+      },
+      levels: {southvale_field:1,valebrook:1,whispering_woods:4,riverside:6,honeyrill:3,old_quarry:10,ancient_ruins:14,bracken_sink:9,verdigris_rise:14,sunfield_plains:18,ashford:18,gloomroot_forest:24,ember_hollow:28,mistmire_swamp:34,duskgate_pass:40,pitchwood:24,yellowlick_flats:30,peatcut_bog:36,stormwall_city:45,frostpeak_slopes:45,frozen_mere:52,sledrun_gully:47,brinecrust_shoals:54,howling_steppes:58,cloudspire_ruins:64,sanctum:70,shattered_vale:70,umbral_depths:80,throne_of_warden:90,kitewind_terraces:64,glasswrack:72,marrowdeep:82,rustbell_barracks:92},
+      pvpMaps: ['shattered_vale','umbral_depths','throne_of_warden','glasswrack','marrowdeep','rustbell_barracks'],
+    },
+    markup: () => `<section class="bth-section bth-page" role="tabpanel" data-bth-page="gathering" hidden>
+      <div class="bth-section-title"><small>GATHERING</small><span>ค้นหาแหล่งเก็บเกี่ยว</span></div>
+      <label class="bth-field"><span>ชนิดทรัพยากร</span><select id="bthgtype"><option value="tree">ไม้</option><option value="rock">แร่</option><option value="herb">สมุนไพร</option><option value="fish">ปลา</option></select></label>
+      <label class="bth-field"><span>Tier</span><select id="bthgtier">${[1,2,3,4,5].map(t => `<option value="${t}">Tier ${t}</option>`).join('')}</select></label>
+      <label class="bth-field"><span>แมพแรกที่ค้นหา</span><select id="bthgmap"></select></label>
+      <label class="bth-switch"><input id="bthgchannels" type="checkbox"><span class="bth-switch-ui"></span><span>ค้นหาข้าม Channel อัตโนมัติ</span></label>
+      <label class="bth-switch"><input id="bthgmapsweep" type="checkbox"><span class="bth-switch-ui"></span><span>ไปแมพถัดไปเมื่อค้นหาไม่พบ</span></label>
+      <label class="bth-switch"><input id="bthgpvp" type="checkbox"><span class="bth-switch-ui"></span><span>รวมแมพ PvP ในการค้นหา</span></label>
+      <label class="bth-switch"><input id="bthggold" type="checkbox"><span class="bth-switch-ui"></span><span>ต้องเป็น node ทอง</span></label>
+      <div id="bthgmaps" class="bth-note"></div>
+      <button id="bthgrun" type="button" style="width:100%"></button>
+      <div class="bth-note">ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · แมพจะเรียงจากระดับต่ำไปสูง</div>
+    </section>`,
+    render: ({ $, cfg, GATHER_MAPS, GATHER_MAP_LEVEL, GATHER_PVP_MAPS, MAP_NAMES, gatherMaps }) => {
+      $('#bthgrun').textContent = cfg.running && cfg.gathering.enabled ? '■ หยุด Gathering' : '▶ เริ่ม Gathering';
+      $('#bthgtype').value = cfg.gathering.type; $('#bthgtier').value = cfg.gathering.tier; $('#bthgpvp').checked = !!cfg.gathering.pvp; $('#bthggold').checked = !!cfg.gathering.gold; $('#bthgchannels').checked = !!cfg.gathering.scanChannels; $('#bthgmapsweep').checked = !!cfg.gathering.rotateMaps;
+      const mapChoices = [...new Set((GATHER_MAPS[cfg.gathering.type] || {})[+cfg.gathering.tier] || [])].filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).sort((a,b) => (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999));
+      if (cfg.gathering.preferredMap && !mapChoices.includes(cfg.gathering.preferredMap)) cfg.gathering.preferredMap = '';
+      $('#bthgmap').innerHTML = `<option value="">ระดับแมพต่ำสุดก่อน (อัตโนมัติ)</option>${mapChoices.map(id => `<option value="${id}">${MAP_NAMES[id] || id}</option>`).join('')}`;
+      $('#bthgmap').value = cfg.gathering.preferredMap;
+      $('#bthgmaps').textContent = gatherMaps().filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).sort((a,b) => (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999)).map(id => MAP_NAMES[id] || id).join(' → ') || 'ไม่มีแมพตามตัวเลือก';
+    },
+    bind: ({ $, updateGather, updatePreferredMap, toggleGather }) => {
+      for (const id of ['bthgtype','bthgtier','bthgpvp','bthggold','bthgchannels','bthgmapsweep']) $('#' + id).onchange = updateGather;
+      $('#bthgmap').onchange = updatePreferredMap;
+      $('#bthgrun').onclick = toggleGather;
+    },
+  };
+})();
+
+  // return.js
+(() => {
+  const pages = window.__bthPageModules || (window.__bthPageModules = Object.create(null));
+  pages.return = {
+    markup: ({ TOWN_IDS }) => `<section class="bth-section bth-page" role="tabpanel" data-bth-page="return" hidden>
+      <div class="bth-section-title"><small>RETURN</small><span>กลับเมืองและจัดกระเป๋า</span></div>
+      <label class="bth-field" for="bthtown"><span>เมืองที่จะกลับไป</span><select id="bthtown">${Object.keys(TOWN_IDS).map(t => `<option value="${t}">${t}</option>`).join('')}</select></label>
+      <label class="bth-inline" for="bthpct"><span>ขายของเมื่อน้ำหนักถึง</span><span><input id="bthpct" type="number" min="10" max="100"> %</span></label>
+      <label class="bth-switch"><input id="bthsalv" type="checkbox"><span class="bth-switch-ui"></span><span>แยกชิ้นอุปกรณ์ Normal / Magic ก่อนขาย</span></label>
+      <label class="bth-inline" for="bthsalvlv"><span>เฉพาะเลเวลไอเทมต่ำกว่า</span><span>Lv <input id="bthsalvlv" type="number" min="2" max="99" style="width:48px"></span></label>
+      <div class="bth-note">ไม่แยกชิ้น Rare / Epic / Unique / ของตีบวก / ของล็อก</div>
+    </section>`,
+    render: ({ $, cfg, TOWN_IDS }) => {
+      $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct;
+      $('#bthsalv').checked = !!cfg.salvOn; $('#bthsalvlv').value = cfg.salvBelow;
+    },
+    bind: ({ $, cfg, save, log }) => {
+      $('#bthtown').onchange = e => { cfg.town = e.target.value; save(); log('เมืองขาย: ' + cfg.town); };
+      $('#bthpct').onchange = e => { cfg.sellPct = Math.max(10, Math.min(100, +e.target.value || 95)); save(); };
+      $('#bthsalv').onchange = e => { cfg.salvOn = e.target.checked; save(); log(cfg.salvOn ? `เปิดแยกชิ้น Normal / Magic เลเวลต่ำกว่า ${cfg.salvBelow}` : 'ปิดแยกชิ้น'); };
+      $('#bthsalvlv').onchange = e => { cfg.salvBelow = Math.max(2, Math.min(99, Math.round(+e.target.value) || 30)); e.target.value = cfg.salvBelow; save(); };
+    },
+  };
+})();
+
+  // supply.js
+(() => {
+  const pages = window.__bthPageModules || (window.__bthPageModules = Object.create(null));
+  pages.supply = {
+    markup: ({ POTIONS }) => `<section class="bth-section bth-page" role="tabpanel" data-bth-page="supply" hidden>
+      <div class="bth-section-title"><small>SUPPLY</small><span>เติมยาอัตโนมัติ</span></div>
+      <div class="bth-potions">${['hp', 'mp'].map(k => `<div class="bth-potion"><div class="bth-potion-title">${k === 'hp' ? '♥ ยา HP' : '✦ ยา MP'}</div><label class="bth-switch"><input id="bth_${k}_enabled" type="checkbox"><span class="bth-switch-ui"></span><span>เปิดเติมอัตโนมัติ</span></label><select id="bth_${k}_item">${Object.entries(POTIONS[k]).map(([id, n]) => `<option value="${id}">${n}</option>`).join('')}</select><div class="bth-potion-grid"><label>ซื้อเมื่อเหลือต่ำกว่า<input id="bth_${k}_min" type="number" min="1" max="9999"></label><label>เติมถึง<input id="bth_${k}_to" type="number" min="1" max="9999"></label></div></div>`).join('')}</div>
+      <div class="bth-note">เปิด/ปิดการเติมแยกสำหรับ HP และ MP · ยาต้องอยู่ในช่อง Q/E</div>
+    </section>`,
+    render: ({ $, cfg }) => {
+      for (const k of ['hp', 'mp']) { const b = (cfg.buy || {})[k] || {}; $(`#bth_${k}_enabled`).checked = b.enabled !== false; $(`#bth_${k}_item`).value = b.item; $(`#bth_${k}_min`).value = b.min || 1; $(`#bth_${k}_to`).value = b.to || 1; }
+    },
+    bind: ({ $, cfg, save, log }) => {
+      for (const k of ['hp', 'mp']) {
+        const upd = () => {
+          const min = Math.max(1, +$(`#bth_${k}_min`).value || 1), to = Math.max(min, +$(`#bth_${k}_to`).value || min);
+          cfg.buy = { ...(cfg.buy || {}), [k]: { ...((cfg.buy || {})[k] || {}), item: $(`#bth_${k}_item`).value, min, to } }; save();
+          $(`#bth_${k}_min`).value = min; $(`#bth_${k}_to`).value = to;
+        };
+        for (const f of ['item', 'min', 'to']) $(`#bth_${k}_${f}`).onchange = upd;
+        $(`#bth_${k}_enabled`).onchange = e => { cfg.buy[k].enabled = e.target.checked; save(); log(`${k === 'hp' ? 'ยา HP' : 'ยา MP'}${e.target.checked ? 'เปิด' : 'ปิด'}เติมอัตโนมัติ`); };
+      }
+    },
+  };
+})();
+  // END GENERATED PAGE MODULES
+  const requiredPages = ['farm', 'return', 'supply', 'travel', 'bounty', 'gathering'];
+  if (requiredPages.some(name => !window.__bthPageModules || !window.__bthPageModules[name])) {
+    console.error('[Binder Helper] menu modules missing; load helper/pages/*.js through the manager');
+    return 'helper menu modules missing';
+  }
   // a minimised / hidden tab runs page timers once a minute, so every step of a trip took minutes; a worker's timers
   // keep their pace, so the helper's own timers tick from one. Native timers until the worker has answered once
   // (a blocked worker then just leaves the helper on native timers).
@@ -58,21 +259,31 @@
     return { setTimeout: add(false), setInterval: add(true), clearTimeout: clear, clearInterval: clear, stopTimers: () => { for (const id of [...recs.keys()]) clear(id); if (w) w.terminate(); }, onWorker: () => ready };
   })();
   const KEY = 'bth_cfg';
+  const clearResumeMarkers = () => { try { localStorage.removeItem('bth_resume'); localStorage.removeItem('bth_alive'); } catch { } };
   const DEF = {
     farmMap: '', farmSpot: null, town: '', sellPct: 95, sellAfterDeathPct: 40, deathWaitMs: 3000,
     quietCh: true, followLeader: true, lockCh: false, lockChNum: 1, bossHunt: true, worldBoss: true, mobIcons: true,
     // town trip with selling: salvage Normal / Magic gear whose item level is below salvBelow first (off by default)
     salvOn: false, salvBelow: 30,
     // potions: below `min` (0 = off) -> trip to town; in town always top up to `to`
-    buy: { hp: { item: 'hi_potion', min: 50, to: 200 }, mp: { item: 'mana_potion', min: 30, to: 150 } },
+    buy: { hp: { enabled: true, item: 'hi_potion', min: 50, to: 200 }, mp: { enabled: true, item: 'mana_potion', min: 30, to: 150 } },
     panel: { x: 8, y: 120, min: false }, running: false,
+    gathering: { enabled: false, type: 'tree', tier: 5, pvp: false, gold: false, preferredMap: '', scanChannels: false, rotateMaps: false },
   };
   const load = () => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { ...DEF }; } };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch { } };
   const cfg = load();
+  const storedBuy = (() => { try { return (JSON.parse(localStorage.getItem(KEY) || '{}').buy) || {}; } catch { return {}; } })();
+  cfg.buy = Object.fromEntries(['hp', 'mp'].map(k => {
+    const saved = storedBuy[k] || {}, defaults = DEF.buy[k];
+    const enabled = saved.enabled === undefined ? (saved.min === undefined && saved.to === undefined ? true : (+saved.min > 0 || +saved.to > 0)) : !!saved.enabled;
+    return [k, { ...defaults, ...((cfg.buy || {})[k] || {}), enabled }];
+  }));
+  cfg.gathering = { enabled: false, type: 'tree', tier: 5, pvp: false, gold: false, preferredMap: '', scanChannels: false, rotateMaps: false, ...(cfg.gathering || {}) };
+  if (cfg.gathering.sweep) { cfg.gathering.scanChannels = true; cfg.gathering.rotateMaps = true; delete cfg.gathering.sweep; }
   // the saved flag is still true when the page went away while running (reload, game update, kick); ■ saves false
   const wasRunning = cfg.running;
-  cfg.running = false; // start stopped; resumed below only when the last page was running a moment ago
+  cfg.running = false; cfg.gathering.enabled = false; // start stopped; resumed below only when the last page was running a moment ago
   // +1 whenever you set a new farm map / spot: a trip still heading for the old one sees it and gives up
   let farmGen = 0;
 
@@ -107,7 +318,7 @@
     }
     return null; // not on the belt
   };
-  const potionPlans = () => ['hp', 'mp'].map(k => ({ k, ...((cfg.buy || {})[k] || {}) })).filter(p => p.item && (p.min > 0 || p.to > 0)).map(p => ({ ...p, have: beltCount(p.item) }));
+  const potionPlans = () => ['hp', 'mp'].map(k => ({ k, ...((cfg.buy || {})[k] || {}) })).filter(p => p.enabled !== false && p.item).map(p => ({ ...p, have: beltCount(p.item) }));
   const lowPotions = () => potionPlans().filter(p => p.min > 0 && p.have !== null && p.have < p.min);
   const respawnTown = () => { const m = (($('#drespawn') || {}).textContent || '').match(/เกิดใหม่ที่\s*(.+?)(\s*\(\d+\))?$/); return m ? m[1].trim() : ''; };
 
@@ -132,8 +343,15 @@
   // the bag from the server's "inv" messages: { items: [{ id, qty }] } is the whole bag, with d: true only the changed
   // stacks (items) and the removed ones (gone) — merged the same way as the game does. null until a whole bag was seen
   let invItems = null;
+  let recentGatherResult = null;
+  let lastStillHereAt = 0;
   window.__bthOnServer = m => {
     for (const e of Array.isArray(m) ? m : [m]) {
+      if (e && e.type === 'gatherResult') recentGatherResult = { at: Date.now(), nodeId: e.nodeId == null ? null : String(e.nodeId), nodeType: e.nodeType };
+      if (e && e.type === 'idleWarn' && (cfg.running || autoOn()) && Date.now() - lastStillHereAt > 4000) {
+        const r = room();
+        if (r) { lastStillHereAt = Date.now(); r.send('input', { type: 'stillHere' }); log(`เกมเตือน AFK${e.leftMs ? ` · เหลือ ${Math.ceil(e.leftMs / 1000)} วิ` : ''} — ส่ง stillHere`); }
+      }
       if (e && e.type === 'worldBoss' && e.view) {
         wb.view = e.view; wb.at = Date.now();
         if (e.mine !== undefined) { wb.mine = Number(e.mine) || 0; wb.need = Number(e.need) || 0; }
@@ -237,6 +455,36 @@
   // ---- channel: move to the least crowded safe channel of this map (same rules as the game's channel menu) ----
   const PVP_CH = 10, BASE_CH = 10, MAP_FULL = 40, SERVER_FULL = 300;
   const chOf = r => +(((r && r.name) || '').match(/_ch(\d+)$/) || [])[1] || 0;
+  const GATHER_PAGE_DATA = (window.__bthPageModules || {}).gathering?.data || {};
+  const GATHER_MAPS = GATHER_PAGE_DATA.maps || {};
+  const GATHER_MAP_LEVEL = GATHER_PAGE_DATA.levels || {};
+  const GATHER_PVP_MAPS = new Set(GATHER_PAGE_DATA.pvpMaps || []);
+  let gatherMapIndex = 0, gatherChannelOrder = [], gatherChannelIndex = 0, gatherScannedMap = '';
+  function discoverGameMaps() {
+    for (const el of document.querySelectorAll('.atlasspot')) {
+      const d = el.dataset || {}, id = d.mapId || d.mapid || d.map || d.zone || d.zoneId;
+      const label = el.getAttribute('aria-label') || el.textContent || '', name = label.split(/\s+(?:Lv\.?|Level)\s*/i)[0].trim();
+      if (id && name) {
+        MAP_NAMES[id] = name;
+        const lv = +(d.levelMin || d.minLevel || ((label.match(/(?:Lv\.?|Level)\s*(\d+)/i) || [])[1])); if (lv) GATHER_MAP_LEVEL[id] = lv;
+        if (d.pvp === 'true' || d.pvp === '1' || d.danger === 'danger') GATHER_PVP_MAPS.add(id);
+      }
+    }
+  }
+  const gatherMaps = () => {
+    discoverGameMaps();
+    const base = ((GATHER_MAPS[cfg.gathering.type] || {})[+cfg.gathering.tier] || []).slice();
+    if (cfg.gathering.preferredMap && !base.includes(cfg.gathering.preferredMap)) base.push(cfg.gathering.preferredMap);
+    return base.sort((a,b) => (a === cfg.gathering.preferredMap ? -1 : b === cfg.gathering.preferredMap ? 1 : (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999)));
+  };
+  const liveGatherNodes = () => { const r = room(), nodes = r && r.state && r.state.nodes; if (!nodes) return []; if (typeof nodes.entries === 'function') return [...nodes.entries()].map(([id,node]) => ({ id, node })); if (Array.isArray(nodes)) return nodes.map((node,id) => ({ id: String(id), node })); return Object.entries(nodes).map(([id,node]) => ({ id, node })); };
+  const gatherNodeKey = n => `${mapId()}:${n.nodeType}:${(+n.x).toFixed(1)},${(+n.y).toFixed(1)}`;
+  const gatherNodeProgress = new Map(), gatherNodeBlacklist = new Map();
+  const suitableGatherNode = () => {
+    const now = Date.now();
+    for (const [key, until] of gatherNodeBlacklist) if (until <= now) gatherNodeBlacklist.delete(key);
+    return liveGatherNodes().find(({node:n}) => n && n.nodeType === cfg.gathering.type && +n.tier === +cfg.gathering.tier && n.available === true && +n.charges > 0 && (!cfg.gathering.gold || n.golden) && !gatherNodeBlacklist.has(gatherNodeKey(n)));
+  };
   // send one game message and wait for the server reply that matches (server events can come batched in an array)
   function request(msg, match, timeout = 3000) {
     return new Promise(resolve => {
@@ -281,6 +529,15 @@
     }
     log('ย้าย CH ไม่สำเร็จ — อยู่ CH เดิม');
     return false;
+  }
+  async function randomChannel() {
+    const r = room(), cur = chOf(r);
+    if (!r || !cur) return log('ยังอ่าน CH ปัจจุบันไม่ได้');
+    const candidates = Array.from({length:40}, (_,i) => i + 1).filter(ch => ch !== cur && ch !== PVP_CH);
+    if (!candidates.length) return;
+    const ch = candidates[Math.floor(Math.random() * candidates.length)];
+    log(`สุ่มย้ายไป CH${ch}`);
+    await switchTo(r, cur, ch, null, 'สุ่ม CH');
   }
   // the channel to switch to: { ch, why, lock }, or null to stay (quiet = no log when staying)
   async function pickChannel(quiet) {
@@ -934,7 +1191,83 @@
     await sleep(1500);
     await backToFarm();
   }
-  const stopWith = (why, msg) => { log(msg); cfg.running = false; save(); render(); setPhase('หยุด: ' + why); };
+  const stopWith = (why, msg) => { log(msg); cfg.running = false; cfg.gathering.enabled = false; clearResumeMarkers(); save(); render(); setPhase('หยุด: ' + why); };
+  let lastGatherCommand = 0;
+  async function gatherNodeStep(found) {
+    const {id, node} = found, p = myPos(), r = room();
+    if (!p || !r) return;
+    const now = Date.now(), key = gatherNodeKey(node);
+    let progress = gatherNodeProgress.get(key);
+    if (!progress) { progress = { charges: +node.charges, lastChargeAt: now, startedAt: now, lastResultAt: 0, lastMoveAt: 0 }; gatherNodeProgress.set(key, progress); }
+    else if (+node.charges < progress.charges) { progress.charges = +node.charges; progress.lastChargeAt = now; }
+    else progress.charges = +node.charges;
+    if (recentGatherResult && recentGatherResult.at > progress.startedAt && recentGatherResult.at > progress.lastResultAt
+      && (recentGatherResult.nodeId === String(id) || (recentGatherResult.nodeId == null && recentGatherResult.nodeType === node.nodeType))) {
+      progress.lastChargeAt = recentGatherResult.at; progress.lastResultAt = recentGatherResult.at;
+    }
+    if (now - progress.lastChargeAt >= 120_000) {
+      gatherNodeBlacklist.set(key, now + 30_000); gatherNodeProgress.delete(key);
+      log(`node ${node.nodeType} T${node.tier} ที่ (${node.x.toFixed(1)}, ${node.y.toFixed(1)}) charge ไม่ลด 120 วิ — พัก node นี้ 30 วิ แล้วหา node อื่น`);
+      return;
+    }
+    const target = { x: +node.x, y: +node.y };
+    setAuto(false);
+    if (dist(p, target) > 1.5) {
+      setPhase(`Gathering · เดินไป ${node.golden ? 'node ทอง' : cfg.gathering.type} T${node.tier}`);
+      if (now - progress.lastMoveAt >= 5000) { progress.lastMoveAt = now; r.send('input', { type: 'moveTo', x: target.x, y: target.y }); }
+      return;
+    }
+    const me = r.state.players && r.state.players.get(r.sessionId);
+    if (me && (me.st === 2 || me.st === 3)) { setPhase(`Gathering · กำลังเก็บ ${node.nodeType} T${node.tier} (${node.charges} charge)`); return; }
+    if (Date.now() - lastGatherCommand < 1800) return;
+    lastGatherCommand = Date.now();
+    setPhase(`Gathering · เก็บ ${node.golden ? 'node ทอง ' : ''}${node.nodeType} T${node.tier} (${node.charges} charge)`);
+    r.send('input', cfg.gathering.type === 'fish' ? { type: 'fish' } : { type: 'gather', nodeId: id });
+  }
+
+  async function gatheringStep() {
+    const allMaps = gatherMaps().filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id));
+    const maps = cfg.gathering.rotateMaps ? allMaps : allMaps.slice(0, 1);
+    if (!maps.length) return stopWith('ไม่มีแมพตามเงื่อนไข', 'ไม่พบแมพที่มีชนิด / tier นี้ตามตัวกรอง PvP');
+    if (gatherMapIndex >= maps.length) gatherMapIndex = 0;
+    const target = maps[gatherMapIndex], targetName = MAP_NAMES[target] || target;
+    if (mapId() !== target) {
+      setAuto(false); setPhase(`Gathering · ไป ${targetName}`);
+      if (!await travelTo(targetName)) { log(`ไป ${targetName} ไม่สำเร็จ — ข้ามไปแมพถัดไป`); gatherMapIndex++; gatherScannedMap = ''; return; }
+      gatherScannedMap = ''; gatherChannelOrder = []; gatherChannelIndex = 0;
+    }
+    const currentNode = suitableGatherNode();
+    if (currentNode) { await gatherNodeStep(currentNode); return; }
+    if (!cfg.gathering.scanChannels) {
+      if (cfg.gathering.rotateMaps) { log(`ไม่พบ node ใน ${targetName} CH${chOf(room())} — ไปแมพถัดไป`); setAuto(false); gatherMapIndex++; gatherScannedMap = ''; return; }
+      setPhase(`Gathering · รอ node ที่ตรงเงื่อนไข · ${targetName} CH${chOf(room())}`); return;
+    }
+    if (gatherScannedMap !== target) {
+      const cur = chOf(room()) || 1;
+      // Treat the arrival channel as already visited; traverse each other channel once in clockwise order.
+      gatherChannelOrder = (cur >= 1 && cur <= 40
+        ? Array.from({length:39}, (_,i) => ((cur + i) % 40) + 1)
+        : Array.from({length:40}, (_,i) => i + 1)).filter(ch => cfg.gathering.pvp || ch !== PVP_CH);
+      gatherChannelIndex = 0; gatherScannedMap = target;
+    }
+    while (gatherChannelIndex < gatherChannelOrder.length && cfg.running) {
+      const ch = gatherChannelOrder[gatherChannelIndex++], r = room();
+      if (!r || chOf(r) === ch) continue;
+      setPhase(`Gathering · ${targetName} CH${ch} (${gatherChannelIndex}/${gatherChannelOrder.length})`);
+      if (await switchTo(r, chOf(r), ch, null, 'ค้นหา node')) {
+        await sleep(1200);
+        const found = suitableGatherNode();
+        if (found) { await gatherNodeStep(found); return; }
+      }
+    }
+    if (!cfg.running) return;
+    if (gatherChannelIndex >= gatherChannelOrder.length) {
+      if (cfg.gathering.rotateMaps) {
+        log(`ตรวจครบ ${gatherChannelOrder.length} CH ใน ${targetName} แล้ว — ไปแมพถัดไป`);
+        setAuto(false); gatherMapIndex++; gatherScannedMap = ''; gatherChannelOrder = []; gatherChannelIndex = 0;
+      } else setPhase(`Gathering · ตรวจ CH ครบแล้ว รอ node · ${targetName} CH${chOf(room())}`);
+    }
+  }
 
   // ---- main loop ----
   let busy = false, phase = 'stopped', startCheck = false;
@@ -967,6 +1300,8 @@
         // still below minimum (not enough Gold, item not sold here) -> stop instead of warping again and again
         if (lowPotions().length) return stopWith('ซื้อยาไม่ได้', `ซื้อยาแล้วยังต่ำกว่าขั้นต่ำ (${lowPotions().map(p => potName(p.item) + ' ' + p.have).join(', ')}) — Gold ไม่พอ? หยุด helper`);
         await backToFarm();
+      } else if (cfg.gathering.enabled && !bq.active) {
+        await gatheringStep();
       } else if (bq.active && !curBounty()) {
         // bounty list done or stopped: put AUTO back while still on the bounty map, then go home
         await finishBounty('ค่าหัวจบแล้ว — กลับไปฟาร์มแมพปกติ');
@@ -974,7 +1309,7 @@
         // during a bounty the helper moves you between bounty maps itself
         if (startCheck || curBounty() || tripFailed) { startCheck = false; setAuto(false); await backToFarm(); } // you pressed ▶ elsewhere / our trip failed -> go there
         // not caused by the helper (its own trips return inside the same tick): you moved yourself -> pause, don't drag you back
-        else if (mapName()) { cfg.running = false; save(); render(); setPhase('หยุดชั่วคราว: คุณย้ายแมพเอง'); log(`ย้ายไป ${mapName()} เอง — หยุดไว้ก่อน · กด "จำจุดนี้" ที่จุดใหม่ แล้วกด ▶`); }
+        else if (mapName()) { cfg.running = false; cfg.gathering.enabled = false; clearResumeMarkers(); save(); render(); setPhase('หยุดชั่วคราว: คุณย้ายแมพเอง'); log(`ย้ายไป ${mapName()} เอง — หยุดไว้ก่อน · กด "จำจุดนี้" ที่จุดใหม่ แล้วกด ▶`); }
       } else if (bq.active) {
         startCheck = false;
         await bountyStep();
@@ -1008,8 +1343,11 @@
     #bthmini { box-sizing:border-box; display:flex; flex:none; align-items:center; justify-content:flex-end; max-width:150px; min-width:0; margin-left:auto; overflow:hidden; color:#9fd0ff!important; font-size:11.5px; font-weight:600; line-height:1.6; text-overflow:ellipsis; white-space:nowrap; }
     #bthbody { display:grid; gap:8px; max-height:calc(82vh - 38px); overflow:auto; padding:8px; scrollbar-width:thin; scrollbar-color:rgba(143,162,187,.4) transparent; }
     #bth #bthbody { display:grid; gap:0; max-height:calc(82vh - 38px); overflow:auto; padding:0; }
-    #bth-tabs { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; padding:8px 8px 0; }
-    #bth .bth-tab { min-height:26px; padding:3px 2px; border:1px solid rgba(255,255,255,.14); border-radius:6px; background:rgba(255,255,255,.06); color:#b9c8da; font-size:11px; font-weight:600; }
+    #bth-tabs { display:block; padding:8px 8px 0; }
+    #bth #bth-tab-viewport { min-width:0; overflow:hidden; touch-action:pan-y; cursor:grab; }
+    #bth #bth-tab-track { display:flex; width:100%; will-change:transform; transition:transform 460ms cubic-bezier(.22,.61,.36,1)!important; }
+    #bth .bth-tab-slide { display:grid; flex:0 0 100%; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+    #bth .bth-tab { min-width:0; min-height:38px; padding:4px 3px; border:1px solid rgba(255,255,255,.14); border-radius:6px; background:rgba(255,255,255,.06); color:#b9c8da; font-size:10.5px; font-weight:600; line-height:1.15; overflow-wrap:anywhere; }
     #bth .bth-tab:hover { background:rgba(255,255,255,.12); color:#fff; }
     #bth .bth-tab[aria-selected="true"] { border-color:#2f74e0; background:#2f74e0; color:#fff; }
     #bth-pages { padding:8px; }
@@ -1018,8 +1356,8 @@
     #bth button { box-sizing:border-box; min-height:28px; border:1px solid rgba(255,255,255,.2); border-radius:6px; padding:4px 10px; background:rgba(42,53,80,.8); color:#fff; font:600 11.5px Kanit,"Noto Sans Thai",system-ui,sans-serif; cursor:pointer; transition:background .15s,border-color .15s,transform .12s; }
     #bth button:hover { background:rgba(62,78,115,.9); border-color:rgba(159,208,255,.5); }
     #bth button:active { transform:translateY(1px); }
-    #bth #bthrun, #bth #bthqgo { min-height:34px; background:#2f74e0; border-color:#2f74e0; color:#fff; font-size:12.5px; }
-    #bth #bthrun:hover, #bth #bthqgo:hover { background:#3f84f0; border-color:#3f84f0; }
+    #bth #bthrun, #bth #bthgrun, #bth #bthqgo { min-height:34px; background:#2f74e0; border-color:#2f74e0; color:#fff; font-size:12.5px; }
+    #bth #bthrun:hover, #bth #bthgrun:hover, #bth #bthqgo:hover { background:#3f84f0; border-color:#3f84f0; }
     #bth select, #bth input:not([type=checkbox]) { box-sizing:border-box; min-height:28px; border:1px solid rgba(255,255,255,.18); border-radius:6px; padding:3px 7px; background:rgba(5,10,18,.7); color:#fff; font:500 11.5px Kanit,"Noto Sans Thai",system-ui,sans-serif; }
     #bth select { max-width:100%; }
     #bth select option { background:#141c2b; color:#fff; }
@@ -1069,6 +1407,8 @@
     @media(max-width:420px) { #bth { width:min(300px,calc(100vw - 16px))!important; } .bth-potions { grid-template-columns:1fr; } }
   `;
   document.head.appendChild(uiStyle);
+  const PAGE_MODULES = window.__bthPageModules || {};
+  const pageMarkup = (name, ctx = {}) => PAGE_MODULES[name] && PAGE_MODULES[name].markup ? PAGE_MODULES[name].markup(ctx) : '';
   const box = document.createElement('div');
   box.id = 'bth';
   box.style.cssText = 'position:fixed;z-index:99999;background:rgba(20,24,34,.92);color:#e8ecf4;font:12px/1.4 Kanit,sans-serif;padding:8px 10px;border-radius:8px;width:230px;box-shadow:0 2px 10px #0008';
@@ -1076,70 +1416,58 @@
      <b>Binder Helper</b> <span id="bthmini" style="color:#9fd"></span>
      <button id="bthmin" type="button" title="ย่อแผง" aria-label="ย่อแผง">−</button></div>
    <div id="bthbody">
-   <div id="bth-tabs" role="tablist" aria-label="หมวดตั้งค่า">
-     <button class="bth-tab" type="button" role="tab" data-bth-tab="farm" aria-selected="true">ฟาร์ม</button>
-     <button class="bth-tab" type="button" role="tab" data-bth-tab="return" aria-selected="false">ขายของ</button>
-     <button class="bth-tab" type="button" role="tab" data-bth-tab="supply" aria-selected="false">เติมยา</button>
-     <button class="bth-tab" type="button" role="tab" data-bth-tab="travel" aria-selected="false">Channel</button>
-     <button class="bth-tab" type="button" role="tab" data-bth-tab="bounty" aria-selected="false">ค่าหัว</button>
+   <div id="bth-tabs" aria-label="หมวดตั้งค่า">
+     <div id="bth-tab-viewport"><div id="bth-tab-track" role="tablist">
+       <div class="bth-tab-slide">
+         <button class="bth-tab" type="button" role="tab" data-bth-tab="farm" aria-selected="true">ฟาร์ม</button>
+         <button class="bth-tab" type="button" role="tab" data-bth-tab="return" aria-selected="false">ขายของ</button>
+         <button class="bth-tab" type="button" role="tab" data-bth-tab="supply" aria-selected="false">เติมยา</button>
+         <button class="bth-tab" type="button" role="tab" data-bth-tab="travel" aria-selected="false">Channel</button>
+       </div>
+       <div class="bth-tab-slide">
+         <button class="bth-tab" type="button" role="tab" data-bth-tab="bounty" aria-selected="false">ค่าหัว</button>
+         <button class="bth-tab" type="button" role="tab" data-bth-tab="gathering" aria-selected="false">Gather</button>
+       </div>
+     </div></div>
    </div>
    <div id="bth-pages">
-     <section class="bth-section bth-page active" role="tabpanel" data-bth-page="farm">
-       <div class="bth-section-title"><small>FARM</small><span>จุดฟาร์ม</span></div>
-       <div class="bth-map"><b id="bthmap"></b><button id="bthset" type="button" title="เลือกจุดฟาร์ม: เปิดแผนที่ใหญ่ แล้วแตะจุดที่จะฟาร์ม" aria-label="เลือกจุดฟาร์มบนแผนที่"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mob"/></svg></button></div>
-       <label class="bth-inline" for="bthwait"><span>รอก่อนกลับมาเกิด</span><span><input id="bthwait" type="number" min="0" max="60"> วินาที</span></label>
-       <label class="bth-switch"><input id="bthboss" type="checkbox"><span class="bth-switch-ui"></span><span>เจอ Boss / Mini-boss ในแมพ ไปตีก่อน</span></label>
-       <label class="bth-switch"><input id="bthwb" type="checkbox"><span class="bth-switch-ui"></span><span>เข้า World Boss อัตโนมัติ (ตีจนจบ แล้วกลับมาฟาร์ม)</span></label>
-       <div class="bth-note" id="bthwbinfo"></div>
-       <label class="bth-switch" id="bthmobiconrow"><input id="bthmobicon" type="checkbox"><span class="bth-switch-ui"></span><span>แสดงรูปมอนบนมินิแมพ</span></label>
-       <button id="bthrun" type="button" style="width:100%"></button>
-     </section>
-     <section class="bth-section bth-page" role="tabpanel" data-bth-page="return" hidden>
-       <div class="bth-section-title"><small>RETURN</small><span>กลับเมืองและจัดกระเป๋า</span></div>
-       <label class="bth-field" for="bthtown"><span>เมืองที่จะกลับไป</span><select id="bthtown">${Object.keys(TOWN_IDS).map(t => `<option value="${t}">${t}</option>`).join('')}</select></label>
-       <label class="bth-inline" for="bthpct"><span>ขายของเมื่อน้ำหนักถึง</span><span><input id="bthpct" type="number" min="10" max="100"> %</span></label>
-       <label class="bth-switch"><input id="bthsalv" type="checkbox"><span class="bth-switch-ui"></span><span>แยกชิ้นอุปกรณ์ Normal / Magic ก่อนขาย</span></label>
-       <label class="bth-inline" for="bthsalvlv"><span>เฉพาะเลเวลไอเทมต่ำกว่า</span><span>Lv <input id="bthsalvlv" type="number" min="2" max="99" style="width:48px"></span></label>
-       <div class="bth-note">ไม่แยกชิ้น Rare / Epic / Unique / ของตีบวก / ของล็อก</div>
-     </section>
-     <section class="bth-section bth-page" role="tabpanel" data-bth-page="supply" hidden>
-       <div class="bth-section-title"><small>SUPPLY</small><span>เติมยาอัตโนมัติ</span></div>
-       <div class="bth-potions">${['hp', 'mp'].map(k => `<div class="bth-potion"><div class="bth-potion-title">${k === 'hp' ? '♥ ยา HP' : '✦ ยา MP'}</div><select id="bth_${k}_item">${Object.entries(POTIONS[k]).map(([id, n]) => `<option value="${id}">${n}</option>`).join('')}</select><div class="bth-potion-grid"><label>ซื้อเมื่อ<input id="bth_${k}_min" type="number" min="0" max="9999"></label><label>เติมถึง<input id="bth_${k}_to" type="number" min="0" max="9999"></label></div></div>`).join('')}</div>
-       <div class="bth-note">ตั้งค่า 0 เพื่อปิด · ยาต้องอยู่ในช่อง Q/E</div>
-     </section>
-     <section class="bth-section bth-page" role="tabpanel" data-bth-page="travel" hidden>
-       <div class="bth-section-title"><small>TRAVEL</small><span>การเลือก Channel</span></div>
-       <div id="bthchinfo" class="bth-chinfo"></div>
-       <label class="bth-switch"><input id="bthlockch" type="checkbox"><span class="bth-switch-ui"></span><span>ล็อก Channel</span></label>
-       <label class="bth-inline" for="bthlockchnum"><span>อยู่เฉพาะ CH</span><span><button id="bthlockchcur" type="button">ใช้ CH ตอนนี้</button><input id="bthlockchnum" type="number" min="1" max="99" style="width:48px"></span></label>
-       <div class="bth-note bth-subnote">เปิดอยู่ → ไม่ตามหัวตี้ ไม่ย้ายหา CH คนน้อย · ย้ายไป CH ที่ล็อกตอนกด ▶ และตอนกลับมาแมพฟาร์มเท่านั้น</div>
-       <label class="bth-switch"><input id="bthlead" type="checkbox"><span class="bth-switch-ui"></span><span>ตาม Channel ของหัวตี้ก่อน</span></label>
-       <div class="bth-note bth-subnote">หัวตี้ออนไลน์และอยู่แมพเดียวกัน → ย้ายไป CH เดียวกับหัวตี้ · ถ้าหัวตี้อยู่ CH PvP จะไม่ตาม</div>
-       <label class="bth-switch"><input id="bthquiet" type="checkbox"><span class="bth-switch-ui"></span><span>ถ้าไม่เจอ ให้เลือก Channel คนน้อยสุด</span></label>
-       <div class="bth-note bth-subnote">นับคนอื่นในแมพนี้ของแต่ละ CH · ย้ายเมื่อเจอ CH ที่คนน้อยกว่าจริง · คนเท่ากันเลือก CH ที่ทั้ง CH คนน้อยกว่า · ข้าม CH เต็ม (แมพ 40 / ทั้ง CH 300 คน)</div>
-       <div class="bth-note"><b>เลือก CH เมื่อ</b> เข้าแมพฟาร์ม: กด ▶ · กลับมาแมพฟาร์ม (หลังตาย / เข้าเมือง / ค่าหัว) — ระหว่างฟาร์มไม่ย้าย CH</div>
-       <div class="bth-note"><b>ติดต่อสู้</b> รอให้หลุดก่อนย้าย CH และก่อนวาป (AUTO สู้กลับเฉพาะตอนโดนตี) · เกิน 60 วิ: ไม่ย้าย CH รอบนั้น / วาปไม่ได้ก็เดินเข้าเมือง</div>
-       <div class="bth-note">ไม่เลือก CH PvP (CH10) · เมนู Channel ของเกมแสดงจำนวนคนในแมพทางขวาของแต่ละแถว</div>
-     </section>
-     <section class="bth-section bth-page" role="tabpanel" data-bth-page="bounty" hidden>
-       <div class="bth-section-title"><small>DAILY</small><span>ค่าหัววันนี้</span></div>
-       <label class="bth-inline" for="bthqabove"><span>เลเวลคุณ <b id="bthqlv">?</b></span><span>เผื่อเลเวล <input id="bthqabove" type="number" min="0" max="30" style="width:48px"></span></label>
-       <div id="bthqlist" style="margin:2px 0;max-height:220px;overflow:auto"></div>
-       <div id="bthqnote" style="color:#8fa2bb;font-size:11px"></div>
-       <div style="display:flex;gap:7px;margin-top:2px"><button id="bthqgo" type="button" style="flex:2"></button><button id="bthqref" type="button" style="flex:1">↻ รีเฟรช</button></div>
-       <div class="bth-note">Auto จะล่ามอนค่าหัวในทั้งแมพ เมื่อครบจะคืนค่าตั้งเดิมและกลับไปจุดฟาร์ม</div>
-     </section>
+     ${pageMarkup('farm')}
+     ${pageMarkup('return', { TOWN_IDS })}
+     ${pageMarkup('supply', { POTIONS })}
+     ${pageMarkup('travel')}
+     ${pageMarkup('bounty')}
+     ${pageMarkup('gathering')}
    </div>
    </div>`;
   document.body.appendChild(box);
-  const bthTabButtons = [...box.querySelectorAll('[data-bth-tab]')];
+  const bthTabTrack = $('#bth-tab-track'), bthTabViewport = $('#bth-tab-viewport');
+  const originalTabButtons = [...box.querySelectorAll('[data-bth-tab]')];
+  const bthTabButtons = originalTabButtons;
+  const bthTabSlides = [...bthTabTrack.children];
+  let bthTabSlideIndex = 0;
+  const showBthTabSlide = index => {
+    bthTabSlideIndex = Math.max(0, Math.min(bthTabSlides.length - 1, index));
+    bthTabTrack.style.transform = `translateX(-${bthTabSlideIndex * 100}%)`;
+  };
+  let tabPointer = null, suppressTabClick = false;
+  bthTabViewport.addEventListener('pointerdown', e => { if (e.button !== 0) return; tabPointer = { x:e.clientX, y:e.clientY }; suppressTabClick = false; });
+  window.addEventListener('pointerup', e => {
+    if (!tabPointer) return;
+    const dx = e.clientX - tabPointer.x, dy = e.clientY - tabPointer.y; tabPointer = null;
+    if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy) * 1.25) { suppressTabClick = true; showBthTabSlide(bthTabSlideIndex + (dx < 0 ? 1 : -1)); setTimeout(() => { suppressTabClick = false; }, 0); }
+  }, true);
+  bthTabViewport.addEventListener('pointercancel', () => { tabPointer = null; });
+  bthTabViewport.addEventListener('wheel', e => { if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 12) { e.preventDefault(); showBthTabSlide(bthTabSlideIndex + (e.deltaX > 0 ? 1 : -1)); } }, { passive:false });
   const bthPages = [...box.querySelectorAll('[data-bth-page]')];
   let bqAll = [], bqPick = new Set(), bqLoaded = false;
   const selectBthTab = name => {
+    const selectedIndex = bthTabButtons.findIndex(button => button.dataset.bthTab === name);
+    if (selectedIndex >= 0) showBthTabSlide(Math.floor(selectedIndex / 4));
     for (const button of bthTabButtons) button.setAttribute('aria-selected', String(button.dataset.bthTab === name));
     for (const page of bthPages) { const active = page.dataset.bthPage === name; page.hidden = !active; page.classList.toggle('active', active); }
   };
   for (const button of bthTabButtons) button.onclick = () => {
+    if (suppressTabClick) return;
     const tab = button.dataset.bthTab;
     selectBthTab(tab);
     if (tab === 'bounty') {
@@ -1158,16 +1486,34 @@
     $('#bthmin').title = p.min ? 'ขยายแผง' : 'ย่อแผง';
     showMini();
   };
+  let panelDrag = null, panelDragFrame = 0;
+  const drawPanelDrag = () => {
+    panelDragFrame = 0;
+    if (!panelDrag) return;
+    const d = panelDrag, x = Math.max(8, Math.min(innerWidth - d.w - 8, d.ox + d.cx - d.sx));
+    const y = Math.max(8, Math.min(innerHeight - d.h - 8, d.oy + d.cy - d.sy));
+    d.x = x; d.y = y;
+    box.style.left = `${x}px`; box.style.top = `${y}px`;
+  };
   $('#bthbar').addEventListener('pointerdown', e => {
-    if (e.target.closest('button')) return;
+    if (e.button !== 0 || e.target.closest('button')) return;
     e.preventDefault(); e.stopPropagation();
-    const sx = e.clientX, sy = e.clientY, ox = box.offsetLeft, oy = box.offsetTop;
-    const move = ev => { cfg.panel = { ...(cfg.panel || DEF.panel), x: ox + ev.clientX - sx, y: oy + ev.clientY - sy }; place(); };
-    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); save(); };
-    addEventListener('pointermove', move); addEventListener('pointerup', up);
+    panelDrag = { sx:e.clientX, sy:e.clientY, cx:e.clientX, cy:e.clientY, ox:box.offsetLeft, oy:box.offsetTop, w:box.offsetWidth, h:box.offsetHeight };
+    panelDrag.x = panelDrag.ox; panelDrag.y = panelDrag.oy;
+    const move = ev => {
+      if (!panelDrag) return;
+      panelDrag.cx = ev.clientX; panelDrag.cy = ev.clientY;
+      if (!panelDragFrame) panelDragFrame = requestAnimationFrame(drawPanelDrag);
+    };
+    const up = () => {
+      removeEventListener('pointermove', move, true); removeEventListener('pointerup', up, true); removeEventListener('pointercancel', up, true);
+      if (panelDragFrame) { cancelAnimationFrame(panelDragFrame); panelDragFrame = 0; drawPanelDrag(); }
+      if (panelDrag) { cfg.panel = { ...(cfg.panel || DEF.panel), x:panelDrag.x, y:panelDrag.y }; panelDrag = null; place(); save(); }
+    };
+    addEventListener('pointermove', move, true); addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true);
   });
   // keep game input (click-to-move, hotkeys) from reacting to clicks / typing inside the panel
-  for (const ev of ['pointerdown', 'mousedown', 'click', 'keydown', 'wheel']) box.addEventListener(ev, e => e.stopPropagation());
+  for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mouseup', 'click', 'keydown', 'wheel']) box.addEventListener(ev, e => e.stopPropagation());
   $('#bthmin').onclick = () => { cfg.panel = { ...(cfg.panel || DEF.panel), min: !(cfg.panel || DEF.panel).min }; save(); place(); };
   addEventListener('resize', place);
   place();
@@ -1319,12 +1665,9 @@
     if (t === 'หยุดอยู่' && !stoppedLogged) { console.info('[Binder Helper]', t); stoppedLogged = true; }
     else if (t !== 'หยุดอยู่') stoppedLogged = false;
   }
+  let pageContext = null;
   function render() {
-    $('#bthmap').textContent = cfg.farmMap ? cfg.farmMap + (cfg.farmSpot ? ` (${cfg.farmSpot.x.toFixed(0)}, ${cfg.farmSpot.y.toFixed(0)})` : '') : '(ยังไม่ตั้ง)';
-    $('#bthtown').value = TOWN_IDS[cfg.town] ? cfg.town : 'Ashford'; $('#bthpct').value = cfg.sellPct; $('#bthwait').value = cfg.deathWaitMs / 1000; $('#bthquiet').checked = !!cfg.quietCh; $('#bthlead').checked = !!cfg.followLeader; $('#bthlockch').checked = !!cfg.lockCh; $('#bthlockchnum').value = cfg.lockChNum; $('#bthlead').disabled = $('#bthquiet').disabled = !!cfg.lockCh; $('#bthboss').checked = !!cfg.bossHunt; $('#bthwb').checked = cfg.worldBoss !== false; $('#bthmobicon').checked = cfg.mobIcons !== false;
-    $('#bthsalv').checked = !!cfg.salvOn; $('#bthsalvlv').value = cfg.salvBelow;
-    for (const k of ['hp', 'mp']) { const b = (cfg.buy || {})[k] || {}; $(`#bth_${k}_item`).value = b.item; $(`#bth_${k}_min`).value = b.min || 0; $(`#bth_${k}_to`).value = b.to || 0; }
-    $('#bthrun').textContent = cfg.running ? '■ หยุด' : '▶ เริ่ม';
+    if (pageContext) for (const name of ['farm', 'return', 'supply', 'travel', 'gathering']) PAGE_MODULES[name]?.render?.(pageContext);
     if (!cfg.running) setPhase('หยุดอยู่');
   }
   const remember = () => {
@@ -1350,72 +1693,43 @@
     cfg.running = true; startCheck = true; stoppedLogged = false; save(); render();
   };
   setInterval(() => { if (pickUntil && Date.now() > pickUntil) { setPick(false); log('ยกเลิกเลือกจุดฟาร์ม (เกิน 60 วิ)'); } }, 1000);
-  $('#bthset').onclick = () => {
+  const pickFarm = () => {
     if (pickUntil) { setPick(false); if (bigMapOpen()) click($('#mmbigx'), 'ปิดแผนที่ใหญ่'); log('ยกเลิกเลือกจุดฟาร์ม'); return; }
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปแมพฟาร์มก่อนแล้วเลือกจุด`); return; }
     setPick(true);
     if (!bigMapOpen()) { const mm = $('#minimap'); if (mm) mm.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse', button: 0 })); }
     log('แตะจุดบนแผนที่ใหญ่ที่จะฟาร์ม');
   };
-  $('#bthtown').onchange = e => { cfg.town = e.target.value; save(); log('เมืองขาย: ' + cfg.town); };
-  $('#bthpct').onchange = e => { cfg.sellPct = Math.max(10, Math.min(100, +e.target.value || 95)); save(); };
-  $('#bthwait').onchange = e => { cfg.deathWaitMs = Math.max(0, +e.target.value || 0) * 1000; save(); };
-  $('#bthsalv').onchange = e => { cfg.salvOn = e.target.checked; save(); log(cfg.salvOn ? `เปิดแยกชิ้น Normal / Magic เลเวลต่ำกว่า ${cfg.salvBelow}` : 'ปิดแยกชิ้น'); };
-  $('#bthsalvlv').onchange = e => { cfg.salvBelow = Math.max(2, Math.min(99, Math.round(+e.target.value) || 30)); e.target.value = cfg.salvBelow; save(); };
-  $('#bthquiet').onchange = e => { if (cfg.lockCh) { e.target.checked = !!cfg.quietCh; return; } cfg.quietCh = e.target.checked; save(); };
-  $('#bthlead').onchange = e => { if (cfg.lockCh) { e.target.checked = !!cfg.followLeader; return; } cfg.followLeader = e.target.checked; save(); };
-  $('#bthlockch').onchange = e => { cfg.lockCh = e.target.checked; save(); $('#bthlead').disabled = $('#bthquiet').disabled = cfg.lockCh; log(cfg.lockCh ? `ล็อก CH${cfg.lockChNum} · ปิดการย้าย CH อัตโนมัติ` : 'ปลดล็อก CH'); };
-  $('#bthlockchnum').onchange = e => { cfg.lockChNum = Math.max(1, Math.min(99, Math.round(+e.target.value) || 1)); e.target.value = cfg.lockChNum; save(); if (cfg.lockCh) log(`ล็อก CH${cfg.lockChNum}`); };
-  $('#bthlockchcur').onclick = () => { const ch = chOf(room()); if (!ch) return; $('#bthlockchnum').value = ch; $('#bthlockchnum').onchange({ target: $('#bthlockchnum') }); };
-  $('#bthboss').onchange = e => { cfg.bossHunt = e.target.checked; save(); };
-  $('#bthwb').onchange = e => { cfg.worldBoss = e.target.checked; save(); };
-  if (!MOB_ICONS) $('#bthmobiconrow').style.display = 'none';
-  $('#bthmobicon').onchange = e => { cfg.mobIcons = e.target.checked; save(); };
-  for (const k of ['hp', 'mp']) {
-    const upd = () => {
-      const min = Math.max(0, +$(`#bth_${k}_min`).value || 0), to = Math.max(min, +$(`#bth_${k}_to`).value || 0);
-      cfg.buy = { ...(cfg.buy || {}), [k]: { item: $(`#bth_${k}_item`).value, min, to } }; save();
-      $(`#bth_${k}_to`).value = to;
-    };
-    for (const f of ['item', 'min', 'to']) $(`#bth_${k}_${f}`).onchange = upd;
-  }
-  $('#bthrun').onclick = () => {
-    // first start: remember where we stand (never a town); later starts keep the saved spot
+  const toggleFarm = () => {
     if (!cfg.running && (!cfg.farmMap || (!cfg.farmSpot && mapName() === cfg.farmMap))) remember();
     if (!cfg.running && !cfg.farmMap) return;
-    cfg.running = !cfg.running; startCheck = cfg.running; if (cfg.running) stoppedLogged = false; save(); render(); log(cfg.running ? 'เริ่ม' : 'หยุด');
+    const switchingFromGathering = !!cfg.gathering.enabled;
+    cfg.gathering.enabled = false;
+    if (switchingFromGathering) { cfg.running = true; startCheck = true; setAuto(false); }
+    else { cfg.running = !cfg.running; startCheck = cfg.running; }
+    clearResumeMarkers();
+    if (cfg.running) stoppedLogged = false; save(); render(); log(switchingFromGathering ? 'หยุด Gathering แล้วเริ่มฟาร์ม' : cfg.running ? 'เริ่มฟาร์ม' : 'หยุดฟาร์ม');
   };
-
+  const updateGather = () => {
+    cfg.gathering.type = $('#bthgtype').value; cfg.gathering.tier = +$('#bthgtier').value; cfg.gathering.pvp = $('#bthgpvp').checked; cfg.gathering.gold = $('#bthggold').checked; cfg.gathering.scanChannels = $('#bthgchannels').checked; cfg.gathering.rotateMaps = $('#bthgmapsweep').checked;
+    const valid = (GATHER_MAPS[cfg.gathering.type] || {})[+cfg.gathering.tier] || [];
+    if (!valid.includes(cfg.gathering.preferredMap) || (!cfg.gathering.pvp && GATHER_PVP_MAPS.has(cfg.gathering.preferredMap))) cfg.gathering.preferredMap = '';
+    gatherMapIndex = 0; gatherScannedMap = ''; gatherChannelOrder = []; save(); render();
+  };
+  const updatePreferredMap = e => { cfg.gathering.preferredMap = e.target.value; gatherMapIndex = 0; gatherScannedMap = ''; gatherChannelOrder = []; save(); render(); };
+  const toggleGather = () => {
+    if (cfg.gathering.enabled) { cfg.gathering.enabled = false; if (!bq.active) cfg.running = false; }
+    else { cfg.gathering.enabled = true; cfg.running = true; startCheck = false; gatherMapIndex = 0; gatherScannedMap = ''; gatherChannelOrder = []; setAuto(false); stoppedLogged = false; }
+    clearResumeMarkers(); save(); render(); log(cfg.gathering.enabled ? `หยุดฟาร์มแล้วเริ่ม Gathering ${cfg.gathering.type} Tier ${cfg.gathering.tier}` : 'หยุด Gathering');
+  };
   const reachable = b => !b.claimed && b.lo <= myLevel() + (+bq.maxAbove || 0);
-  function renderBq() {
-    $('#bthqlv').textContent = myLevel() || '?';
-    $('#bthqabove').value = bq.maxAbove;
-    const cur = curBounty();
-    if (bq.active) {
-      $('#bthqlist').innerHTML = bq.list.map((b, i) => `<div style="padding:3px 0;${i === bq.i ? 'color:#ffd27a;font-weight:600' : b.claimed ? 'color:#9fd0ff' : ''}">${i < bq.i || b.claimed ? '✓' : i === bq.i ? '▶' : '·'} ${b.mob} ${b.prog}/${b.need} <small style="color:#8fa2bb">${b.mapName}</small></div>`).join('');
-      $('#bthqnote').textContent = cur ? `กำลังทำ ${cur.mob} ที่ ${cur.mapName}` : '';
-      $('#bthqgo').textContent = '■ หยุดค่าหัว';
-      return;
-    }
-    const show = bqAll.filter(reachable), hidden = bqAll.filter(b => !reachable(b));
-    $('#bthqlist').innerHTML = show.length ? show.map(b => `<label style="display:block;padding:3px 0"><input type="checkbox" data-bq="${b.id}" ${bqPick.has(b.id) ? 'checked' : ''}> <b>${b.mob}</b> ${b.prog}/${b.need} <small style="color:#8fa2bb">${b.mapName} · Lv ${b.lo}–${b.hi}</small></label>`).join('')
-      : '<div style="color:#8fa2bb">ไม่มีค่าหัวที่ไปได้ (กด ↻ รีเฟรช)</div>';
-    $('#bthqnote').textContent = hidden.length ? `ซ่อน ${hidden.length} ตัว: ${hidden.map(b => b.claimed ? b.mob + ' (รับแล้ว)' : `${b.mob} (Lv ${b.lo}+)`).join(', ')}` : '';
-    $('#bthqgo').textContent = '▶ เริ่มล่าค่าหัว';
-    for (const c of document.querySelectorAll('#bthqlist [data-bq]')) c.onchange = e => { e.target.checked ? bqPick.add(e.target.dataset.bq) : bqPick.delete(e.target.dataset.bq); };
-  }
+  function renderBq() { if (pageContext) PAGE_MODULES.bounty?.render?.(pageContext); }
   async function refreshBq() {
     $('#bthqnote').textContent = 'กำลังอ่านค่าหัว…';
-    bqAll = await readBounties();
-    bqPick = new Set(bqAll.filter(reachable).map(b => b.id));
-    renderBq();
+    bqAll = await readBounties(); bqPick = new Set(bqAll.filter(reachable).map(b => b.id)); renderBq();
   }
-  $('#bthqref').onclick = () => { if (!bq.active) refreshBq(); else renderBq(); };
-  $('#bthqabove').onchange = e => { bq.maxAbove = Math.max(0, +e.target.value || 0); saveBq(); if (!bq.active) { bqPick = new Set(bqAll.filter(reachable).map(b => b.id)); renderBq(); } };
-  $('#bthqgo').onclick = () => {
-    if (bq.active) { // stop: put AUTO back on the next tick and go home
-      bq.list = bq.list.slice(0, bq.i); bq.i = bq.list.length; saveBq(); log('หยุดค่าหัว — คืนค่า Auto แล้วกลับแมพปกติ'); renderBq(); return;
-    }
+  const startBounty = () => {
+    if (bq.active) { bq.list = bq.list.slice(0, bq.i); bq.i = bq.list.length; saveBq(); log('หยุดค่าหัว — คืนค่า Auto แล้วกลับแมพปกติ'); renderBq(); return; }
     const list = bqAll.filter(b => bqPick.has(b.id) && reachable(b));
     if (!list.length) { $('#bthqnote').textContent = 'ยังไม่ได้เลือกค่าหัว'; return; }
     if (!cfg.farmMap) log('ยังไม่ได้ตั้งแมพฟาร์มปกติ — ทำค่าหัวเสร็จแล้ว helper จะหยุด');
@@ -1424,6 +1738,13 @@
     if (!cfg.running) { cfg.running = true; startCheck = false; save(); render(); }
     renderBq();
   };
+  pageContext = {
+    $, cfg, save, log, TOWN_IDS, POTIONS, MAP_NAMES, GATHER_MAPS, GATHER_MAP_LEVEL, GATHER_PVP_MAPS, gatherMaps, mobIcons: MOB_ICONS,
+    room, chOf, randomChannel, pickFarm, toggleFarm, updateGather, updatePreferredMap, toggleGather,
+    bq, getBqAll: () => bqAll, getBqPick: () => bqPick, setBqPick: v => { bqPick = v; },
+    myLevel, reachable, curBounty, saveBq, refreshBq, renderBq, startBounty,
+  };
+  for (const name of ['farm', 'return', 'supply', 'travel', 'bounty', 'gathering']) PAGE_MODULES[name]?.bind?.(pageContext);
   render();
   const timer = setInterval(tick, 1000);
   setTimeout(() => log(onWorker() ? 'ตัวจับเวลาทำงานเต็มความเร็วแม้พับหน้าต่าง' : 'ตัวจับเวลาแบบปกติ — พับหน้าต่างแล้วจะช้าลง'), 2000);
@@ -1487,8 +1808,8 @@
   })();
 
   window.__bth = {
-    cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(kickTimer); clearInterval(exitTimer); stopTimers(); alive = false; for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bth; }, // running=false also ends a trip in progress
+    cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; cfg.gathering.enabled = false; clearResumeMarkers(); save(); render(); },
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(kickTimer); clearInterval(exitTimer); stopTimers(); alive = false; for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bthPageModules; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {
