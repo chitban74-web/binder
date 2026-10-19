@@ -1,19 +1,17 @@
-Binder Town Manager — release 1.0.4
+Binder Town Manager
 
 วิธีเปิด
-1. ดับเบิลคลิก Binder-Town-Manager.exe
-2. ไอคอน Binder Town Manager จะอยู่ใน System Tray และ Dashboard จะเปิดในเบราว์เซอร์
+1. ดับเบิลคลิก Start_Binder.bat
+2. Dashboard จะเปิดที่ http://localhost:3889 ในเบราว์เซอร์
 3. ใช้ Dashboard เพื่อสร้างโปรไฟล์และเปิดเกม
 
 การควบคุม
-- ดับเบิลคลิกไอคอน System Tray หรือเลือก “เปิด Dashboard” เพื่อเปิดหน้า Manager
-- คลิกขวาไอคอนเพื่อเปิด Dashboard, รีสตาร์ตเซิร์ฟเวอร์ หรือปิดโปรแกรม
-- ปิดโปรแกรมจากเมนูใน System Tray เพื่อหยุด Manager และหน้าต่างเกมที่เปิดโดยโปรแกรม
+- ดับเบิลคลิก Start_Binder.bat เพื่อเปิด Manager
+- ดับเบิลคลิก Stop_Binder.bat เพื่อหยุด Manager และหน้าต่างเกมที่เปิดโดยโปรแกรม
 
 สิ่งที่รวมมาในชุดนี้
-- Binder-Town-Manager.exe เป็น Windows launcher ขนาดเล็กและทำงานใน System Tray
-- Start_Binder.bat และ Stop_Binder.bat สำหรับเปิดหรือหยุดผ่าน Console
-- bin/node.exe เป็น Node.js portable ไม่ต้องติดตั้ง Node.js เพิ่ม
+- Start_Binder.bat และ Stop_Binder.bat สำหรับเปิดและหยุด Manager
+- ต้องมี Node.js 22 ขึ้นไป หรือวาง portable Node.js ที่ bin\node.exe
 - ต้องติดตั้ง Chrome, Edge หรือ Brave เพื่อเปิดหน้าต่างเกม
 
 ข้อมูลผู้ใช้
@@ -25,6 +23,5 @@ Binder Town Manager — release 1.0.4
 - ปุ่มทดสอบ full routine ในเมนูขายของทำรายการจริงตามตัวกรอง ซื้อยา และฝากวัตถุดิบ
 
 หมายเหตุ
-- launcher นี้เปิด Dashboard ในเบราว์เซอร์เริ่มต้นเหมือน Pelican Manager
-- ตัว .exe ยังไม่ได้เซ็นรับรองด้วย certificate ผู้เผยแพร่ Windows อาจแสดงคำเตือนเมื่อเปิดครั้งแรก
+- Start_Binder.bat เปิด Manager เบื้องหลังและเปิด Dashboard ในเบราว์เซอร์เริ่มต้น
 

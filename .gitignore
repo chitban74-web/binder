@@ -7,5 +7,6 @@ data/
 node_modules/
 *.zip
 *.log
+Binder-Town-Manager.exe
 # marks the main machine (pushes, never auto-pulls) - local only
 .binder-main
