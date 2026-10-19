@@ -329,12 +329,19 @@
   }
 
   // where to farm right now: the bounty's map (whole map) while a bounty runs, else the saved farm map + spot
+  let tripFailed = false;
   async function backToFarm(t = tgt()) {
+    tripFailed = false;
     if (!t.map) return false;
     const g = farmGen, still = () => g === farmGen;
     const changed = () => { if (still()) return false; log('เปลี่ยนจุดฟาร์มแล้ว — เลิกไปจุดเดิม'); return true; };
     setPhase('กลับไปฟาร์ม ' + t.map);
-    if (!await travelTo(t.map, still)) { changed(); return false; }
+    if (!await travelTo(t.map, still)) {
+      // our own trip did not get there (wrong exit, the game's walk stuck in a hidden tab): the next tick tries again
+      // instead of taking it for "you moved yourself" and pausing (18 Oct 21:23, stuck in Sanctum)
+      if (!changed() && cfg.running && !isDead()) { tripFailed = true; log(`ไป ${t.map} ไม่สำเร็จ — ลองใหม่`); }
+      return false;
+    }
     await sleep(1500);
     if (changed()) return false;
     setAuto(false);
@@ -925,7 +932,7 @@
         await finishBounty('ค่าหัวจบแล้ว — กลับไปฟาร์มแมพปกติ');
       } else if (mapName() !== tgt().map) {
         // during a bounty the helper moves you between bounty maps itself
-        if (startCheck || curBounty()) { startCheck = false; setAuto(false); await backToFarm(); } // you pressed ▶ elsewhere -> go there
+        if (startCheck || curBounty() || tripFailed) { startCheck = false; setAuto(false); await backToFarm(); } // you pressed ▶ elsewhere / our trip failed -> go there
         // not caused by the helper (its own trips return inside the same tick): you moved yourself -> pause, don't drag you back
         else if (mapName()) { cfg.running = false; save(); render(); setPhase('หยุดชั่วคราว: คุณย้ายแมพเอง'); log(`ย้ายไป ${mapName()} เอง — หยุดไว้ก่อน · กด "จำจุดนี้" ที่จุดใหม่ แล้วกด ▶`); }
       } else if (bq.active) {
