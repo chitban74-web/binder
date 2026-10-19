@@ -543,23 +543,63 @@
   // still in Sanctum), so then walk exit to exit with moveTo, like walkToSpot. Exits from data/maps/zones.json
   // (map id -> [to, x, y] centre of the exit area). Not yet seen working: logs each step, gives up after 10 s at an exit.
   const EXITS = {'southvale_field':[['valebrook',29.5,2.0],['honeyrill',27.5,2.0]],'valebrook':[['southvale_field',21.5,42.5],['whispering_woods',21.5,2.0],['riverside',42.0,25.0],['old_quarry',2.0,30.0]],'whispering_woods':[['valebrook',27.5,54.0],['ancient_ruins',27.5,2.0],['bloomcrown_glade',42.5,2.0],['bracken_sink',32.5,54.0]],'riverside':[['valebrook',2.0,34.5],['honeyrill',2.0,26.0]],'old_quarry':[['valebrook',54.0,32.0],['verdigris_rise',2.0,28.0]],'ancient_ruins':[['whispering_woods',27.5,54.0],['sunfield_plains',27.5,2.0]],'sunfield_plains':[['ancient_ruins',27.5,54.0],['ashford',26.5,2.0],['gloomroot_forest',54.0,29.0],['bracken_sink',2.0,29.0]],'ashford':[['sunfield_plains',24.0,46.0],['gloomroot_forest',46.0,34.0],['ember_hollow',24.0,2.0],['mistmire_swamp',2.0,40.0],['duskgate_pass',45.5,2.0]],'gloomroot_forest':[['sunfield_plains',53.5,28.5],['ashford',26.5,54.0],['pitchwood',28.5,2.0]],'ember_hollow':[['ashford',25.5,54.0],['mistmire_swamp',2.0,26.5],['cinder_eyrie',54.0,22.5],['yellowlick_flats',54.0,28.0]],'mistmire_swamp':[['ashford',25.5,2.0],['ember_hollow',53.5,44.5],['duskgate_pass',40.5,2.0],['lotus_hollow',2.0,42.5],['peatcut_bog',2.0,28.0]],'duskgate_pass':[['mistmire_swamp',28.5,54.0],['stormwall_city',31.5,2.0],['ashford',12.0,2.0]],'stormwall_city':[['duskgate_pass',23.5,46.0],['frostpeak_slopes',2.0,28.0],['frozen_mere',24.0,2.0],['howling_steppes',46.0,23.0],['cloudspire_ruins',39.5,2.0]],'frostpeak_slopes':[['stormwall_city',54.0,27.5],['sledrun_gully',28.5,2.0]],'frozen_mere':[['stormwall_city',26.5,54.0],['aurora_hollow',2.0,24.5],['brinecrust_shoals',54.0,28.0]],'howling_steppes':[['stormwall_city',2.0,27.0],['cloudspire_ruins',42.5,2.0],['brinecrust_shoals',28.5,54.0]],'cloudspire_ruins':[['howling_steppes',26.5,54.0],['sanctum',26.5,2.0],['stormwall_city',2.0,12.0],['tempest_aerie',27.5,2.0],['kitewind_terraces',28.5,54.0]],'sanctum':[['cloudspire_ruins',22.0,42.5],['shattered_vale',2.0,26.0],['umbral_depths',22.0,2.0],['throne_of_warden',42.0,21.0],['rustbell_barracks',32.0,42.0]],'shattered_vale':[['sanctum',54.0,26.5],['opalweb_grotto',39.5,54.0],['glasswrack',2.0,28.0]],'umbral_depths':[['sanctum',27.5,54.0],['throne_of_warden',27.5,2.0],['marrowdeep',2.0,28.0]],'throne_of_warden':[['umbral_depths',24.5,46.0],['sanctum',32.0,2.0],['wardens_seat',24.5,46.0]],'training_grounds':[],'rootfall_barrow':[],'honeyrill':[['southvale_field',27.5,54.0],['riverside',54.0,26.0]],'bracken_sink':[['whispering_woods',28.5,2.0],['sunfield_plains',54.0,32.0]],'verdigris_rise':[['old_quarry',54.0,28.0]],'pitchwood':[['gloomroot_forest',28.5,54.0]],'yellowlick_flats':[['ember_hollow',2.0,28.0]],'peatcut_bog':[['mistmire_swamp',54.0,28.0]],'sledrun_gully':[['frostpeak_slopes',28.5,54.0]],'brinecrust_shoals':[['frozen_mere',2.0,28.0],['howling_steppes',28.5,2.0]],'kitewind_terraces':[['cloudspire_ruins',28.5,2.0]],'glasswrack':[['shattered_vale',54.0,28.0]],'marrowdeep':[['umbral_depths',54.0,28.0]],'rustbell_barracks':[['sanctum',28.5,2.0]]};
-  // the exits the game's own route walk uses: its map table in the live bundle (/assets/main-*.js, map objects
-  // {id:"sanctum",name:...,exits:[{to,rect:{x0,y0,x1,y1}}]}), walked to at the rect centre + 0.5 like the game does.
-  // EXITS above is a copy from an older bundle (Sanctum -> Umbral Depths (22, 2) took us to Cloudspire Ruins on 18 Oct)
+  // the exits the game's own route walk uses. Its bundle (/assets/main-*.js) has each map's exits ({id:"sanctum",..,w,h,
+  // exits:[{to,rect,side}]}), but at start-up the game moves them: every exit goes on the side its target lies on the world
+  // map (position table: the one read by `const n=X[t],s=X[e];if(!n||!s)return;`), spread evenly along that side, then
+  // the map is scaled (table read by `X[t.id],[w,v]=g??[1,1]`). Same steps here, so the spots match what the game walks to
+  // (checked on the 15 Oct bundle against its own walks: Sanctum -> Shattered Vale (2, 15), Shattered Vale -> Glasswrack
+  // (2, 42), Umbral Depths -> Marrowdeep (2, 43); Sanctum -> Umbral Depths is (2, 29) on the west side, (22, 2) north is
+  // Cloudspire Ruins: why the walk kept ending up there on 18 Oct). Walked to at the rect centre + 0.5 like the game does.
   let liveExits = null;
   (async () => {
     try {
       await sleep(0); // log() is set up further down this file
       const src = [...document.querySelectorAll('script[src]')].map(e => e.src).find(u => /\/assets\/main-/.test(u));
       if (!src) { log('ไม่เจอไฟล์เกม main-*.js — ใช้ทางออกจาก zones.json'); return; }
-      const text = await (await fetch(src)).text(), out = {};
-      const heads = [...text.matchAll(/\{id:"([a-z_]+)",name:"[^"]*",region:"/g)];
+      const text = await (await fetch(src)).text();
+      const table = name => {
+        const i = name ? text.search(new RegExp('[,;{ ]' + name.replace(/\$/g, '\\$') + '=\\{')) : -1; if (i < 0) return null;
+        const st = text.indexOf('{', i); let d = 0, j = st;
+        for (; j < text.length; j++) { if (text[j] === '{') d++; else if (text[j] === '}' && !--d) break; }
+        const o = {}; for (const m of text.slice(st, j + 1).matchAll(/([a-z_]+):\[(-?[\d.]+),(-?[\d.]+)\]/g)) o[m[1]] = [+m[2], +m[3]];
+        return o;
+      };
+      const W = table((text.match(/const n=([\w$]+)\[t\],s=\1\[e\];if\(!n\|\|!s\)return;/) || [])[1]);
+      const SC = table((text.match(/([\w$]+)\[t\.id\],\[[\w$]+,[\w$]+\]=[\w$]+\?\?\[1,1\]/) || [])[1]);
+      if (!W || !SC) { log('อ่านตารางตำแหน่ง / ขนาดแมพจากไฟล์เกมไม่ได้ — ใช้ทางออกจาก zones.json'); return; }
+      const maps = {}, heads = [...text.matchAll(/\{id:"([a-z_]+)",name:"[^"]*",region:"/g)];
       heads.forEach((h, i) => {
-        const body = text.slice(h.index, i + 1 < heads.length ? heads[i + 1].index : h.index + 200000);
-        const ex = [...body.matchAll(/\{to:"([a-z_]+)",rect:\{x0:(-?[\d.]+),y0:(-?[\d.]+),x1:(-?[\d.]+),y1:(-?[\d.]+)\}/g)]
-          .map(m => [m[1], (+m[2] + +m[4]) / 2 + 0.5, (+m[3] + +m[5]) / 2 + 0.5]);
-        if (ex.length && !out[h[1]]) out[h[1]] = ex;
+        const body = text.slice(h.index, i + 1 < heads.length ? heads[i + 1].index : h.index + 200000), wh = body.match(/,w:(\d+),h:(\d+),/);
+        const ex = [...body.matchAll(/\{to:"([a-z_]+)",rect:\{x0:(-?[\d.]+),y0:(-?[\d.]+),x1:(-?[\d.]+),y1:(-?[\d.]+)\},side:"([NSEW])"/g)]
+          .map(m => ({ to: m[1], rect: { x0: +m[2], y0: +m[3], x1: +m[4], y1: +m[5] }, side: m[6] }));
+        if (wh && ex.length && !maps[h[1]]) maps[h[1]] = { w: +wh[1], h: +wh[2], exits: ex };
       });
+      const sideOf = (a, b) => { const n = W[a], s = W[b]; if (!n || !s) return; const x = s[0] - n[0], y = s[1] - n[1]; return Math.abs(x) >= Math.abs(y) ? (x >= 0 ? 'E' : 'W') : (y >= 0 ? 'S' : 'N'); };
+      const out = {};
+      for (const [id, t] of Object.entries(maps)) {
+        const e = t.exits, sides = e.map(a => sideOf(id, a.to) || a.side);
+        let ex = e.map((a, o) => {
+          const i = sides[o], k = i === 'N' || i === 'S' ? 0 : 1;
+          const r = e.map((x, f) => ({ i: f, other: x })).filter(x => sides[x.i] === i).sort((x, y) => ((W[x.other.to] || [])[k] || 0) - ((W[y.other.to] || [])[k] || 0));
+          if (i === a.side && r.length === 1) return a;
+          const l = r.findIndex(x => x.i === o) + 1, c = k === 0 ? t.w : t.h;
+          const d = Math.min(8, Math.max(3, a.rect.x1 - a.rect.x0 + 1, a.rect.y1 - a.rect.y0 + 1)), u = Math.max(1, Math.min(c - d - 1, Math.round(c * l / (r.length + 1) - d / 2)));
+          const p = i === 'N' ? { x0: u, x1: u + d - 1, y0: 1, y1: 2 } : i === 'S' ? { x0: u, x1: u + d - 1, y0: t.h - 3, y1: t.h - 2 } : i === 'E' ? { x0: t.w - 3, x1: t.w - 2, y0: u, y1: u + d - 1 } : { x0: 1, x1: 2, y0: u, y1: u + d - 1 };
+          return { ...a, side: i, rect: p };
+        });
+        const sc = SC[id];
+        if (sc) {
+          const [fx, fy] = sc, A = Math.round(t.w * fx), O = Math.round(t.h * fy);
+          ex = ex.map(y => {
+            const g = (y.rect.x0 + y.rect.x1 + 1) / 2, w = (y.rect.y0 + y.rect.y1 + 1) / 2, v = (y.rect.x1 - y.rect.x0) / 2, M = (y.rect.y1 - y.rect.y0) / 2;
+            const nsX = { x0: Math.round(g * fx - v - 0.5), x1: Math.round(g * fx + v - 0.5) }, ewY = { y0: Math.round(w * fy - M - 0.5), y1: Math.round(w * fy + M - 0.5) };
+            const x = y.side === 'N' ? { ...nsX, y0: y.rect.y0, y1: y.rect.y1 } : y.side === 'S' ? { ...nsX, y0: O - (t.h - y.rect.y0), y1: O - (t.h - y.rect.y1) }
+              : y.side === 'E' ? { x0: A - (t.w - y.rect.x0), x1: A - (t.w - y.rect.x1), ...ewY } : { x0: y.rect.x0, x1: y.rect.x1, ...ewY };
+            return { ...y, rect: x };
+          });
+        }
+        out[id] = ex.map(y => [y.to, (y.rect.x0 + y.rect.x1) / 2 + 0.5, (y.rect.y0 + y.rect.y1) / 2 + 0.5]);
+      }
       if (!Object.keys(out).length) { log('อ่านทางออกจากไฟล์เกมไม่ได้ — ใช้ทางออกจาก zones.json'); return; }
       liveExits = out;
       const s = (out.sanctum || []).map(e => `${MAP_NAMES[e[0]] || e[0]} (${e[1]}, ${e[2]})`).join(', ');
