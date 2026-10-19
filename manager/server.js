@@ -2,10 +2,9 @@
 //  • opens each saved game profile in its own persistent Chrome / Edge / Brave data directory
 //  • loads helper/binder_helper.js and its per-menu modules in every game tab
 //  • shows each tab's helper status, start / stop / reload helper from the web
-//  • updates from git (fetch / pull --ff-only); after a pull the helper is reloaded in every tab,
-//    and if manager/ itself changed the server exits with code 3 so Start_Binder.bat restarts it
+//  • updates from Git clones or GitHub ZIP installs; after an update the manager restarts itself
 // usage: node manager/server.js   (Start_Binder.bat does this)
-const fs = require('fs'), path = require('path'), http = require('http'), crypto = require('crypto'), { execFile } = require('child_process');
+const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), crypto = require('crypto'), { execFile } = require('child_process');
 const { GAME_URL, ROOT, exeOf, targets, Tab } = require('./browser');
 const { createBrowserMode } = require('./browser_mode');
 
@@ -161,12 +160,114 @@ async function loop() {
 // ---------------- git update ----------------
 const git = (...args) => new Promise(resolve => execFile('git', args, { cwd: ROOT, windowsHide: true, timeout: 60000 }, (err, stdout, stderr) =>
   resolve({ ok: !err, out: String(stdout).trim(), err: String(stderr || (err && err.message) || '').trim() })));
+async function isGitInstall() {
+  const top = await git('rev-parse', '--show-toplevel');
+  return top.ok && path.resolve(top.out).toLowerCase() === path.resolve(ROOT).toLowerCase();
+}
 const UPDATE_REPO_URL = 'https://github.com/chitban74-web/binder.git';
+const UPDATE_REPO_API = 'https://api.github.com/repos/chitban74-web/binder';
+const ZIP_VERSION_FILE = path.join(DATA_ROOT, 'profiles', '.binder-zip-version.json');
 const update = { isRepo: false, branch: '', commit: '', date: '', behind: 0, incoming: [], checkedAt: 0, error: '' };
+async function latestZipCommit() {
+  const r = await fetch(`${UPDATE_REPO_API}/commits/main`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Binder-Town-Updater' } });
+  if (!r.ok) throw new Error(`GitHub API ตอบกลับ HTTP ${r.status}`);
+  const c = await r.json();
+  if (!/^[a-f0-9]{40}$/i.test(c.sha || '')) throw new Error('อ่าน commit ล่าสุดจาก GitHub ไม่สำเร็จ');
+  return { sha: c.sha, date: c.commit?.committer?.date || c.commit?.author?.date || '' };
+}
+async function checkZipUpdate() {
+  update.isRepo = false;
+  update.source = 'zip';
+  update.branch = 'main';
+  update.behind = 0;
+  update.incoming = [];
+  update.error = '';
+  try {
+    const latest = await latestZipCommit();
+    let installed = '';
+    try { installed = JSON.parse(fs.readFileSync(ZIP_VERSION_FILE, 'utf8')).sha || ''; } catch { }
+    update.commit = latest.sha.slice(0, 7);
+    update.date = latest.date ? latest.date.slice(0, 16).replace('T', ' ') : '';
+    update.behind = installed === latest.sha ? 0 : 1;
+    update.incoming = update.behind ? [`${latest.sha.slice(0, 7)} GitHub ZIP update`] : [];
+    update.error = '';
+  } catch (e) {
+    update.error = 'เช็ก ZIP อัปเดตจาก GitHub ไม่สำเร็จ: ' + e.message;
+  }
+  update.checkedAt = Date.now();
+  return update;
+}
+function runPowerShell(args, env) {
+  return new Promise((resolve, reject) => execFile('powershell.exe', args, { windowsHide: true, timeout: 120000, env: { ...process.env, ...env } }, (err, stdout, stderr) =>
+    err ? reject(new Error(String(stderr || err.message).trim())) : resolve(String(stdout).trim())));
+}
+function copyZipFiles(source, destination, backupRoot) {
+  const preserve = new Set(['.git', '.binder-main', 'bin', 'profiles', 'raw', 'data']);
+  let copied = 0, backedUp = 0;
+  function visit(src, rel = '') {
+    const name = path.basename(src);
+    const nextRel = rel ? path.join(rel, name) : name;
+    const parts = nextRel.split(path.sep);
+    if (parts.some(p => preserve.has(p)) || /^Binder-Town-Manager\.exe$/i.test(name) || (parts[0] === 'manager' && name === 'server.log')) return;
+    const dst = path.join(destination, nextRel);
+    const st = fs.statSync(src);
+    if (st.isDirectory()) {
+      fs.mkdirSync(dst, { recursive: true });
+      for (const child of fs.readdirSync(src)) visit(path.join(src, child), nextRel);
+      return;
+    }
+    if (!st.isFile()) return;
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    if (fs.existsSync(dst)) {
+      const old = fs.readFileSync(dst), incoming = fs.readFileSync(src);
+      if (!old.equals(incoming)) {
+        const backup = path.join(backupRoot, nextRel);
+        fs.mkdirSync(path.dirname(backup), { recursive: true });
+        fs.copyFileSync(dst, backup);
+        backedUp++;
+      }
+    }
+    fs.copyFileSync(src, dst);
+    copied++;
+  }
+  for (const child of fs.readdirSync(source)) visit(path.join(source, child));
+  return { copied, backedUp };
+}
+async function pullZipUpdate() {
+  let tempDir = '';
+  try {
+    const latest = await latestZipCommit();
+    let installed = '';
+    try { installed = JSON.parse(fs.readFileSync(ZIP_VERSION_FILE, 'utf8')).sha || ''; } catch { }
+    if (installed === latest.sha) return { ok: true, msg: 'เป็นเวอร์ชันล่าสุดแล้ว' };
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'binder-town-update-'));
+    const response = await fetch(`https://codeload.github.com/chitban74-web/binder/zip/${latest.sha}`, { headers: { 'User-Agent': 'Binder-Town-Updater' } });
+    if (!response.ok) throw new Error(`ดาวน์โหลด ZIP ไม่สำเร็จ (HTTP ${response.status})`);
+    const archive = path.join(tempDir, 'source.zip');
+    fs.writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
+    const extracted = path.join(tempDir, 'extracted');
+    fs.mkdirSync(extracted);
+    await runPowerShell(['-NoProfile', '-NonInteractive', '-Command', 'Expand-Archive -LiteralPath $env:BINDER_UPDATE_ARCHIVE -DestinationPath $env:BINDER_UPDATE_EXTRACTED -Force'], {
+      BINDER_UPDATE_ARCHIVE: archive, BINDER_UPDATE_EXTRACTED: extracted,
+    });
+    const root = fs.readdirSync(extracted).map(n => path.join(extracted, n)).find(p => fs.statSync(p).isDirectory());
+    if (!root || !fs.existsSync(path.join(root, 'manager', 'server.js'))) throw new Error('ZIP ไม่มีไฟล์ Binder Town ที่คาดไว้');
+    const backupRoot = path.join(DATA_ROOT, 'profiles', 'zip-update-backup', new Date().toISOString().replace(/[:.]/g, '-'));
+    const result = copyZipFiles(root, ROOT, backupRoot);
+    fs.mkdirSync(path.dirname(ZIP_VERSION_FILE), { recursive: true });
+    fs.writeFileSync(ZIP_VERSION_FILE, JSON.stringify({ sha: latest.sha, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+    setTimeout(() => { log('ตัวจัดการถูกอัปเดตจาก ZIP — รีสตาร์ต'); process.exit(RESTART_CODE); }, 800);
+    return { ok: true, msg: `อัปเดตจาก GitHub ZIP แล้ว (${result.copied} ไฟล์)` + (result.backedUp ? ` · สำรองไฟล์เดิม ${result.backedUp} ไฟล์ไว้ใน profiles/zip-update-backup` : '') , restart: true };
+  } catch (e) {
+    return { ok: false, msg: 'อัปเดตจาก GitHub ZIP ไม่สำเร็จ: ' + e.message };
+  } finally {
+    if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
 async function checkUpdate(fetchFirst = true) {
-  const repo = await git('rev-parse', '--is-inside-work-tree');
-  update.isRepo = repo.ok && repo.out === 'true';
-  if (!update.isRepo) { update.error = 'โฟลเดอร์นี้ไม่ใช่ git repo (clone มาจาก GitHub ก่อนถึงอัปเดตได้)'; return update; }
+  update.isRepo = await isGitInstall();
+  if (!update.isRepo) return checkZipUpdate();
+  update.source = 'git';
   update.branch = (await git('rev-parse', '--abbrev-ref', 'HEAD')).out;
   const head = await git('log', '-1', '--format=%h|%cd', '--date=format:%Y-%m-%d %H:%M');
   [update.commit, update.date] = head.out.split('|');
@@ -190,6 +291,7 @@ async function checkUpdate(fetchFirst = true) {
   return update;
 }
 async function pullUpdate() {
+  if (!(await isGitInstall())) return pullZipUpdate();
   const before = (await git('rev-parse', 'HEAD')).out;
   const st = await git('status', '--porcelain', '--untracked-files=no');
   if (st.out && !IS_MAIN) {

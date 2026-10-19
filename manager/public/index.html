@@ -225,7 +225,7 @@ function renderGameProfiles(profiles = [], activeIds = []) {
 function renderUpdate(u) {
   if (!u) return;
   $('#role').textContent = u.main ? 'เครื่องหลัก' : u.autoPull ? 'อัปเดตตามเครื่องหลัก' : 'อัปเดตเอง';
-  $('#ver').textContent = u.isRepo ? `${u.commit} · ${u.date}` : 'ไม่ใช่ git';
+  $('#ver').textContent = u.source === 'zip' ? `${u.commit} · ZIP` : u.isRepo ? `${u.commit} · ${u.date}` : 'ไม่ใช่ git';
   const b = $('#btn-update');
   b.dataset.pull = u.behind ? '1' : '';
   $('#upd-label').textContent = u.behind ? `อัปเดต (${u.behind} ใหม่)` : u.error ? 'เช็กอัปเดตไม่ได้' : 'เวอร์ชันล่าสุด';
