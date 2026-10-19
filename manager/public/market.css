@@ -276,3 +276,21 @@
 .tip-foot > b small { font-size: 10.5px; font-weight: 600; color: #fde68a; }
 .tip-foot > span { font-size: 11px; color: var(--text-muted); }
 .tip-foot .mk-buy { margin-left: auto; }
+
+/* "เช็คออปชัน": wanted options (affix + minimum tier) in the all-listings view */
+.mk-want { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-md); background: var(--bg-inset); border: 1px solid var(--line); font-size: 12px; color: var(--text-muted); }
+.mk-want[hidden] { display: none; }
+.mk-want.active { border-color: #22e3c4; }
+.mk-want > span:first-child { margin-right: 4px; }
+.mk-want select { height: 28px; padding: 0 6px; font-size: 12px; max-width: 230px; }
+.mk-want > button { border: 1px solid var(--line-strong); background: rgba(255,255,255,.03); color: var(--text-muted); border-radius: 8px; padding: 4px 10px; font: 700 11.5px var(--font-sans); cursor: pointer; }
+.mk-want > button:hover { color: var(--text-main); border-color: var(--border-glow); }
+.mk-want small { margin-left: auto; color: var(--text-faint); font-size: 10.5px; }
+.mk-wchip { --tc: #94a3b8; display: inline-flex; align-items: center; gap: 5px; padding: 3px 4px 3px 9px; border-radius: 999px; border: 1px solid var(--tc); color: color-mix(in srgb, var(--tc) 70%, #ffffff); background: rgba(255,255,255,.04); }
+.mk-wchip b { font: 800 10.5px var(--font-mono); color: #0b1222; background: var(--tc); border-radius: 5px; padding: 1px 5px; }
+.mk-wchip button { border: 0; background: none; color: var(--text-faint); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; }
+.mk-wchip button:hover { color: var(--text-main); }
+.mk-wchip.t1 { --tc: #cbd5e1; } .mk-wchip.t2 { --tc: #86efac; } .mk-wchip.t3 { --tc: #93c5fd; } .mk-wchip.t4 { --tc: #c4b5fd; }
+.mk-wchip.t5 { --tc: #fdba74; } .mk-wchip.t6 { --tc: #fca5a5; } .mk-wchip.t7 { --tc: #f0abfc; } .mk-wchip.t8 { --tc: #fde68a; }
+.mk-lopt.hit { outline: 1px solid #22e3c4; outline-offset: 2px; border-radius: 6px; background: rgba(34,227,196,.08); }
+.mk-at { color: var(--text-faint); font-size: 11px; white-space: nowrap; }

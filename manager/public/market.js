@@ -12,10 +12,17 @@
   const RAR = { normal: 'Normal', common: 'Normal', uncommon: 'Magic', magic: 'Magic', rare: 'Rare', epic: 'Epic', unique: 'Unique', legendary: 'Legendary' };
   const RARS = [['', 'ทุกระดับ'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['epic', 'Epic'], ['unique', 'Unique']];
   const PAGE = 15;
+  const AUTOS = [[0, 'ปิด'], [1, 'ทุก 1 นาที'], [2, 'ทุก 2 นาที'], [5, 'ทุก 5 นาที'], [10, 'ทุก 10 นาที'], [15, 'ทุก 15 นาที'], [30, 'ทุก 30 นาที']];
   // sub-types and affixes as the game's market window lists them (weapon names from the game's class table)
   const SUBS = { weapon: [["sword", "ดาบ"], ["greatsword", "ดาบสองมือ"], ["mace", "กระบอง"], ["dagger", "มีดสั้น"], ["bow", "ธนู"], ["staff", "ไม้เท้า"], ["wand", "ไม้กายสิทธิ์"], ["rod", "คทา"], ["book", "ตำรา"], ["spear", "หอก"], ["axe", "ขวาน"], ["crossbow", "หน้าไม้"], ["orb", "ลูกแก้วเวท"], ["hand_crossbow", "หน้าไม้มือ"], ["javelin", "หลาว"], ["sling", "สลิง"], ["pike", "ทวน"], ["lance", "หอกทหารม้า"], ["knuckles", "สนับมือ"], ["flail", "ลูกตุ้มโซ่"], ["rapier", "เรเปียร์"], ["throwing_knives", "มีดบิน"], ["greatstaff", "ไม้เท้ายาว"], ["spellstaff", "ไม้เท้าศึก"], ["maul", "ค้อนศักดิ์สิทธิ์"], ["lightstaff", "ไม้เท้าแสง"], ["scythe", "เคียวใหญ่"], ["chain_sickle", "เคียวโซ่"]], gear: [["armor", "เกราะ"], ["headgear", "หมวก"], ["face", "หน้า"], ["mouth", "ปาก"], ["boots", "รองเท้า"], ["offhand", "มือรอง / โล่"], ["accessory", "เครื่องประดับ"], ["necklace", "สร้อยคอ"], ["belt", "เข็มขัด"]] };
   const AFFIXES = [["desperate", "ดาเมจตอนเลือดคุณต่ำกว่า 35%"], ["vsdebuff", "ดาเมจใส่มอนที่ติดสตัน/ตรึง/สโล%"], ["opener", "ดาเมจใส่มอนที่เลือดยังเกิน 90%"], ["bossbane", "ดาเมจใส่ Boss%"], ["castspd", "ร่ายไว%"], ["aspd", "สปีดตี%"], ["agi", "AGI"], ["atk", "ATK"], ["atkpct", "ATK%"], ["block", "Block%"], ["bossres", "Boss Resist%"], ["p_bulwark", "Bulwark (Trigger)"], ["p_chain", "Chain Spark (Trigger)"], ["crit", "CRIT%"], ["critdmg", "Crit DMG%"], ["p_nova", "Death Burst (Trigger)"], ["guard", "DEF"], ["dex", "DEX"], ["p_echo", "Echo Strike (Trigger)"], ["evasive", "FLEE"], ["p_haste", "Frenzy (Trigger)"], ["p_frost", "Frostbite (Trigger)"], ["mending", "Heal power"], ["hit", "HIT"], ["regen", "HP regen/s"], ["int", "INT"], ["p_barrier", "Lifeline (Trigger)"], ["leech", "Lifesteal%"], ["luk", "LUK"], ["manatide", "Mana Tide: MP ที่ใช้กับสกิลเวท"], ["matk", "MATK"], ["matkpct", "MATK%"], ["hp", "Max HP"], ["hppct", "Max HP%"], ["mp", "Max MP"], ["move", "Move speed%"], ["p_bleed", "Rend (Trigger)"], ["p_renew", "Second Wind (Trigger)"], ["p_siphon", "Siphon (Trigger)"], ["cdr", "Skill CDR%"], ["p_gust", "Slipstream (Trigger)"], ["sturdy", "Soft DEF"], ["spellamp", "Spell Amp%"], ["str", "STR"], ["p_expose", "Sunder (Trigger)"], ["p_thorns", "Thorns (Trigger)"], ["p_vigor", "Vigor (Trigger)"], ["vit", "VIT"]];
-  let st = { lsel: null, buyers: [], buyerTab: '', capF: 0, lall: null, lprog: '', view: 'board', lsort: 'def', lpage: 0, ltotal: 0, listings: [], lloading: false, lerror: '', req: 0, q: '', rarity: '', progress: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0 };
+  let st = { lsel: null, buyers: [], buyerTab: '', capF: 0, lall: null, lprog: '', view: 'board', lsort: 'def', lpage: 0, ltotal: 0, listings: [], lloading: false, lerror: '', req: 0, q: '', rarity: '', progress: '', cat: '', sub: 'all', lvMin: 0, lvMax: 0, affix: '', tierMin: 0, counts: null, sort: 'def', rows: [], total: 0, page: 0, loading: false, error: '', sel: null, item: null, range: '7d', itemLoading: false, at: 0, want: [], auto: 5, lat: 0 };
+  // wanted options ("เช็คออปชัน") and the auto-update interval are remembered in this browser
+  const PREF = 'bt.market.prefs';
+  try { const p = JSON.parse(localStorage.getItem(PREF) || '{}');
+    if (Array.isArray(p.want)) st.want = p.want.filter(w => w && typeof w.id === 'string').map(w => ({ id: w.id, t: Math.max(1, Math.min(8, Number(w.t) || 1)) })).slice(0, 6);
+    if (AUTOS.some(([v]) => v === p.auto)) st.auto = p.auto; } catch (e) { }
+  const savePrefs = () => { try { localStorage.setItem(PREF, JSON.stringify({ want: st.want, auto: st.auto })); } catch (e) { } };
 
   // item id -> base id, rarity, display name (gear ids carry "|rare|..." / "^insight", cards "|mob")
   const parse = (key, itemId) => {
@@ -151,7 +158,10 @@
         <p>Affix ${it.opts.length} แถว (จำนวนแถวตายตัวตามความหายาก) · เลเวลไอเทม ${it.ilvl} — ดรอปจากมอนเลเวลสูงกว่า = Tier สูงกว่า · Reroll ที่ Smith สุ่มได้ถึง Tier เดียวกัน</p>
         <div class="ib-ladder">${ladder}</div></details></div>`;
   }
-  const optRows = it => (it.opts.length || it.insight) ? `<div class="mk-lopts">${it.opts.map(o => `<div class="mk-lopt t${Math.min(8, o.tier)}"><b>T${o.tier}</b><span>${esc(optText(o))}</span><small>${esc(it.tierName(o))}</small></div>`).join('')}${it.insight ? `<div class="mk-lopt ins"><b>✦</b><span>${esc(it.insight)}</span><small>insight</small></div>` : ''}</div>` : '';
+  // "เช็คออปชัน": a listing passes when it has every wanted option at (at least) its tier
+  const wantHit = o => st.want.some(w => w.id === o.id && o.tier >= w.t);
+  const wantOk = it => st.want.every(w => it.opts.some(o => o.id === w.id && o.tier >= w.t));
+  const optRows = it => (it.opts.length || it.insight) ? `<div class="mk-lopts">${it.opts.map(o => `<div class="mk-lopt t${Math.min(8, o.tier)}${wantHit(o) ? ' hit' : ''}"><b>T${o.tier}</b><span>${esc(optText(o))}</span><small>${esc(it.tierName(o))}</small></div>`).join('')}${it.insight ? `<div class="mk-lopt ins"><b>✦</b><span>${esc(it.insight)}</span><small>insight</small></div>` : ''}</div>` : '';
   const buyBtn = l => `<button type="button" class="mk-buy" data-buy="${l.id}" title="ซื้อประกาศนี้ (ของส่งเข้าจดหมายในเกม)">ซื้อ</button>`;
   function listingCard(l) {
     const it = listingItem(l.itemId), unit = Math.round(l.price / Math.max(1, l.qty));
@@ -203,7 +213,7 @@
     st.lloading = true; st.lerror = ''; st.lprog = ''; renderListings();
     if (SUBS[st.cat] && !keepAll) loadCounts();
     try {
-      if (!st.capF) {
+      if (!st.capF && !st.want.length) {
         st.lall = null;
         const r = await listingsPage(st.lpage);
         if (my !== st.req) return;
@@ -221,17 +231,18 @@
           if (my !== st.req) return;
           st.lall = { rows: all, total: first.total || 0, cut: Math.ceil((first.total || 0) / 100) > MAX_ALL_PAGES };
         }
-        const rows = st.lall.rows.filter(l => listingItem(l.itemId).cap === st.capF);
+        const rows = st.lall.rows.filter(l => { const it = listingItem(l.itemId); return (!st.capF || it.cap === st.capF) && wantOk(it); });
         st.ltotal = rows.length; st.listings = rows.slice(st.lpage * 100, st.lpage * 100 + 100);
       }
+      st.lat = Date.now();
     } catch (e) { if (my !== st.req) return; st.lerror = e.message; st.listings = []; }
-    st.lloading = false; renderListings();
+    st.lloading = false; renderListings(); renderAt();
   }
   function renderListings() {
     if (st.view !== 'list') return;
     const pages = Math.max(1, Math.ceil(st.ltotal / 100));
     $('mk-count').textContent = st.lloading ? (st.lprog || 'กำลังโหลดประกาศ…') : st.lerror ? '⚠ ' + st.lerror
-      : `${g(st.ltotal)} ประกาศ${st.capF ? ` ที่สูงสุด T${st.capF} (จาก ${g(st.lall ? st.lall.rows.length : 0)}${st.lall && st.lall.cut ? ` — ดึงแค่ ${MAX_ALL_PAGES} หน้าแรก กรองหมวดเพิ่มเพื่อให้ครบ` : ''})` : ''} · หน้า ${st.lpage + 1}/${pages} (หน้าละ 100)`;
+      : `${g(st.ltotal)} ประกาศ${st.capF || st.want.length ? `${st.capF ? ` ที่สูงสุด T${st.capF}` : ''}${st.want.length ? ` ที่ตรงออปชัน` : ''} (จาก ${g(st.lall ? st.lall.rows.length : 0)}${st.lall && st.lall.cut ? ` — ดึงแค่ ${MAX_ALL_PAGES} หน้าแรก กรองหมวดเพิ่มเพื่อให้ครบ` : ''})` : ''} · หน้า ${st.lpage + 1}/${pages} (หน้าละ 100)`;
     $('mk-lists').innerHTML = st.listings.length ? st.listings.map(listingCard).join('') : `<div class="mk-empty small">${st.lloading ? 'กำลังโหลด…' : 'ไม่มีประกาศ'}</div>`;
     const win = [...new Set([0, st.lpage - 2, st.lpage - 1, st.lpage, st.lpage + 1, st.lpage + 2, pages - 1])].filter(x => x >= 0 && x < pages).sort((a, b) => a - b);
     $('mk-pager').innerHTML = pages > 1 ? `<button type="button" data-lpg="${st.lpage - 1}" ${st.lpage ? '' : 'disabled'}>‹</button>`
@@ -260,8 +271,11 @@
         <div class="mk-views" id="mk-views"><button type="button" data-view="board" class="on">กระดานราคา</button><button type="button" data-view="list">ประกาศทั้งหมด</button></div>
         <div class="mk-bar"><span id="mk-count">กำลังโหลด…</span>
           <label>เรียง <select class="mk-input" id="mk-sort">${SORTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
+          <label title="โหลดหน้าที่เปิดอยู่ใหม่เองตามเวลาที่ตั้ง (เฉพาะตอนเปิดแท็บตลาด)">อัพเดตอัตโนมัติ <select class="mk-input" id="mk-auto">${AUTOS.map(([v, l]) => `<option value="${v}" ${v === st.auto ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <span class="mk-at" id="mk-at"></span>
           <button type="button" class="mk-icon" id="mk-reload" title="โหลดใหม่">⟳</button></div>
         <div class="mk-capf" id="mk-capf" hidden><span>Tier สูงสุดของชิ้น</span><button type="button" data-cap="0" class="all on">ทุก T</button>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<button type="button" data-cap="${n}" class="t${n}">T${n}</button>`).join('')}<small>กรองจากทุกหน้าของตัวกรองที่เลือก</small></div>
+        <div class="mk-want" id="mk-want" hidden></div>
         <div class="mk-lists" id="mk-lists" hidden></div>
         <div class="mk-table" id="mk-table">
           <div class="mk-head"><span>ไอเทม</span><span class="r">ราคาถูกสุด</span><span class="r">ในตลาด</span><span class="r">ขายล่าสุด</span></div>
@@ -272,6 +286,22 @@
       <section class="mk-detail" id="mk-detail"><div class="mk-empty"><b>เลือกไอเทมทางซ้าย</b><span>เพื่อดูกราฟราคาและประกาศขาย</span></div></section>
     </div>`;
   const $ = id => document.getElementById(id);
+  // "เช็คออปชัน" panel: the wanted options (affix + minimum tier), a row to add one
+  function renderWant() {
+    const used = new Set(st.want.map(w => w.id));
+    $('mk-want').innerHTML = `<span>เช็คออปชัน</span>${st.want.map((w, i) => `<span class="mk-wchip t${w.t}">${esc(AFFIX_NAME[w.id] || w.id)} <b>T${w.t}+</b><button type="button" data-wdel="${i}" title="เอาออก">×</button></span>`).join('')}
+      ${st.want.length < 6 ? `<select class="mk-input" id="mk-wid"><option value="">+ เลือกออปชัน…</option>${AFFIXES.filter(([v]) => !used.has(v)).map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select>
+      <select class="mk-input" id="mk-wt">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}">T${n}+</option>`).join('')}</select>
+      <button type="button" data-wadd="1">เพิ่ม</button>` : ''}${st.want.length ? `<button type="button" data-wclear="1">ล้าง</button>` : ''}
+      <small>${st.want.length ? 'แสดงเฉพาะประกาศที่มีครบทุกออปชัน · ' : ''}เช็คจากทุกหน้าของตัวกรองที่เลือก</small>`;
+    $('mk-want').classList.toggle('active', !!st.want.length);
+  }
+  // when the open view was last loaded
+  function renderAt() {
+    const t = st.view === 'list' ? st.lat : st.at;
+    $('mk-at').textContent = t ? `อัพเดต ${ago(t)}` : '';
+    $('mk-at').title = t ? new Date(t).toLocaleTimeString('th-TH') : '';
+  }
 
   const gearCat = () => st.cat === '' || st.cat === 'weapon' || st.cat === 'gear';
   function filterParams() {
@@ -353,7 +383,7 @@
       if (my !== st.req) return;   // a newer search started meanwhile
       st.rows = sortRows([...rows.values()]); st.total = st.rows.length; st.page = 0; st.at = Date.now();
     } catch (e) { if (my !== st.req) return; st.error = e.message; st.rows = []; }
-    st.loading = false; st.progress = ''; renderBoard();
+    st.loading = false; st.progress = ''; renderBoard(); renderAt();
   }
   async function loadItem() {
     if (!st.sel) return;
@@ -439,12 +469,21 @@
   $('mk-views').onclick = e => {
     const b = e.target.closest('button[data-view]'); if (!b || b.dataset.view === st.view) return;
     st.view = b.dataset.view; for (const x of $('mk-views').children) x.classList.toggle('on', x === b);
-    $('mk-table').hidden = st.view === 'list'; $('mk-lists').hidden = st.view !== 'list'; $('mk-capf').hidden = st.view !== 'list';
+    $('mk-table').hidden = st.view === 'list'; $('mk-lists').hidden = st.view !== 'list'; $('mk-capf').hidden = st.view !== 'list'; $('mk-want').hidden = st.view !== 'list';
     $('mk-sort').innerHTML = (st.view === 'list' ? LSORTS : SORTS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
     $('mk-sort').value = st.view === 'list' ? st.lsort : st.sort;
     if (st.view === 'list') loadListings(); else renderBoard();
-    renderDetail();
+    renderDetail(); renderAt();
   };
+  $('mk-want').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.wadd) { const id = $('mk-wid').value; if (!id) return $('mk-wid').focus(); st.want.push({ id, t: Number($('mk-wt').value) || 1 }); }
+    else if (b.dataset.wdel) st.want.splice(Number(b.dataset.wdel), 1);
+    else if (b.dataset.wclear) st.want = [];
+    else return;
+    savePrefs(); renderWant(); st.lpage = 0; loadListings(!!st.lall);   // the pages already loaded for the same filters are reused
+  };
+  $('mk-auto').onchange = e => { st.auto = Number(e.target.value) || 0; savePrefs(); };
   $('mk-reload').onclick = () => (st.view === 'list' ? loadListings() : loadBoard());
   $('mk-cats').onclick = e => { const b = e.target.closest('button[data-cat]'); if (!b) return; st.cat = b.dataset.cat; st.sub = 'all'; st.counts = null; for (const x of $('mk-cats').children) x.classList.toggle('on', x === b); renderFilters(); reload(); };
   $('mk-rars').onclick = e => { const b = e.target.closest('button[data-rar]'); if (!b) return; st.rarity = b.dataset.rar; for (const x of $('mk-rars').children) x.classList.toggle('on', x === b); reload(); };
@@ -485,9 +524,19 @@
   });
   $('mk-detail').onclick = e => { const b = e.target.closest('button[data-range]'); if (!b) return; st.range = b.dataset.range; st.item = null; loadItem(); };
 
-  // first load when the tab is opened; refresh every 5 min while it is open (a full read is many requests)
+  // first load when the tab is opened; while it is open the open view reloads itself every `st.auto` minutes
+  // (a full read is many requests; a failed load waits the same interval before the next try)
   const open = () => pane.classList.contains('active');
-  document.querySelectorAll('.tab-btn[data-tab="market"]').forEach(b => b.addEventListener('click', () => { loadBuyers(); if (!st.at) loadBoard(); }));
-  setInterval(() => { if (open() && Date.now() - st.at > 300000 && !st.loading) loadBoard(); }, 5000);
-  if (open()) loadBoard();
+  const boardLoad = () => { st.tried = Date.now(); loadBoard(); };
+  document.querySelectorAll('.tab-btn[data-tab="market"]').forEach(b => b.addEventListener('click', () => { loadBuyers(); if (!st.at) boardLoad(); }));
+  setInterval(() => {
+    if (!open()) return;
+    renderAt();
+    if (!st.auto) return;
+    const due = t => Date.now() - (t || 0) > st.auto * 60000;
+    if (st.view === 'list') { if (!st.lloading && due(Math.max(st.lat, st.ltried || 0))) { st.ltried = Date.now(); loadListings(); } }
+    else if (!st.loading && due(Math.max(st.at, st.tried || 0))) boardLoad();
+  }, 5000);
+  renderWant();
+  if (open()) boardLoad();
 })();
