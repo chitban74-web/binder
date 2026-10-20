@@ -209,6 +209,27 @@ function createBrowserMode({ getSettings, rootDir = ROOT, port = SHARED_BROWSER_
     return { ok: true, msg: 'เปิดหน้าต่างเกมใหม่แล้ว', targetId: target.targetId };
   }
 
+  // Chromium may refuse to start a second Edge process when another process
+  // already owns the profile. A separate BrowserContext gives this profile
+  // independent cookies/storage while reusing the running browser process.
+  async function launchIsolated(clientId) {
+    clientId = String(clientId || `client-${Date.now()}`);
+    await ensureBrowser();
+    await monitor();
+    const existing = [...clients.values()].find(client => client.clientId === clientId);
+    if (existing) {
+      await windowAction(existing.targetId, 'focus').catch(() => {});
+      return { ok: true, msg: 'โปรไฟล์นี้เปิดอยู่แล้ว', targetId: existing.targetId, alreadyOpen: true };
+    }
+    const { browserContextId } = await send('Target.createBrowserContext', { disposeOnDetach: false });
+    const { targetId } = await send('Target.createTarget', { url: 'about:blank', browserContextId });
+    const target = { targetId, type: 'page', url: 'about:blank', clientId };
+    const client = await attachTarget(target);
+    await send('Page.navigate', { url: gameUrl }, client.sessionId, 10000);
+    await windowAction(targetId, 'focus').catch(() => {});
+    return { ok: true, msg: 'เปิดโปรไฟล์แยกแล้ว กรุณาเข้าสู่ระบบเกมด้วย ID นี้', targetId, isolated: true };
+  }
+
   async function removeProfile(clientId) {
     const expectedParent = path.resolve(rootDir, 'profiles', 'game-windows');
     const targetDir = path.resolve(userDataDir);
@@ -329,7 +350,7 @@ function createBrowserMode({ getSettings, rootDir = ROOT, port = SHARED_BROWSER_
     pending.clear();
   }
 
-  return { launch, close, closeAll, shutdown, removeProfile, isProfileOpen, windowAction, start, dispose, findBrowser, isOpen, port };
+  return { launch, launchIsolated, close, closeAll, shutdown, removeProfile, isProfileOpen, windowAction, start, dispose, findBrowser, isOpen, port };
 }
 
 module.exports = { createBrowserMode };

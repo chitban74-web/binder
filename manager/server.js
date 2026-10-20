@@ -101,6 +101,10 @@ async function inject(t, resumeMode) {
     await t.tab.eval(fs.readFileSync(path.join(HELPER_PAGES, file), 'utf8'));
   }
   const r = await t.tab.eval(fs.readFileSync(HELPER, 'utf8'));
+  const savedProfile = readGameProfiles().find(p => p.id === t.profileId);
+  const savedPlan = savedProfile?.plan;
+  if (savedPlan) await t.tab.eval(`window.__bth && window.__bth.applyPlan(${JSON.stringify(savedPlan)})`);
+  if (savedProfile?.skillPlan) await t.tab.eval(`window.__bth && window.__bth.applySkillPlan(${JSON.stringify(savedProfile.skillPlan)})`);
   if (resumeMode === 'gathering') await t.tab.eval(`window.__bth && !window.__bth.cfg.gathering.enabled && document.querySelector('#bthgrun')?.click()`);
   else if (resumeMode === 'farm') await t.tab.eval(`window.__bth && !window.__bth.cfg.running && window.__bth.toggle()`);
   log(`[${t.browser}] ${t.id.slice(0, 6)}: โหลด helper แล้ว (${r})`);
@@ -111,18 +115,21 @@ async function reloadHelper(t) {
   await inject(t, resumeMode);
 }
 
-async function checkTab(key, target, mode) {
+async function checkTab(key, target, mode, profileId) {
   let t = tabs.get(target.id);
   if (!t || t.tab.closed) {
     if (!target.webSocketDebuggerUrl) return;
-    t = { id: target.id, tab: new Tab(target), browser: key, mode, state: 'loading', status: null, injecting: false };
+    t = { id: target.id, tab: new Tab(target), browser: key, mode, profileId, state: 'loading', status: null, injecting: false };
     tabs.set(target.id, t);
   }
   if (mode) t.mode = mode;
+  if (profileId && !t.profileId) t.profileId = profileId;
   t.url = target.url; t.title = target.title; t.seen = Date.now();
   if (t.injecting) return;
   const s = await t.tab.eval(STATE_JS);
   t.clientId = s.clientId || t.clientId || '';
+  const matchedProfile = readGameProfiles().find(profile => profile.id === t.clientId);
+  if (matchedProfile) t.profileId = matchedProfile.id;
   t.status = s.status;
   if (s.status) t.wasMode = s.status.mode || (s.status.gathering?.enabled ? 'gathering' : s.status.running ? 'farm' : 'stopped'); // kept over a page reload
   if (s.status && s.status.log) {
@@ -158,7 +165,7 @@ async function loop() {
       anyProfileBrowserUp ||= !!list;
       if (!list) continue;
       for (const target of list) if (target.type === 'page' && String(target.url).startsWith(GAME_URL)) {
-        try { await checkTab('shared', target, mode); } catch (e) { if (!/closed|timeout|connect/.test(e.message)) log(`[${profileId}] ตรวจแท็บไม่ได้:`, e.message); }
+        try { await checkTab('shared', target, mode, profileId); } catch (e) { if (!/closed|timeout|connect/.test(e.message)) log(`[${profileId}] ตรวจแท็บไม่ได้:`, e.message); }
       }
     }
     browserUp.shared = anyProfileBrowserUp;
@@ -312,6 +319,205 @@ const server = http.createServer(async (req, res) => {
       return res.end(fs.readFileSync(path.join(PUBLIC, 'index.html')));
     }
     if (req.method === 'GET' && url.pathname === '/api/status') return json(res, 200, statusBody());
+    if (req.method === 'GET' && url.pathname === '/api/plan/maps') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(fs.readFileSync(path.join(PUBLIC, 'plan_maps.json')));
+    }
+    if (req.method === 'GET' && url.pathname === '/api/map-captures') {
+      let maps;
+      try { maps = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'plan_maps.json'), 'utf8')); }
+      catch { return json(res, 500, { ok: false, error: 'อ่านรายชื่อแผนที่ไม่สำเร็จ' }); }
+      const dir = path.join(PUBLIC, 'map_captures');
+      let saved = {}; try { saved = JSON.parse(fs.readFileSync(path.join(dir, 'progress.json'), 'utf8')); } catch { }
+      const captures = Object.fromEntries(maps.flatMap(m => {
+        if (saved[m.id]?.invalid) return [];
+        const filename = [`${m.id}_big.png`, `${m.id}.png`].find(f => fs.existsSync(path.join(dir, f)));
+        return filename ? [[m.id, { filename, capturedAt: null, ...(saved[m.id] || {}) }]] : [];
+      }));
+      return json(res, 200, { ok: true, captures });
+    }
+    const planMapImage = url.pathname.match(/^\/api\/plan\/map-image\/([\w-]+)$/);
+    if (req.method === 'GET' && planMapImage) {
+      const id = planMapImage[1], dir = path.join(PUBLIC, 'map_captures');
+      const file = path.join(dir, `${id}_big.png`);
+      if (!fs.existsSync(file)) return json(res, 404, { error: 'ยังไม่มีภาพแผนที่จริง' });
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
+      return res.end(fs.readFileSync(file));
+    }
+    const captureMatch = url.pathname.match(/^\/api\/map-captures\/([\w-]+)$/);
+    if (captureMatch && req.method === 'POST') {
+      const mapId = captureMatch[1];
+      let maps;
+      try { maps = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'plan_maps.json'), 'utf8')); }
+      catch { return json(res, 500, { ok: false, error: 'อ่านรายชื่อแผนที่ไม่สำเร็จ' }); }
+      const map = maps.find(m => m.id === mapId);
+      if (!map) return json(res, 404, { ok: false, error: 'ไม่พบแผนที่นี้' });
+      const body = await new Promise(resolve => { let data = ''; req.on('data', c => { data += c; }); req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve({}); } }); });
+      const t = [...tabs.values()].find(x => x.profileId === String(body.profileId || '') && x.state === 'helper' && !x.tab.closed);
+      if (!t) return json(res, 409, { ok: false, error: 'โปรไฟล์นี้ไม่มีแท็บเกมที่พร้อม' });
+      let shot;
+      try { shot = await t.tab.eval(`(async() => { const expected=${JSON.stringify(map.name)},box=document.querySelector('#mmbig'); let opened=false; const title=()=>document.querySelector('#mmbigname')?.textContent?.trim()||''; if(window.__bth?.status?.()?.map===expected&&title()!==expected){ if(box&&!box.hidden){document.querySelector('#mmbigx')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,80));} const mini=document.querySelector('#minimap'); if(box?.hidden&&mini){mini.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,pointerType:'mouse',button:0}));opened=!box.hidden;if(opened)await new Promise(r=>setTimeout(r,700));} } const s=window.__bth?.status?.(),c=document.querySelector('#mmbigcv'),result={map:s?.map||document.querySelector('#mapname')?.textContent?.trim()||'',canvasMap:title(),data:c&&c.width>0&&c.height>0?c.toDataURL('image/png'):'',width:c?.width||0,height:c?.height||0}; if(opened&&box&&!box.hidden)document.querySelector('#mmbigx')?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true})); return result; })()`); }
+      catch (e) { return json(res, 503, { ok: false, error: `อ่านภาพจากเกมไม่สำเร็จ: ${e.message}` }); }
+      if (shot.map !== map.name) return json(res, 409, { ok: false, error: `ตอนนี้อยู่ ${shot.map || 'ไม่ทราบแมพ'} · ต้องอยู่ ${map.name} ก่อน` });
+      if (shot.canvasMap !== map.name) return json(res, 409, { ok: false, error: `หัวแผนที่ในเกมยังเป็น ${shot.canvasMap || 'ไม่ทราบแมพ'} · รอแผนที่ ${map.name} โหลดให้เสร็จก่อน` });
+      if (!shot.data || !shot.data.startsWith('data:image/png;base64,') || shot.data.length < 1000)
+        return json(res, 409, { ok: false, error: 'ยังอ่านภาพแผนที่จริงจากเกมไม่ได้ เปิดแผนที่ใหญ่ในเกมแล้วลองอีกครั้ง' });
+      const dir = path.join(PUBLIC, 'map_captures'), filename = `${map.id}_big.png`, file = path.join(dir, filename);
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(file, Buffer.from(shot.data.slice('data:image/png;base64,'.length), 'base64'));
+        let progress = {}; try { progress = JSON.parse(fs.readFileSync(path.join(dir, 'progress.json'), 'utf8')); } catch { }
+        progress[map.id] = { filename, capturedAt: new Date().toISOString(), width: shot.width, height: shot.height, invalid: false };
+        fs.writeFileSync(path.join(dir, 'progress.json'), JSON.stringify(progress, null, 2), 'utf8');
+      } catch (e) { return json(res, 500, { ok: false, error: `บันทึกภาพไม่สำเร็จ: ${e.message}` }); }
+      return json(res, 200, { ok: true, map: map.name, filename, width: shot.width, height: shot.height });
+    }
+    const skillTreeMatch = url.pathname.match(/^\/api\/profiles\/([\w-]+)\/skill-tree$/);
+    if (req.method === 'GET' && skillTreeMatch) {
+      const profileId = skillTreeMatch[1];
+      if (!readGameProfiles().some(p => p.id === profileId)) return json(res, 404, { error: 'ไม่พบโปรไฟล์นี้' });
+      const t = [...tabs.values()].find(x => x.profileId === profileId && x.state === 'helper' && !x.tab.closed);
+      if (!t) return json(res, 409, { error: 'โปรไฟล์นี้ไม่มีแท็บเกมที่โหลด Helper อยู่' });
+      try {
+        const openedSkillUi = await t.tab.eval(`(() => { const root=document.querySelector('#skillrows'); if (root?.getClientRects().length) return false; const button=document.querySelector('#mbskill'); if (!button) return false; button.click(); return true; })()`);
+        if (openedSkillUi) {
+          // The game only populates #skillrows after its Skill menu is opened.
+          // Wait briefly for that real UI to render before taking the snapshot.
+          for (let attempt = 0; attempt < 12; attempt++) {
+            await sleep(150);
+            const ready = await t.tab.eval(`!!document.querySelector('#skillrows .skB-node[data-skill]')`);
+            if (ready) break;
+          }
+        }
+        const snapshot = await t.tab.eval(`(async () => {
+          const root=document.querySelector('#skillrows'), room=window.__bthRoom, p=room?.state?.players?.get(room?.sessionId);
+          if(!root||!p)return {error:'ยังอ่าน skill UI หรือสถานะตัวละครจากเกมไม่ได้'};
+          const headers=[...root.querySelectorAll('.skB-head')].map((h,index)=>{const trait=h.querySelector('.skB-trait');return {index,className:h.className,name:h.querySelector(':scope > b')?.textContent?.trim()||'',summary:h.querySelector(':scope > small')?.textContent?.trim()||'',mastery:h.querySelector('.skB-mast span')?.textContent?.trim()||'',masteryPercent:Number(h.querySelector('.skB-mast u')?.style.width?.replace('%','')||0),traitLine:trait?.dataset.traitline||'',traitName:trait?.querySelector('.tr2tx small')?.textContent?.trim()||'',traitLocked:trait?.classList.contains('lock')||false,traitIcon:trait?.querySelector('img')?.src||'',traitProgress:trait?.querySelector('.tr2bar u')?.style.width||''};});
+          const skills=[...root.querySelectorAll('.skB-node[data-skill]')].map(b=>{
+            const aria=b.getAttribute('aria-label')||'', m=aria.match(/^(.*?)\\s+(\\d+)\\/(\\d+)/), cell=b.closest('.skB-cell');
+            const col=(cell?.className.match(/\\bg(\\d+)\\b/)||[])[1], id=b.dataset.skill, lv=Number(p.skillLevels?.get?.(id)??m?.[2]??0), body=b.querySelector('.skB-bd');
+            const labels=[...(body?.children||[])].filter(e=>e.tagName!=='B').map(e=>({tag:e.tagName,className:e.className,text:e.innerText.trim()})).filter(e=>e.text);
+            const max=Number(m?.[3]||lv), mod=String(p.skillMods?.get?.(id)||'');
+            return {id,name:body?.querySelector('b')?.textContent?.trim()||m?.[1]||id,level:lv,max,line:col==null?'':root.querySelector('.skB-head.g'+col+' > b')?.textContent?.trim()||'',column:col==null?null:Number(col),labels,aria,className:b.className,locked:b.classList.contains('locked'),unlockJobLevel:Number((aria.match(/ปลดล็อก Job Lv\\s*(\\d+)/)||[])[1]||0),icon:b.querySelector('.skB-ic img')?.src||'',currentEvolution:mod,evolutionAvailable:b.classList.contains('evo')||mod==='a'||mod==='b',evolutionLevel:Math.ceil(max/2)};
+          });
+          let traitState={};try{traitState=typeof p.traits==='string'?JSON.parse(p.traits):p.traits||{};}catch{}
+          return {job:String(p.job||''),jobLevel:Number(p.jobLevel||0),skillPoints:Number(p.skillPoints||0),statPoints:Number(p.statPoints||0),stats:Object.fromEntries(['str','agi','vit','int','dex','luk'].map(k=>[k,Number(p[k]||0)])),traitState,headers,skills};
+        })()`);
+        if (snapshot?.error) return json(res, 409, { error: snapshot.error });
+        return json(res, 200, snapshot);
+      } catch (e) { return json(res, 503, { error: `อ่าน Skill UI จากเกมไม่สำเร็จ: ${e.message}` }); }
+    }
+    const skillPlanMatch = url.pathname.match(/^\/api\/profiles\/([\w-]+)\/skill-plan$/);
+    const skillEvolutionMatch = url.pathname.match(/^\/api\/profiles\/([\w-]+)\/skill-evolution$/);
+    const skillTraitMatch = url.pathname.match(/^\/api\/profiles\/([\w-]+)\/skill-trait$/);
+    if (req.method === 'POST' && skillTraitMatch) {
+      const profileId = skillTraitMatch[1], body = await new Promise(resolve => { let data = ''; req.on('data', c => { data += c; }); req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve(null); } }); });
+      const line = String(body?.line || ''), pick = String(body?.pick || '').toLowerCase();
+      if (!['marksman','artillery','wind','assassin','trickery','shadow','destruction','runecraft','mind','judgment','mercy','covenant','spirits','souls','shards','fury','wounds','survival'].includes(line) || !['a','b'].includes(pick)) return json(res, 400, { error: 'สายหรือ Trait A/B ไม่ถูกต้อง' });
+      if (!readGameProfiles().some(p => p.id === profileId)) return json(res, 404, { error: 'ไม่พบโปรไฟล์นี้' });
+      const t = [...tabs.values()].find(x => x.profileId === profileId && x.state === 'helper' && !x.tab.closed);
+      if (!t) return json(res, 409, { error: 'โปรไฟล์นี้ไม่มีแท็บเกมที่พร้อม' });
+      try {
+        const result = await t.tab.eval(`(async()=>{const root=document.querySelector('#skillrows'),room=window.__bthRoom,p=room?.state?.players?.get(room?.sessionId),line=${JSON.stringify(line)},pick=${JSON.stringify(pick)};if(!root||!p)return {error:'อ่าน Skill UI จากเกมไม่ได้'};let traits={};try{traits=typeof p.traits==='string'?JSON.parse(p.traits):p.traits||{}}catch{};if(traits[line]===pick)return {ok:true,unchanged:true,pick};const button=root.querySelector('.skB-trait[data-traitline="'+line+'"]');if(!button)return {error:'ไม่พบ Trait ของสายนี้ในเกม'};if(button.classList.contains('lock'))return {error:'Trait จะเลือกได้เมื่อลงแต้มในสายนี้ครบ 10 แต้ม'};button.click();await new Promise(r=>setTimeout(r,60));const veil=document.querySelector('#buyconfirm'),title=document.querySelector('#bctitle')?.textContent?.trim()||'',yes=document.querySelector('#bcyes'),choice=document.querySelector('#bcbody [data-trc="'+pick+'"]');if(!veil||veil.hidden||!yes||!title.includes('Trait')||!choice)return {error:'เกมไม่เปิดหน้าต่างเลือก Trait A/B'};choice.click();const label=yes.textContent.trim();if(label==='ปิด'){yes.click();return {error:traits[line]?'เปลี่ยน Trait ที่เลือกอยู่ได้เฉพาะในเมือง':'เกมยังไม่ปลดล็อกการเลือก Trait'};}if(!label.includes('ใช้ Trait นี้'))return {error:'ปุ่มยืนยัน Trait ไม่ตรงกับเกม'};yes.click();await new Promise(r=>setTimeout(r,350));let updated={};try{updated=typeof p.traits==='string'?JSON.parse(p.traits):p.traits||{}}catch{};return {ok:true,pick:updated[line]||pick,current:updated[line]||traits[line]||''};})()`);
+        if (result?.error) return json(res, 409, { error: result.error });
+        return json(res, 200, result || { ok: false, error: 'เกมไม่ตอบกลับการเลือก Trait' });
+      } catch (e) { return json(res, 503, { error: `เลือก Trait จาก UI เกมไม่สำเร็จ: ${e.message}` }); }
+    }
+    if (req.method === 'POST' && skillEvolutionMatch) {
+      const profileId = skillEvolutionMatch[1], body = await new Promise(resolve => { let data = ''; req.on('data', c => { data += c; }); req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve(null); } }); });
+      const skillId = String(body?.skillId || ''), mod = String(body?.mod || '').toLowerCase();
+      if (!/^[a-z0-9_]{1,80}$/.test(skillId) || !['a','b'].includes(mod)) return json(res, 400, { error: 'สกิลหรือ Evolution A/B ไม่ถูกต้อง' });
+      if (!readGameProfiles().some(p => p.id === profileId)) return json(res, 404, { error: 'ไม่พบโปรไฟล์นี้' });
+      const t = [...tabs.values()].find(x => x.profileId === profileId && x.state === 'helper' && !x.tab.closed);
+      if (!t) return json(res, 409, { error: 'โปรไฟล์นี้ไม่มีแท็บเกมที่พร้อม' });
+      try {
+        const result = await t.tab.eval(`(async()=>{const root=document.querySelector('#skillrows'),room=window.__bthRoom,p=room?.state?.players?.get(room?.sessionId),id=${JSON.stringify(skillId)},mod=${JSON.stringify(mod)};if(!root||!p)return {error:'อ่าน Skill UI จากเกมไม่ได้'};const node=root.querySelector('.skB-node[data-skill="'+id+'"]');if(!node||node.classList.contains('locked'))return {error:'สกิลนี้ยังเรียนไม่ได้'};const current=p.skillMods?.get?.(id)||'';if(current===mod)return {ok:true,unchanged:true,current};if(!node.classList.contains('evo')&&!current)return {error:'Evolution A/B ยังไม่ปลดล็อก · สกิลนี้ปลดล็อกที่ Lv '+Math.ceil((Number((node.getAttribute('aria-label')||'').match(/\\/(\\d+)/)?.[1]||1))/2)};const name=node.querySelector('.skB-bd>b')?.textContent?.trim()||id;if(!node.classList.contains('sel'))node.click();const choose=root.querySelector('.dk-evo [data-evo="'+mod+'"]');if(!choose)return {error:'ไม่พบปุ่ม Evolution '+mod.toUpperCase()+' ในหน้าสกิลเกม'};if(choose.disabled)return {error:'เกมยังไม่อนุญาตให้เลือก Evolution นี้'};choose.click();await new Promise(r=>setTimeout(r,80));const veil=document.querySelector('#buyconfirm'),title=document.querySelector('#bctitle')?.textContent?.trim()||'',yes=document.querySelector('#bcyes');if(!veil||veil.hidden||!yes||!title.includes(name))return {error:'เกมไม่เปิดหน้าต่างยืนยัน Evolution ของสกิลนี้'};const label=yes.textContent.trim();if(!/เลือก|เปลี่ยน/.test(label))return {error:'ปุ่มยืนยัน Evolution ไม่ตรงกับเกม'};if(label.includes('เปลี่ยน')&&!label.includes('ฟรี'))return {pending:true,message:'การเปลี่ยน Evolution นี้มีค่าใช้จ่าย · ตรวจและยืนยันในหน้าต่างเกม',title,label};yes.click();await new Promise(r=>setTimeout(r,350));const updated=room?.state?.players?.get(room?.sessionId)?.skillMods?.get?.(id)||'';return {ok:true,selected:updated||mod,current:updated||current};})()`);
+        if (result?.error) return json(res, 409, { error: result.error });
+        if (result?.pending) return json(res, 409, { error: result.message, pending: true });
+        return json(res, 200, result || { ok: false, error: 'เกมไม่ตอบกลับการเลือก Evolution' });
+      } catch (e) { return json(res, 503, { error: `เลือก Evolution จาก UI เกมไม่สำเร็จ: ${e.message}` }); }
+    }
+    if (skillPlanMatch && ['GET', 'PUT'].includes(req.method)) {
+      const profileId = skillPlanMatch[1], profiles = readGameProfiles(), profile = profiles.find(p => p.id === profileId);
+      if (!profile) return json(res, 404, { error: 'ไม่พบโปรไฟล์นี้' });
+      if (req.method === 'GET') return json(res, 200, { ok: true, skillPlan: profile.skillPlan || { enabled: false, job: '', items: [], jobs: {}, jobChange: { enabled: false, targetJob: 'scout', allowPaid: false }, statusPlan: { enabled: false, job: '', items: [] } } });
+      const body = await new Promise(resolve => { let data = ''; req.on('data', c => { data += c; }); req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve(null); } }); });
+      if (!body || !Array.isArray(body.items) || body.items.length > 60) return json(res, 400, { error: 'รายการสกิลต้องมี 0–60 รายการ' });
+      const items = [], seen = new Set();
+      for (const [i, item] of body.items.entries()) {
+        const skillId = String(item?.skillId || '');
+        const target = Math.max(0, Math.min(30, Math.floor(Number(item?.target) || 0)));
+        const baseLevel = Math.max(0, Math.min(30, Math.floor(Number(item?.baseLevel) || 0)));
+        if (!/^[a-z0-9_]{1,80}$/.test(skillId) || seen.has(skillId)) return json(res, 400, { error: `รายการสกิลลำดับ ${i + 1} ไม่ถูกต้อง` });
+        seen.add(skillId); items.push({ skillId, target, baseLevel });
+      }
+      const jobs = { ...(profile.skillPlan?.jobs || {}) };
+      if (body.jobs && typeof body.jobs === 'object' && !Array.isArray(body.jobs)) {
+        for (const [jobName, jobPlan] of Object.entries(body.jobs).slice(0, 20)) {
+          if (!/^[a-z0-9_-]{1,40}$/i.test(jobName) || !Array.isArray(jobPlan?.items) || jobPlan.items.length > 60) continue;
+          const seenJobSkills = new Set(), jobItems = [];
+          for (const item of jobPlan.items) {
+            const skillId = String(item?.skillId || '');
+            if (!/^[a-z0-9_]{1,80}$/.test(skillId) || seenJobSkills.has(skillId)) continue;
+            seenJobSkills.add(skillId);
+            jobItems.push({ skillId, target: Math.max(0, Math.min(30, Math.floor(Number(item?.target) || 0))),
+              baseLevel: Math.max(0, Math.min(30, Math.floor(Number(item?.baseLevel) || 0))) });
+          }
+          jobs[jobName] = { enabled: jobPlan.enabled === true && jobItems.length > 0, items: jobItems };
+        }
+      }
+      const job = String(body.job || '').slice(0, 40);
+      if (job) jobs[job] = { enabled: body.enabled === true && items.length > 0, items };
+      const jobChange = body.jobChange || {};
+      const targetJob = String(jobChange.targetJob || 'scout');
+      if (!['knight','warrior','scout','rogue','mage','acolyte','summoner'].includes(targetJob)) return json(res, 400, { error: 'อาชีพปลายทางไม่ถูกต้อง' });
+      const statusPlan = body.statusPlan || {}, validStats = ['str','agi','vit','int','dex','luk'], statusItems = [], seenStats = new Set();
+      if (!Array.isArray(statusPlan.items) || statusPlan.items.length > 6) return json(res, 400, { error: 'รายการสเตตัสต้องมี 0–6 รายการ' });
+      for (const item of statusPlan.items) {
+        const stat = String(item?.stat || '').toLowerCase(), target = Math.max(0, Math.min(99, Math.floor(Number(item?.target) || 0)));
+        if (!validStats.includes(stat) || seenStats.has(stat)) return json(res, 400, { error: 'ลำดับสเตตัสไม่ถูกต้อง' });
+        seenStats.add(stat); statusItems.push({ stat, target });
+      }
+      profile.skillPlan = { enabled: body.enabled === true, job, items, jobs,
+        jobChange: { enabled: jobChange.enabled === true, targetJob, allowPaid: jobChange.allowPaid === true },
+        statusPlan: { enabled: statusPlan.enabled === true, job: String(statusPlan.job || '').slice(0, 40), items: statusItems } };
+      saveGameProfiles(profiles);
+      const results = await Promise.all([...tabs.values()].filter(t => t.profileId === profileId && t.state === 'helper' && !t.tab.closed)
+        .map(async t => { try { return await t.tab.eval(`window.__bth && window.__bth.applySkillPlan(${JSON.stringify(profile.skillPlan)})`); } catch (e) { return { error: e.message }; } }));
+      const failures = results.filter(r => r && r.error);
+      return json(res, 200, { ok: true, skillPlan: profile.skillPlan, applied: results.length - failures.length, warning: failures.length ? 'บันทึกแล้ว แต่ส่ง Skill Plan ให้ Helper บางจอไม่สำเร็จ' : '' });
+    }
+    const planMatch = url.pathname.match(/^\/api\/profiles\/([\w-]+)\/plan$/);
+    if (planMatch && ['GET', 'PUT'].includes(req.method)) {
+      const profileId = planMatch[1], profiles = readGameProfiles(), profile = profiles.find(p => p.id === profileId);
+      if (!profile) return json(res, 404, { ok: false, error: 'ไม่พบโปรไฟล์นี้' });
+      if (req.method === 'GET') return json(res, 200, { ok: true, plan: profile.plan || { enabled: false, steps: [] } });
+      const body = await new Promise(resolve => { let data = ''; req.on('data', chunk => { data += chunk; }); req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve(null); } }); });
+      if (!body || !Array.isArray(body.steps) || body.steps.length > 30) return json(res, 400, { ok: false, error: 'แผนต้องมีขั้น 0–30 ขั้น' });
+      let maps;
+      try { maps = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'plan_maps.json'), 'utf8')); } catch { return json(res, 500, { ok: false, error: 'อ่านข้อมูลแผนที่ไม่สำเร็จ' }); }
+      const byMap = new Map(maps.map(m => [m.id, m]));
+      const steps = [];
+      let nextMinLevel = 1;
+      for (const [i, s] of body.steps.entries()) {
+        const map = byMap.get(String(s.map || ''));
+        const minLevel = nextMinLevel;
+        const maxLevel = Math.max(minLevel, Math.min(999, Math.floor(Number(s.maxLevel) || minLevel)));
+        const x = Number(s.spot && s.spot.x), y = Number(s.spot && s.spot.y);
+        if (!map || !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > map.w || y > map.h)
+          return json(res, 400, { ok: false, error: `ขั้น ${i + 1}: เลือกแมพและจุดฟาร์มในขอบเขตแผนที่ก่อน` });
+        steps.push({ id: String(s.id || crypto.randomUUID()).slice(0, 80), name: String(s.name || `ขั้น ${i + 1}`).slice(0, 60),
+          minLevel, maxLevel, map: map.id, spot: { x: +x.toFixed(2), y: +y.toFixed(2) }, mob: String(s.mob || '').slice(0, 80) });
+        nextMinLevel = Math.min(999, maxLevel + 1);
+      }
+      profile.plan = { enabled: body.enabled === true, steps };
+      if (profile.plan.enabled && steps.length) profile.farmMap = byMap.get(steps[0].map)?.name || profile.farmMap || '';
+      saveGameProfiles(profiles);
+      const applyResults = await Promise.all([...tabs.values()].filter(t => t.profileId === profileId && t.state === 'helper' && !t.tab.closed)
+        .map(async t => { try { return await t.tab.eval(`window.__bth && window.__bth.applyPlan(${JSON.stringify(profile.plan)})`); } catch (e) { return { error: e.message }; } }));
+      const failures = applyResults.filter(r => r && r.error);
+      return json(res, 200, { ok: true, plan: profile.plan, applied: applyResults.length - failures.length, warning: failures.length ? 'บันทึกแล้ว แต่ส่งให้ Helper บางจอไม่สำเร็จ' : '' });
+    }
     if (url.pathname === '/api/browser-mode' && req.method === 'GET') return json(res, 200, statusBody().browserMode);
     if (url.pathname === '/api/browser-mode' && req.method === 'POST') {
       const body = await new Promise(resolve => { let data = ''; req.on('data', chunk => { data += chunk; }); req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve({}); } }); });
@@ -370,9 +576,9 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, profiles: updated });
     }
     // other files of the page (style.css, …): plain names inside manager/public only
-    const sf = req.method === 'GET' && url.pathname.match(/^\/([\w-]+\.(css|js|png|svg|ico))$/);
+    const sf = req.method === 'GET' && url.pathname.match(/^\/([\w-]+\.(css|js|json|png|svg|ico))$/);
     if (sf && fs.existsSync(path.join(PUBLIC, sf[1]))) {
-      const type = { css: 'text/css', js: 'text/javascript', png: 'image/png', svg: 'image/svg+xml', ico: 'image/x-icon' }[sf[2]];
+      const type = { css: 'text/css', js: 'text/javascript', json: 'application/json', png: 'image/png', svg: 'image/svg+xml', ico: 'image/x-icon' }[sf[2]];
       res.writeHead(200, { 'Content-Type': type + (/css|js/.test(sf[2]) ? '; charset=utf-8' : ''), 'Cache-Control': 'no-store' });
       return res.end(fs.readFileSync(path.join(PUBLIC, sf[1])));
     }
@@ -478,7 +684,19 @@ const server = http.createServer(async (req, res) => {
       }
       const mode = browserModeForProfile(profile.id);
       await mode.start();
-      return json(res, 200, await mode.launch(profile.id));
+      try {
+        return json(res, 200, await mode.launch(profile.id));
+      } catch (primaryError) {
+        // If Chromium cannot launch/attach the profile's dedicated process,
+        // use another live CDP browser with a fresh isolated BrowserContext.
+        // This keeps this profile's game cookies separate from other profiles.
+        for (const otherMode of allProfileModes()) {
+          if (otherMode === mode || !(await otherMode.isOpen().catch(() => false))) continue;
+          try { return json(res, 200, await otherMode.launchIsolated(profile.id)); }
+          catch (fallbackError) { log(`[${profile.id}] isolated browser fallback failed:`, fallbackError.message); }
+        }
+        throw primaryError;
+      }
     }
     if (url.pathname === '/api/browser/shared/close-all' && req.method === 'POST') {
       const results = await Promise.all(allProfileModes().map(mode => mode.closeAll().catch(() => ({ count: 0 }))));

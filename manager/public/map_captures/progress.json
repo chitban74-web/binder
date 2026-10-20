@@ -1,0 +1,226 @@
+{
+  "southvale_field": {
+    "filename": "southvale_field_big.png",
+    "capturedAt": "2026-10-20T18:39:09.020Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "riverside": {
+    "filename": "riverside_big.png",
+    "capturedAt": "2026-10-20T18:46:07.253Z",
+    "width": 940,
+    "height": 581,
+    "invalid": false
+  },
+  "valebrook": {
+    "filename": "valebrook_big.png",
+    "capturedAt": "2026-10-20T18:36:53.5827223Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "ashford": {
+    "filename": "ashford_big.png",
+    "capturedAt": "2026-10-20T18:46:40.262Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "sunfield_plains": {
+    "filename": "sunfield_plains_big.png",
+    "capturedAt": "2026-10-20T18:46:48.827Z",
+    "width": 939,
+    "height": 718,
+    "invalid": false
+  },
+  "honeyrill": {
+    "filename": "honeyrill_big.png",
+    "capturedAt": "2026-10-20T18:47:45.346Z",
+    "width": 866,
+    "height": 780,
+    "invalid": false
+  },
+  "whispering_woods": {
+    "filename": "whispering_woods_big.png",
+    "capturedAt": "2026-10-20T18:48:01.149Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "bracken_sink": {
+    "filename": "bracken_sink_big.png",
+    "capturedAt": "2026-10-20T18:48:22.610Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "old_quarry": {
+    "filename": "old_quarry_big.png",
+    "capturedAt": "2026-10-20T18:48:36.041Z",
+    "width": 586,
+    "height": 780,
+    "invalid": false
+  },
+  "verdigris_rise": {
+    "filename": "verdigris_rise_big.png",
+    "capturedAt": "2026-10-20T18:49:00.111Z",
+    "width": 665,
+    "height": 780,
+    "invalid": false
+  },
+  "ancient_ruins": {
+    "filename": "ancient_ruins_big.png",
+    "capturedAt": "2026-10-20T18:49:34.982Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "mistmire_swamp": {
+    "filename": "mistmire_swamp_big.png",
+    "capturedAt": "2026-10-20T18:50:23.674Z",
+    "width": 940,
+    "height": 655,
+    "invalid": false
+  },
+  "ember_hollow": {
+    "filename": "ember_hollow_big.png",
+    "capturedAt": "2026-10-20T18:50:38.142Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "duskgate_pass": {
+    "filename": "duskgate_pass_big.png",
+    "capturedAt": "2026-10-20T18:50:57.890Z",
+    "width": 522,
+    "height": 780,
+    "invalid": false
+  },
+  "sledrun_gully": {
+    "filename": "sledrun_gully_big.png",
+    "capturedAt": "2026-10-20T18:52:17.690Z",
+    "width": 563,
+    "height": 780,
+    "invalid": false
+  },
+  "frostpeak_slopes": {
+    "filename": "frostpeak_slopes_big.png",
+    "capturedAt": "2026-10-20T18:52:22.430Z",
+    "width": 559,
+    "height": 780,
+    "invalid": false
+  },
+  "frozen_mere": {
+    "filename": "frozen_mere_big.png",
+    "capturedAt": "2026-10-20T18:52:42.484Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "howling_steppes": {
+    "filename": "howling_steppes_big.png",
+    "capturedAt": "2026-10-20T18:53:03.041Z",
+    "width": 940,
+    "height": 581,
+    "invalid": false
+  },
+  "brinecrust_shoals": {
+    "filename": "brinecrust_shoals_big.png",
+    "capturedAt": "2026-10-20T18:53:24.675Z",
+    "width": 851,
+    "height": 779,
+    "invalid": false
+  },
+  "cloudspire_ruins": {
+    "filename": "cloudspire_ruins_big.png",
+    "capturedAt": "2026-10-20T18:53:51.451Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "sanctum": {
+    "filename": "sanctum_big.png",
+    "capturedAt": "2026-10-20T18:54:17.650Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "shattered_vale": {
+    "filename": "shattered_vale_big.png",
+    "capturedAt": "2026-10-20T18:54:26.610Z",
+    "width": 882,
+    "height": 780,
+    "invalid": false
+  },
+  "glasswrack": {
+    "filename": "glasswrack_big.png",
+    "capturedAt": "2026-10-20T18:54:57.686Z",
+    "width": 837,
+    "height": 780,
+    "invalid": false
+  },
+  "umbral_depths": {
+    "filename": "umbral_depths_big.png",
+    "capturedAt": "2026-10-20T18:55:28.666Z",
+    "width": 779,
+    "height": 779,
+    "invalid": false
+  },
+  "throne_of_warden": {
+    "filename": "throne_of_warden_big.png",
+    "capturedAt": "2026-10-20T18:55:48.168Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "rustbell_barracks": {
+    "filename": "rustbell_barracks_big.png",
+    "capturedAt": "2026-10-20T18:56:03.369Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "gloomroot_forest": {
+    "filename": "gloomroot_forest_big.png",
+    "capturedAt": "2026-10-20T18:56:32.819Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "kitewind_terraces": {
+    "filename": "kitewind_terraces_big.png",
+    "capturedAt": "2026-10-20T18:57:12.128Z",
+    "width": 689,
+    "height": 780,
+    "invalid": false
+  },
+  "marrowdeep": {
+    "filename": "marrowdeep_big.png",
+    "capturedAt": "2026-10-20T18:57:45.596Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "pitchwood": {
+    "filename": "pitchwood_big.png",
+    "capturedAt": "2026-10-20T18:58:27.189Z",
+    "width": 780,
+    "height": 780,
+    "invalid": false
+  },
+  "yellowlick_flats": {
+    "filename": "yellowlick_flats_big.png",
+    "capturedAt": "2026-10-20T18:59:04.868Z",
+    "width": 940,
+    "height": 776,
+    "invalid": false
+  },
+  "peatcut_bog": {
+    "filename": "peatcut_bog_big.png",
+    "capturedAt": "2026-10-20T18:59:42.313Z",
+    "width": 806,
+    "height": 779,
+    "invalid": false
+  }
+}

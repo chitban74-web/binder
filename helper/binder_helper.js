@@ -19,7 +19,7 @@
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
 // socialQuery, vendorBuy, huntQuery, bountyClaim, stillHere.
 (() => {
-  const BINDER_HELPER_VERSION = '1.0.6';
+  const BINDER_HELPER_VERSION = '1.1.0';
   if (window.__bth) { window.__bth.show(); return 'already running'; }
   // BEGIN GENERATED PAGE MODULES
   // bounty.js
@@ -264,6 +264,13 @@
   const load = () => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { ...DEF }; } };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch { } };
   const cfg = load();
+  cfg.plan = { enabled: false, steps: [], ...(cfg.plan || {}) };
+  if (!Array.isArray(cfg.plan.steps)) cfg.plan.steps = [];
+  cfg.skillPlan = { enabled: false, job: '', items: [], ...(cfg.skillPlan || {}) };
+  if (!Array.isArray(cfg.skillPlan.items)) cfg.skillPlan.items = [];
+  cfg.jobChangePlan = { enabled: false, targetJob: 'scout', allowPaid: false, ...(cfg.jobChangePlan || {}) };
+  cfg.statusPlan = { enabled: false, job: '', items: [], ...(cfg.statusPlan || {}) };
+  if (!Array.isArray(cfg.statusPlan.items)) cfg.statusPlan.items = [];
   const storedBuy = (() => { try { return (JSON.parse(localStorage.getItem(KEY) || '{}').buy) || {}; } catch { return {}; } })();
   cfg.buy = Object.fromEntries(['hp', 'mp'].map(k => {
     const saved = storedBuy[k] || {}, defaults = DEF.buy[k];
@@ -608,6 +615,173 @@
   const curBounty = () => (bq.active ? bq.list[bq.i] || null : null);
   function tgt() { const b = curBounty(); return b ? { map: b.mapName, spot: null } : { map: cfg.farmMap, spot: cfg.farmSpot }; }
   const myLevel = () => { const r = room(); const p = r && r.state.players && r.state.players.get(r.sessionId); return p ? p.level : 0; };
+  const planStepForLevel = level => cfg.plan?.enabled && cfg.plan.steps.find(s => level >= s.minLevel && level <= s.maxLevel);
+  const applyPlan = plan => {
+    const steps = Array.isArray(plan?.steps) ? plan.steps.filter(s => s && typeof s.map === 'string' && s.spot && Number.isFinite(+s.spot.x) && Number.isFinite(+s.spot.y)) : [];
+    const enabled = !!plan?.enabled && steps.length > 0;
+    const fallback = cfg.plan?.fallback || (enabled && !cfg.plan?.enabled ? { farmMap: cfg.farmMap, farmSpot: cfg.farmSpot } : null);
+    cfg.plan = { enabled, steps, fallback };
+    const step = planStepForLevel(myLevel()) || (cfg.plan.enabled ? steps[0] : null);
+    if (step) {
+      cfg.farmMap = MAP_NAMES[step.map] || step.map;
+      cfg.farmSpot = { x: +step.spot.x, y: +step.spot.y };
+      farmGen++;
+      if (cfg.running && cfg.mode === 'farm') { startCheck = true; setAuto(false); }
+    } else if (!enabled && fallback) {
+      cfg.farmMap = fallback.farmMap || ''; cfg.farmSpot = fallback.farmSpot || null;
+      cfg.plan.fallback = null; farmGen++;
+      if (cfg.running && cfg.mode === 'farm' && cfg.farmMap) { startCheck = true; setAuto(false); }
+    }
+    save(); render();
+    log(cfg.plan.enabled ? `รับ Plan ${steps.length} ขั้น · จุดปัจจุบัน ${cfg.farmMap} (${cfg.farmSpot.x.toFixed(1)}, ${cfg.farmSpot.y.toFixed(1)})` : 'ปิด Plan ฟาร์ม · ใช้จุดฟาร์มเดิม');
+    return { ok: true, enabled: cfg.plan.enabled, steps: steps.length, map: cfg.farmMap, spot: cfg.farmSpot };
+  };
+  let skillPending = null, skillNextAt = 0;
+  let jobChangeObserved = null, jobChangeReady = null, jobChangeBusy = false, jobChangeNotice = '', jobChangeBlockedCost = null, jobChangeWaitGold = 0;
+  let statusPending = null, statusNextAt = 0, statusBusy = false;
+  const skillLevel = (player, id) => Number(player?.skillLevels?.get?.(id) || 0);
+  const applySkillPlan = plan => {
+    const items = Array.isArray(plan?.items) ? plan.items.slice(0, 60).map(x => ({ skillId: String(x?.skillId || ''), target: Math.max(0, Math.min(30, Math.floor(Number(x?.target) || 0))), baseLevel: Math.max(0, Math.min(30, Math.floor(Number(x?.baseLevel) || 0))) }))
+      .filter(x => /^[a-z0-9_]{1,80}$/.test(x.skillId)) : [];
+    const jobs = {};
+    if (plan?.jobs && typeof plan.jobs === 'object' && !Array.isArray(plan.jobs)) for (const [job, build] of Object.entries(plan.jobs).slice(0, 20)) {
+      if (!/^[a-z0-9_-]{1,40}$/i.test(job) || !Array.isArray(build?.items)) continue;
+      const buildItems = build.items.slice(0, 60).map(x => ({ skillId: String(x?.skillId || ''), target: Math.max(0, Math.min(30, Math.floor(Number(x?.target) || 0))), baseLevel: Math.max(0, Math.min(30, Math.floor(Number(x?.baseLevel) || 0))) })).filter(x => /^[a-z0-9_]{1,80}$/.test(x.skillId));
+      jobs[job] = { enabled: build.enabled === true && buildItems.length > 0, items: buildItems };
+    }
+    const activeJob = String(plan?.job || '').slice(0, 40);
+    if (activeJob && !jobs[activeJob]) jobs[activeJob] = { enabled: plan?.enabled === true && items.length > 0, items };
+    cfg.skillPlan = { enabled: plan?.enabled === true && items.length > 0, job: activeJob, items, jobs };
+    const jc = plan?.jobChange || {};
+    cfg.jobChangePlan = { enabled: jc.enabled === true, targetJob: ['knight','warrior','scout','rogue','mage','acolyte','summoner'].includes(jc.targetJob) ? jc.targetJob : 'scout', allowPaid: jc.allowPaid === true };
+    const sp = plan?.statusPlan || {};
+    const statusItems = Array.isArray(sp.items) ? sp.items.slice(0, 6).map(x => ({ stat: String(x?.stat || '').toLowerCase(), target: Math.max(0, Math.min(99, Math.floor(Number(x?.target) || 0))) })).filter(x => ['str','agi','vit','int','dex','luk'].includes(x.stat)) : [];
+    cfg.statusPlan = { enabled: sp.enabled === true, job: String(sp.job || '').slice(0, 40), items: statusItems };
+    statusPending = null; statusNextAt = 0;
+    const player = room()?.state?.players?.get?.(room()?.sessionId);
+    if (!jobChangeObserved && player) jobChangeObserved = { job: String(player.job || ''), level: Number(player.jobLevel || 0) };
+    if (jobChangeReady && (jobChangeReady.target !== cfg.jobChangePlan.targetJob || player && jobChangeReady.job !== String(player.job || ''))) { jobChangeReady = null; jobChangeBlockedCost = null; jobChangeWaitGold = 0; }
+    jobChangeNotice = '';
+    skillPending = null; skillNextAt = 0; save();
+    log(cfg.skillPlan.enabled ? `รับ Skill Plan ${items.length} รายการ · ${cfg.skillPlan.job}` : 'ปิด Skill Plan อัตโนมัติ');
+    return { ok: true, enabled: cfg.skillPlan.enabled, items: items.length, job: cfg.skillPlan.job };
+  };
+  function runSkillPlan() {
+    const plan = cfg.skillPlan, r = room(), player = r?.state?.players?.get?.(r.sessionId), now = Date.now();
+    if (!player) return;
+    const currentJob = String(player.job || ''), build = plan?.jobs?.[currentJob] || (plan?.job === currentJob ? plan : null);
+    if (!build?.enabled || !build.items?.length) return;
+    if (skillPending?.job && skillPending.job !== currentJob) skillPending = null;
+    if (skillPending) {
+      const level = skillLevel(player, skillPending.skillId), points = Number(player.skillPoints || 0);
+      if (level > skillPending.beforeLevel || points < skillPending.beforePoints) {
+        log(`อัปสกิล ${skillPending.name} แล้ว · Lv.${level}`); skillPending = null; skillNextAt = now + 1200;
+      } else if (now - skillPending.sentAt > 10000) {
+        log(`เกมยังไม่ยืนยันการอัป ${skillPending.name} · จะลองใหม่ภายหลัง`); skillPending = null; skillNextAt = now + 5000;
+      }
+      return;
+    }
+    if (now < skillNextAt || Number(player.skillPoints || 0) < 1) return;
+    const root = document.querySelector('#skillrows'); if (!root) return;
+    if (!root.querySelector('.skB-node[data-skill]')) {
+      if (!root.getClientRects().length) document.querySelector('#mbskill')?.click();
+      skillNextAt = now + 1200;
+      return;
+    }
+    for (const item of build.items) {
+      const current = skillLevel(player, item.skillId), goal = item.baseLevel + item.target; if (item.target < 1 || current >= goal) continue;
+      const node = root.querySelector(`.skB-node[data-skill="${item.skillId}"]`); if (!node || node.classList.contains('locked')) return;
+      const name = node.querySelector('.skB-bd>b')?.textContent?.trim() || item.skillId;
+      node.click();
+      const upgrade = root.querySelector('.dk-up');
+      if (!upgrade || upgrade.disabled) return;
+      skillPending = { job: currentJob, skillId: item.skillId, name, beforeLevel: current, beforePoints: Number(player.skillPoints || 0), sentAt: now };
+      upgrade.click();
+      // The game's own upgrade button may open its prerequisite/cost confirmation.
+      // Confirm only the matching unlock dialog; leave any unrelated game dialog alone.
+      setTimeout(() => {
+        const title = document.querySelector('#bctitle')?.textContent?.trim() || '';
+        const veil = document.querySelector('#buyconfirm'), yes = document.querySelector('#bcyes');
+        if (veil && !veil.hidden && yes && title.includes(name) && title.includes('ปลดล็อก')) yes.click();
+      }, 50);
+      return;
+    }
+  }
+  const skillPlanTimer = setInterval(runSkillPlan, 1200);
+  async function runStatusPlan() {
+    const plan = cfg.statusPlan, r = room(), player = r?.state?.players?.get?.(r.sessionId), now = Date.now();
+    if (!plan?.enabled || !plan.items.length || !player || (plan.job && player.job !== plan.job) || statusBusy) return;
+    if (statusPending) {
+      const current = Number(player[statusPending.stat] || 0), points = Number(player.statPoints || 0);
+      if (current > statusPending.before || points < statusPending.beforePoints) { log(`อัป ${statusPending.stat.toUpperCase()} แล้ว · ${current}/${statusPending.target}`); statusPending = null; statusNextAt = now + 1000; }
+      else if (now - statusPending.sentAt > 2000) { log(`เกมยังไม่ยืนยันการอัป ${statusPending.stat.toUpperCase()} · ลองกด +5 ซ้ำ`); statusPending = null; statusNextAt = now + 300; }
+      return;
+    }
+    if (now < statusNextAt || Number(player.statPoints || 0) < 1) return;
+    statusBusy = true; let openedByHelper = false;
+    try {
+      let charwin = document.querySelector('#charwin');
+      if (!charwin || getComputedStyle(charwin).display === 'none') { const open = document.querySelector('#pfpts'); if (!open) return; open.click(); openedByHelper = true; await new Promise(resolve => setTimeout(resolve, 100)); charwin = document.querySelector('#charwin'); }
+      if (!charwin || getComputedStyle(charwin).display === 'none' || charwin.dataset.tab !== 'stats') return;
+      const rows = [...charwin.querySelectorAll('#statrows .st2row')];
+      for (const item of plan.items) {
+        const current = Number(player[item.stat] || 0); if (item.target - current < 5) continue;
+        const row = rows.find(x => x.querySelector('.st2badge')?.textContent?.trim().toLowerCase() === item.stat);
+        const button = row?.querySelector('button.st2add.x5'); if (!button || button.disabled) continue;
+        statusPending = { stat: item.stat, before: current, beforePoints: Number(player.statPoints || 0), target: item.target, sentAt: now };
+        button.click(); await new Promise(resolve => setTimeout(resolve, 60));
+        const veil = document.querySelector('#buyconfirm'), title = document.querySelector('#bctitle')?.textContent?.trim() || '', yes = document.querySelector('#bcyes');
+        if (veil && !veil.hidden) {
+          if (!yes || !title.includes(`อัป ${item.stat.toUpperCase()}`)) { statusPending = null; log('อัปสเตตัสหยุดไว้: หน้าต่างยืนยันของเกมไม่ตรงกับรายการ'); return; }
+          yes.click();
+        }
+        statusNextAt = now + 700;
+        return;
+      }
+    } catch (e) { log('อัปสเตตัสอัตโนมัติ:', e.message); }
+    finally { if (openedByHelper) document.querySelector('#charwin .pxhead .close')?.click(); statusBusy = false; }
+  }
+  const statusPlanTimer = setInterval(runStatusPlan, 1000);
+  async function runJobChangePlan() {
+    const plan = cfg.jobChangePlan, r = room(), player = r?.state?.players?.get?.(r.sessionId);
+    if (!player) return;
+    const job = String(player.job || ''), level = Number(player.jobLevel || 0), target = plan?.targetJob || '';
+    if (!jobChangeObserved || jobChangeObserved.job !== job) { jobChangeObserved = { job, level }; jobChangeReady = null; jobChangeNotice = ''; return; }
+    const crossed = jobChangeObserved.level < 10 && level >= 10;
+    jobChangeObserved.level = level;
+    if (crossed && plan?.enabled && target && job !== target) jobChangeReady = { job, target };
+    if (!jobChangeReady || jobChangeBusy || !plan?.enabled || !target || jobChangeReady.job !== job || jobChangeReady.target !== target || job === target) return;
+    if (jobChangeBlockedCost?.job === job && jobChangeBlockedCost.target === target && !plan.allowPaid) return;
+    if (plan.allowPaid) jobChangeBlockedCost = null;
+    const currentGold = Number(player.silver || player.gold || 0);
+    if (jobChangeWaitGold > 0 && currentGold < jobChangeWaitGold) return;
+    jobChangeWaitGold = 0;
+    jobChangeBusy = true;
+    let openedByHelper = false;
+    try {
+      let dialog = document.querySelector('#jobdialog');
+      if (!dialog || getComputedStyle(dialog).display === 'none') { const open = document.querySelector('#openjob'); if (!open) return; open.click(); openedByHelper = true; await new Promise(resolve => setTimeout(resolve, 100)); dialog = document.querySelector('#jobdialog'); }
+      const card = dialog?.querySelector(`[data-j="${target}"]`);
+      if (!card) { if (jobChangeNotice !== 'missing') { log('ออโต้เปลี่ยนอาชีพ: ไม่พบอาชีพปลายทางใน UI เกม'); jobChangeNotice = 'missing'; } return; }
+      if (card.classList.contains('on')) { jobChangeReady = null; return; }
+      card.click();
+      const go = dialog.querySelector('.jc2go');
+      if (!go || go.disabled) { if (jobChangeNotice !== 'locked') { log('ออโต้เปลี่ยนอาชีพ: เกมยังไม่อนุญาตให้เปลี่ยนอาชีพนี้'); jobChangeNotice = 'locked'; } return; }
+      const label = go.innerText || '', k = label.match(/([\d,.]+)\s*K\b/i), g = label.match(/([\d,]+)\s*G\b/i);
+      const cost = k ? Number(k[1].replace(/,/g, '')) * 1000 : g ? Number(g[1].replace(/,/g, '')) : 0;
+      if (cost > 0 && !plan.allowPaid) { jobChangeBlockedCost = { job, target, cost }; if (jobChangeNotice !== 'paid-disabled') { log(`ออโต้เปลี่ยนอาชีพหยุดไว้: ${label.trim()} · เปิด “ยืนยันค่าเปลี่ยนอาชีพอัตโนมัติ” ก่อน`); jobChangeNotice = 'paid-disabled'; } return; }
+      if (cost > currentGold) { jobChangeWaitGold = cost; if (jobChangeNotice !== 'insufficient') { log(`ออโต้เปลี่ยนอาชีพ: Gold ไม่พอ · ต้องใช้ ${cost.toLocaleString()} G`); jobChangeNotice = 'insufficient'; } return; }
+      go.click(); await new Promise(resolve => setTimeout(resolve, 100));
+      const veil = document.querySelector('#buyconfirm'), title = document.querySelector('#bctitle')?.textContent?.trim() || '', yes = document.querySelector('#bcyes');
+      const confirmText = `${title} ${document.querySelector('#bcbody')?.innerText || ''}`;
+      if (!veil || veil.hidden || !yes || !/เปลี่ยน|อาชีพ/i.test(confirmText) || !confirmText.toLowerCase().includes(target)) { if (jobChangeNotice !== 'confirm') { log('ออโต้เปลี่ยนอาชีพหยุดไว้: หน้าต่างยืนยันของเกมไม่ตรงกับอาชีพปลายทาง'); jobChangeNotice = 'confirm'; } return; }
+      yes.click(); await new Promise(resolve => setTimeout(resolve, 500));
+      const updated = room()?.state?.players?.get?.(room()?.sessionId);
+      if (String(updated?.job || '') === target) { log(`เปลี่ยนอาชีพอัตโนมัติเป็น ${target} แล้ว`); jobChangeReady = null; jobChangeNotice = ''; }
+    } catch (e) { if (jobChangeNotice !== e.message) { log('ออโต้เปลี่ยนอาชีพ:', e.message); jobChangeNotice = e.message; } }
+    finally { if (openedByHelper && jobChangeReady && document.querySelector('#jobdialog') && getComputedStyle(document.querySelector('#jobdialog')).display !== 'none') document.querySelector('#jobdialog .pxhead .close')?.click(); jobChangeBusy = false; }
+  }
+  const jobChangeTimer = setInterval(runJobChangePlan, 1000);
   const huntView = async () => { const h = await request({ type: 'huntQuery' }, m => m.type === 'hunt'); return h && h.view ? h.view.bounty : null; };
 
   // today's bounties from the game's own bounty window (#huntbody), progress from the server (huntQuery)
@@ -1299,6 +1473,12 @@
     busy = true;
     let boss = null;
     try {
+      const levelStep = planStepForLevel(myLevel());
+      if (levelStep && (cfg.farmMap !== (MAP_NAMES[levelStep.map] || levelStep.map) || cfg.farmSpot?.x !== +levelStep.spot.x || cfg.farmSpot?.y !== +levelStep.spot.y)) {
+        cfg.farmMap = MAP_NAMES[levelStep.map] || levelStep.map; cfg.farmSpot = { x: +levelStep.spot.x, y: +levelStep.spot.y };
+        farmGen++; startCheck = true; setAuto(false); save(); render();
+        log(`Plan เปลี่ยนขั้นตามเลเวล ${myLevel()} · ไป ${cfg.farmMap} (${cfg.farmSpot.x.toFixed(1)}, ${cfg.farmSpot.y.toFixed(1)})`);
+      }
       if (isDead()) {
         const wasGathering = cfg.gathering.enabled && !bq.active;
         const gatherMap = wasGathering ? mapId() : '';
@@ -1912,7 +2092,8 @@
 
   window.__bth = {
     cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); save(); render(); },
-    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(exitTimer); for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bthPageModules; delete window.__bth; }, // running=false also ends a trip in progress
+    applyPlan, applySkillPlan,
+    remove: () => { cfg.running = false; clearInterval(timer); clearInterval(skillPlanTimer); clearInterval(jobChangeTimer); clearInterval(statusPlanTimer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(exitTimer); for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bthPageModules; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
     // read by the web manager (manager/server.js)
     status: () => {

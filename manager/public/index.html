@@ -115,7 +115,8 @@
             <button id="btn-reload-all" class="btn btn-ghost btn-sm" title="โหลด helper ใหม่ทุกแท็บ (สถานะ ▶ คงเดิม)">โหลด helper ใหม่</button>
           </div>
           <div class="toolbar-group">
-            <button class="btn btn-ghost btn-sm" data-soon="Plan Script">Plan Script</button>
+            <button class="btn btn-ghost btn-sm" id="btn-plan-script">Plan Script</button>
+            <button class="btn btn-ghost btn-sm" id="btn-map-capture">TODO จับภาพแมพ</button>
             <button class="btn btn-ghost btn-sm" data-soon="Save List">Save List</button>
             <button class="btn btn-ghost btn-sm" data-soon="Import">Import</button>
             <button class="btn btn-ghost btn-sm" data-soon="Export">Export</button>
@@ -297,7 +298,7 @@ function card(t) {
   const xpRate = t.profileId ? (xpRatesByProfile.get(t.profileId) || { xpm: 0, xph: 0 }) : { xpm: 0, xph: 0 };
   const goldRateValue = (n, suffix) => n > 0 ? `${new Intl.NumberFormat('th-TH').format(n)} <small>${suffix}</small>` : '—';
   const xpRateValue = (n, suffix) => n > 0 ? `${new Intl.NumberFormat('th-TH').format(n)} <small>${suffix}</small>` : '—';
-  const actions = t.profileId ? `<div class="card-menu-dropdown ${menuOpen ? 'is-open' : ''}"><div class="card-menu-header">จัดการโปรไฟล์: ${esc(profileName)}</div>${s ? `<button class="card-menu-item" data-toggle="${esc(t.id)}">${s.running ? 'หยุดบอท' : 'เริ่มบอท'}</button><button class="card-menu-item" data-reload="${esc(t.id)}">โหลด Helper ใหม่</button><button class="card-menu-item" data-window="focus" data-target="${esc(t.id)}">นำหน้าต่างขึ้นมา</button>` : ''}<button class="card-menu-item" data-set-main="${esc(t.profileId)}">${t.isMain ? 'โปรไฟล์หลักอยู่แล้ว' : 'ตั้งเป็นโปรไฟล์หลัก'}</button><button class="card-menu-item cm-danger" data-delete-profile="${esc(t.profileId)}">ลบโปรไฟล์</button></div>` : '';
+  const actions = t.profileId ? `<div class="card-menu-dropdown ${menuOpen ? 'is-open' : ''}"><div class="card-menu-header">จัดการโปรไฟล์: ${esc(profileName)}</div><button class="card-menu-item" data-plan-profile="${esc(t.profileId)}">เปิด Plan Script</button>${s ? `<button class="card-menu-item" data-toggle="${esc(t.id)}">${s.running ? 'หยุดบอท' : 'เริ่มบอท'}</button><button class="card-menu-item" data-reload="${esc(t.id)}">โหลด Helper ใหม่</button><button class="card-menu-item" data-window="focus" data-target="${esc(t.id)}">นำหน้าต่างขึ้นมา</button>` : ''}<button class="card-menu-item" data-set-main="${esc(t.profileId)}">${t.isMain ? 'โปรไฟล์หลักอยู่แล้ว' : 'ตั้งเป็นโปรไฟล์หลัก'}</button><button class="card-menu-item cm-danger" data-delete-profile="${esc(t.profileId)}">ลบโปรไฟล์</button></div>` : '';
   const head = `<div class="card-hero">
     <div class="avatar ${hasAvatarImage ? '' : 'no-img'}">${avatar}<span class="avatar-dot ${s ? 'online' : ''}"></span>${s && s.level ? `<span class="avatar-lv">${s.level}</span>` : ''}</div>
     <div class="card-identity"><div class="card-title-row"><h3 class="profile-title" title="${esc(profileName)}">${esc(profileName)}</h3>${mainBadge}</div>
@@ -305,7 +306,7 @@ function card(t) {
       <div class="card-class-row">${s && className ? `<span class="chip chip-class">${esc(className)}</span>` : s && s.town ? `<span class="chip chip-class">${esc(s.town)}</span>` : ''}</div></div>
     <div class="card-meta"><div class="card-meta-top"><span class="chip chip-port">${s ? `CH ${s.channel || '?'}` : 'CH —'}</span>${t.profileId ? `<div class="card-top-menu ${menuOpen ? 'is-open' : ''}"><button class="btn-card-menu" data-profile-menu="${esc(t.profileId)}" title="จัดการโปรไฟล์"></button>${actions}</div>` : ''}</div></div>
   </div>`;
-  if (!s) return `<article class="profile-card ${menuOpen ? 'menu-open' : ''} ${t.isMain ? 'is-main' : ''} is-offline" data-card-key="${esc(t.profileId || t.id)}" style="--h:${hue}">${head}<div class="card-status-row"><span class="activity-pill tone-offline"><i></i>ออฟไลน์</span></div><div class="profile-target"><span> แผนที่ฟาร์ม</span><b>${esc(t.farmMap || 'ยังไม่ได้ตั้งค่า')}</b></div><div class="reference-metrics"><div><b> GP/M</b><strong>${goldRateValue(goldRate.gpm, 'G/m')}</strong></div><div><b> GP/H</b><strong>${goldRateValue(goldRate.gph, 'G/h')}</strong></div><div><b> XP/M</b><strong>${xpRateValue(xpRate.xpm, 'XP/m')}</strong></div><div><b> XP/H</b><strong>${xpRateValue(xpRate.xph, 'XP/h')}</strong></div></div><div class="card-footer-controls"><div class="card-action-row main-actions"><button class="btn btn-sm btn-launch" data-open-profile="${esc(t.profileId)}">เปิดจอเกม</button><button class="btn btn-sm btn-bot-menu" data-profile-menu="${esc(t.profileId)}">เมนูบอท</button></div></div></article>`;
+  if (!s) return `<article class="profile-card ${menuOpen ? 'menu-open' : ''} ${t.isMain ? 'is-main' : ''} is-offline" data-card-key="${esc(t.profileId || t.id)}" style="--h:${hue}">${head}<div class="card-status-row"><span class="activity-pill tone-offline"><i></i>ออฟไลน์</span></div><div class="profile-target"><span> แผนที่ฟาร์ม</span><b>${esc(t.farmMap || 'ยังไม่ได้ตั้งค่า')}</b></div><div class="reference-metrics"><div><b> GP/M</b><strong>${goldRateValue(goldRate.gpm, 'G/m')}</strong></div><div><b> GP/H</b><strong>${goldRateValue(goldRate.gph, 'G/h')}</strong></div><div><b> XP/M</b><strong>${xpRateValue(xpRate.xpm, 'XP/m')}</strong></div><div><b> XP/H</b><strong>${xpRateValue(xpRate.xph, 'XP/h')}</strong></div></div><div class="card-footer-controls"><div class="card-action-row main-actions"><button class="btn btn-sm btn-launch" data-open-profile="${esc(t.profileId)}">เปิดจอเกม</button><button class="btn btn-sm btn-bot-menu" data-plan-profile="${esc(t.profileId)}">Plan Script</button></div></div></article>`;
   const w = s.weight || 0;
   const b = s.bounty;
   const statusTone = s.dead ? 'tone-danger' : w >= 90 ? 'tone-warn' : !s.running ? 'tone-idle' : /ฟาร์ม/.test(s.phase) ? 'tone-farm' : 'tone-travel';
@@ -318,7 +319,7 @@ function card(t) {
     <div class="profile-target"><span> ${s.map ? 'แมพปัจจุบัน' : 'แผนที่ฟาร์ม'}</span><b>${esc(s.map || s.farmMap || '—')}</b></div>
     <div class="reference-metrics"><div><b> GP/M</b><strong>${goldRateValue(goldRate.gpm, 'G/m')}</strong></div><div><b> GP/H</b><strong>${goldRateValue(goldRate.gph, 'G/h')}</strong></div><div><b> XP/M</b><strong>${xpRateValue(xpRate.xpm, 'XP/m')}</strong></div><div><b> XP/H</b><strong>${xpRateValue(xpRate.xph, 'XP/h')}</strong></div></div>
     <div class="card-footer-controls"><div class="card-action-row main-actions"><button class="btn btn-sm btn-danger" data-close="${esc(t.id)}" title="ปิดหน้าต่างเกมนี้">ปิดจอเกม</button>
-      <button class="btn btn-sm btn-bot-menu" data-profile-menu="${esc(t.profileId || '')}" title="เมนูบอท"> เมนูบอท</button></div></div>
+      <button class="btn btn-sm btn-bot-menu" data-plan-profile="${esc(t.profileId || '')}" title="เปิด Plan Script">Plan Script</button></div></div>
   </article>`;
 }
 function morphNode(oldNode, newNode) {
@@ -654,6 +655,13 @@ document.addEventListener('click', async e => {
     if (last) renderTabs(last.browsers);
     return;
   }
+  if (b.dataset.planProfile) {
+    b.disabled = true;
+    try { openProfileMenuId = ''; await window.openPlanForProfile(b.dataset.planProfile); if (last) renderTabs(last.browsers); }
+    catch (error) { say(`เปิด Plan ไม่สำเร็จ: ${error.message}`, true); }
+    finally { b.disabled = false; }
+    return;
+  }
   if (b.dataset.openProfile) {
     b.disabled = true;
     const result = await post(`/api/browser/shared/open/${b.dataset.openProfile}`);
@@ -718,5 +726,40 @@ refresh(); setInterval(refresh, 2000);
 <script src="item_names.js"></script>
 <script src="market.js"></script>
 <script src="update_panel.js?v=44007"></script>
+<link rel="stylesheet" href="plan_editor.css">
+<div id="plan-editor-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="plan-editor-title">
+  <div class="plan-editor-card">
+    <header class="plan-editor-head"><div><h2 id="plan-editor-title">Plan ฟาร์มตามเลเวล</h2><p>เลือกจุดจากแผนที่ได้แม้ตัวละครอยู่อีกแมพ · Helper จะเดินไปเมื่อถึงขั้น</p></div><div class="plan-head-actions"><button id="plan-open-skills" class="btn btn-sm">⚡ ตั้งค่าอัปสกิล</button><button id="plan-close" class="modal-close" aria-label="ปิด">×</button></div></header>
+    <div class="plan-editor-toolbar"><label>โปรไฟล์ <select id="plan-profile"></select></label><label class="plan-toggle"><input id="plan-enabled" type="checkbox"> เปิดใช้ Plan</label><span id="plan-status"></span></div>
+    <div class="plan-editor-body"><aside class="plan-steps"><div class="plan-step-head"><b>ขั้นฟาร์ม</b><button id="plan-add" class="btn btn-sm">+ เพิ่มขั้น</button></div><div id="plan-step-list"></div>
+      <div class="plan-fields"><label>ชื่อขั้น<input id="plan-name" maxlength="60"></label><div class="plan-levels"><label>ถึงเลเวล<input id="plan-max" type="number" min="1" max="999"></label></div>
+        <section class="plan-map-picker"><div class="plan-picker-title"><b>แมพฟาร์ม</b><span id="plan-map-count"></span></div><input id="plan-map-search" type="search" placeholder="ค้นหาแมพ หรือเลเวล…" autocomplete="off" aria-label="ค้นหาแมพ"><select id="plan-map" class="plan-map-native" tabindex="-1" aria-hidden="true"></select><div id="plan-map-list" class="plan-map-list" role="listbox" aria-label="เลือกแมพ เรียงตามเลเวล"></div></section><label>มอนสำหรับดูบริเวณเกิด<select id="plan-mob"></select></label><div class="plan-selected">จุดฟาร์ม <b id="plan-coords">ยังไม่ได้เลือก</b></div><button id="plan-recommend" class="btn btn-sm">ใช้จุดเกิดมอนเป็นจุดฟาร์ม</button><button id="plan-remove" class="btn btn-sm btn-danger">ลบขั้นนี้</button></div>
+      <p class="plan-hint">เลเวลเริ่มของแต่ละขั้นต่อจากขั้นก่อนหน้าอัตโนมัติ · ข้อมูลมอนใช้แนะนำพิกัด จุดนี้ยังไม่เปลี่ยนตัวกรอง AUTO ในเกม</p></aside>
+      <section class="plan-map-panel"><div class="plan-map-head"><div><b id="plan-map-name">เลือกขั้นฟาร์ม</b><small id="plan-map-info"></small></div><div><button id="plan-zoom-out" class="btn btn-sm" title="ซูมออก">−</button><button id="plan-zoom-in" class="btn btn-sm" title="ซูมเข้า">+</button><button id="plan-fit" class="btn btn-sm">พอดีแผนที่</button></div></div><label class="plan-spawn-filter"><input id="plan-spawn-selected" type="checkbox"> แสดงเฉพาะจุดเกิดของมอนที่เลือก</label><canvas id="plan-canvas" aria-label="คลิกเพื่อเลือกจุดฟาร์ม"></canvas><div class="plan-map-legend"><span><i class="legend-spawn"></i>บริเวณเกิดมอน</span><span><i class="legend-selected"></i>มอนที่เลือก</span><span><i class="legend-elite">◆</i>Elite / Boss</span><span><i class="legend-farm">⌖</i>จุดฟาร์ม</span></div><div class="plan-map-foot"><span>คลิกเพื่อวางจุด · ลากเพื่อเลื่อน · หมุนล้อเพื่อซูม</span><span id="plan-data-info"></span><b id="plan-cursor-coords"></b></div></section></div>
+    <footer class="plan-editor-foot"><span id="plan-runtime-status">บันทึกแล้วจึงส่งแผนให้ Helper ในโปรไฟล์นี้</span><div><button id="plan-cancel" class="btn">ยกเลิก</button><button id="plan-save" class="btn btn-primary">บันทึกและใช้ Plan</button></div></footer>
+  </div>
+</div>
+<div id="skill-plan-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="skill-plan-title" hidden>
+  <section class="skill-plan-card">
+    <header class="skill-plan-head"><div><h2 id="skill-plan-title">อัปสกิลตามคิว</h2><p>นำรายการจาก Skill UI ของเกม · Helper ใช้แต้มตามลำดับที่จัดไว้</p></div><button id="skill-plan-close" class="modal-close" aria-label="ปิด">×</button></header>
+    <div class="skill-plan-toolbar"><span id="skill-plan-character">ยังไม่ได้ดึง Skill UI</span><div><label><input id="skill-plan-enabled" type="checkbox"> เปิดอัปสกิลอัตโนมัติ</label><button id="skill-tree-refresh" class="btn btn-sm">↻ ดึงจากเกม</button></div></div>
+    <section class="job-change-plan"><label class="job-change-enable"><input id="skill-job-change-enabled" type="checkbox"> เปลี่ยนอาชีพอัตโนมัติเมื่อ Job Lv.10</label><label>อาชีพปลายทาง<select id="skill-job-change-target"><option value="knight">Knight</option><option value="warrior">Warrior</option><option value="scout">Scout</option><option value="rogue">Rogue</option><option value="mage">Mage</option><option value="acolyte">Acolyte</option><option value="summoner">Summoner</option></select></label><label class="job-change-paid"><input id="skill-job-change-paid" type="checkbox"> ยืนยันค่าเปลี่ยนอาชีพอัตโนมัติ</label><small>เกมอาจคิด 50,000 G · ปิดตัวเลือกยืนยันไว้จนกว่าจะเปิดเอง</small></section>
+    <section class="status-plan-panel"><div class="status-plan-title"><label><input id="status-plan-enabled" type="checkbox"> อัปสเตตัสอัตโนมัติ</label><small>ตั้งเป้าหมาย 0–99 · ลงครั้งละ 5 ตามลำดับ · ถ้าเกมยังไม่รับจะลองซ้ำ · แต้มไม่ครบ 5 จะรอก่อน</small></div><div id="status-plan-items" class="status-plan-items"></div></section>
+    <div class="skill-plan-main"><section class="skill-tree-panel"><div class="skill-tree-toolbar"><b>ผังสกิล</b><input id="skill-search" type="search" placeholder="ค้นหาสกิล…" autocomplete="off"></div><div id="skill-tree-list" class="skill-tree-list"></div></section></div>
+    <section class="skill-queue-panel"><div class="skill-queue-heading"><b>ลำดับอัปสกิล</b><span>เริ่มที่ 0 · กด + เพิ่มเป้าหมายครั้งละ 1 · Helper ใช้แต้มทีละ 1 แล้วรอเกมยืนยัน</span></div><div id="skill-queue-list" class="skill-queue-list"></div></section>
+    <footer class="skill-plan-foot"><span id="skill-plan-status"></span><div><button id="skill-plan-cancel" class="btn">ปิด</button><button id="skill-plan-save" class="btn btn-primary">บันทึกคิวสกิล</button></div></footer>
+  </section>
+</div>
+<script src="plan_editor.js"></script>
+<link rel="stylesheet" href="map_capture.css">
+<div id="map-capture-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="map-capture-title" hidden>
+  <section class="map-capture-card">
+    <header class="map-capture-head"><div><h2 id="map-capture-title">TODO · เก็บภาพแผนที่จากเกม</h2><p>เดินไปยังแมพด้วยตัวเอง แล้วกดจับภาพเมื่อสถานะตรงกับแมพนั้น</p></div><button id="map-capture-close" class="modal-close" aria-label="ปิด">×</button></header>
+    <div class="map-capture-toolbar"><label>โปรไฟล์เกม<select id="map-capture-profile"></select></label><span id="map-capture-current">กำลังอ่านสถานะเกม…</span><div><button id="map-capture-todo" class="btn btn-sm active">ที่ยังไม่ถ่าย</button><button id="map-capture-all" class="btn btn-sm">ทั้งหมด</button></div></div>
+    <div class="map-capture-progress"><span id="map-capture-count">0 / 0 แมพ</span><span id="map-capture-message"></span></div>
+    <div id="map-capture-list" class="map-capture-list"></div>
+  </section>
+</div>
+<script src="map_capture.js"></script>
 </body>
 </html>
