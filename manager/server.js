@@ -170,7 +170,10 @@ async function loop() {
 // ---------------- git update ----------------
 const git = (...args) => new Promise(resolve => execFile('git', args, { cwd: ROOT, windowsHide: true, timeout: 60000 }, (err, stdout, stderr) =>
   resolve({ ok: !err, out: String(stdout).trim(), err: String(stderr || (err && err.message) || '').trim() })));
-const update = { isRepo: false, branch: '', commit: '', date: '', behind: 0, incoming: [], checkedAt: 0, error: '' };
+const UPDATE_REMOTE = 'token';
+const UPDATE_REF = 'refs/remotes/token/HEAD';
+const UPDATE_REPO_URL = 'https://github.com/fledotexe/babybinder';
+const update = { isRepo: false, branch: '', commit: '', date: '', remoteCommit: '', remoteDate: '', behind: 0, incoming: [], helperVersion: '', remoteHelperVersion: '', checkedAt: 0, error: '' };
 async function checkUpdate(fetchFirst = true) {
   const repo = await git('rev-parse', '--is-inside-work-tree');
   update.isRepo = repo.ok && repo.out === 'true';
@@ -179,35 +182,84 @@ async function checkUpdate(fetchFirst = true) {
   const head = await git('log', '-1', '--format=%h|%cd', '--date=format:%Y-%m-%d %H:%M');
   [update.commit, update.date] = head.out.split('|');
   if (fetchFirst) {
-    const f = await git('fetch', '--quiet', 'origin');
-    // GitHub wants a login: this PC needs the read-only token (set_token.bat in the Binder_Town folder)
+    const configured = await git('remote', 'get-url', UPDATE_REMOTE);
+    if (!configured.ok) {
+      update.error = 'ยังไม่ได้ตั้งแหล่ง Token — รัน set_token.bat ก่อน';
+      update.checkedAt = Date.now();
+      return update;
+    }
+    const safeRemoteUrl = configured.out.replace(/^https:\/\/[^/@]+@/i, 'https://').replace(/\.git$/i, '').replace(/\/$/, '').toLowerCase();
+    if (safeRemoteUrl !== UPDATE_REPO_URL) {
+      update.error = 'แหล่งอัปเดตไม่ใช่ Git repo ที่กำหนด: fledotexe/babybinder';
+      update.checkedAt = Date.now();
+      return update;
+    }
+    // FETCH_HEAD is not needed (the updater reads the remote-tracking ref) and may be
+    // locked by another Binder process. Avoid touching it so Token checks can proceed.
+    // This Windows Git installation's Schannel backend cannot load the token credential.
+    // OpenSSL honors the credential embedded by set_token.bat.
+    const f = await git('-c', 'http.sslBackend=openssl', 'fetch', '--quiet', '--no-write-fetch-head', UPDATE_REMOTE);
+    // The token remote is configured by set_token.bat; keep origin reserved for this checkout.
     const auth = /could not read Username|Invalid username or token|Authentication failed|terminal prompts disabled/i.test(f.err);
-    update.error = f.ok ? '' : auth ? 'GitHub ต้องใช้ token — ดับเบิลคลิก set_token.bat ในโฟลเดอร์ Binder_Town แล้ววาง token' : 'git fetch ไม่สำเร็จ: ' + f.err;
+    update.error = f.ok ? '' : auth ? 'GitHub ปฏิเสธ Token — รัน set_token.bat แล้วตั้ง Token ใหม่' : 'ตรวจแหล่ง Token ไม่สำเร็จ: ' + f.err;
+    if (!f.ok) { update.checkedAt = Date.now(); return update; }
+    await git('remote', 'set-head', UPDATE_REMOTE, '-a');
   }
-  const up = await git('rev-list', '--count', 'HEAD..@{u}');
+  const tokenHead = await git('rev-parse', '--verify', UPDATE_REF);
+  if (!tokenHead.ok) {
+    update.error = 'หา branch หลักของ Token ไม่พบ — ตรวจ remote ที่ตั้งด้วย set_token.bat';
+    update.checkedAt = Date.now();
+    return update;
+  }
+  const up = await git('rev-list', '--count', `HEAD..${UPDATE_REF}`);
   update.behind = up.ok ? +up.out || 0 : 0;
-  const inc = update.behind ? await git('log', '--format=%h %s', 'HEAD..@{u}') : { out: '' };
+  const inc = update.behind ? await git('log', '--format=%h %s', `HEAD..${UPDATE_REF}`) : { out: '' };
   update.incoming = inc.out ? inc.out.split('\n') : [];
+  const remoteHead = await git('log', '-1', '--format=%h|%cd', '--date=format:%Y-%m-%d %H:%M', UPDATE_REF);
+  [update.remoteCommit, update.remoteDate] = remoteHead.ok ? remoteHead.out.split('|') : ['', ''];
+  update.helperVersion = readHelperVersion();
+  const remoteHelper = await git('show', `${UPDATE_REF}:helper/binder_helper.js`);
+  const remoteVersion = remoteHelper.ok && remoteHelper.out.match(/\bconst BINDER_HELPER_VERSION\s*=\s*['"]([^'"]+)['"]/);
+  update.remoteHelperVersion = remoteVersion ? remoteVersion[1] : '';
   update.checkedAt = Date.now();
   return update;
 }
-async function pullUpdate() {
-  const before = (await git('rev-parse', 'HEAD')).out;
-  const st = await git('status', '--porcelain', '--untracked-files=no');
-  if (st.out) return { ok: false, msg: 'มีไฟล์ที่แก้ในเครื่องยังไม่ได้ commit — อัปเดตไม่ได้:\n' + st.out };
-  const p = await git('pull', '--ff-only');
-  if (!p.ok) return { ok: false, msg: 'git pull ไม่สำเร็จ: ' + p.err };
-  const after = (await git('rev-parse', 'HEAD')).out;
-  if (before === after) return { ok: true, msg: 'เป็นเวอร์ชันล่าสุดแล้ว' };
-  const changed = (await git('diff', '--name-only', before, after)).out.split('\n').filter(Boolean);
-  update.lastApplied = { at: Date.now(), files: changed };
-  await checkUpdate(false);
-  // new helper -> reload it in every tab (keeps ▶ state)
-  let reloaded = 0;
-  if (AUTO_RELOAD_HELPERS && changed.some(f => f.startsWith('helper/'))) for (const t of tabs.values()) if (t.state === 'helper') { try { await reloadHelper(t); reloaded++; } catch { } }
-  const restart = changed.some(f => f.startsWith('manager/'));
-  if (restart) setTimeout(() => { log('ตัวจัดการถูกอัปเดต — รีสตาร์ต'); process.exit(RESTART_CODE); }, 800);
-  return { ok: true, msg: `อัปเดตแล้ว ${before.slice(0, 7)} → ${after.slice(0, 7)} (${changed.length} ไฟล์)` + (reloaded ? ` · โหลด helper ใหม่ ${reloaded} แท็บ` : '') + (restart ? ' · ตัวจัดการกำลังรีสตาร์ต' : ''), changed, restart };
+async function stageTokenUpdate() {
+  const checked = await checkUpdate(true);
+  if (checked.error) return { ok: false, msg: checked.error };
+  if (!checked.behind) return { ok: true, msg: 'เป็นเวอร์ชันล่าสุดแล้ว' };
+  const rev = await git('rev-parse', UPDATE_REF);
+  if (!rev.ok) return { ok: false, msg: 'อ่าน commit จาก Token ไม่สำเร็จ: ' + rev.err };
+  if (!/^[0-9a-f]{40}$/i.test(rev.out)) return { ok: false, msg: 'รูปแบบ commit จาก Git ไม่ถูกต้อง' };
+  const folder = path.join(ROOT, '.token-pulls', rev.out.slice(0, 12));
+  if (fs.existsSync(folder)) {
+    const marker = path.join(folder, 'TOKEN_PULL_INFO.txt');
+    try {
+      const info = fs.readFileSync(marker, 'utf8');
+      if (info.includes(rev.out)) return { ok: true, msg: `มีสำเนา Git commit นี้อยู่แล้ว: ${folder}`, folder, commit: rev.out };
+    } catch { }
+    return { ok: false, msg: `ไม่สร้างทับ เพราะโฟลเดอร์มีอยู่แล้ว: ${folder}` };
+  }
+  const tempFolder = `${folder}.staging`;
+  const archivePath = `${folder}.tar`;
+  if (fs.existsSync(tempFolder) || fs.existsSync(archivePath)) return { ok: false, msg: 'พบไฟล์ staging เดิม จึงไม่เขียนทับ' };
+  try { fs.mkdirSync(path.dirname(folder), { recursive: true }); }
+  catch (e) { return { ok: false, msg: 'สร้างโฟลเดอร์เก็บ Git snapshot ไม่สำเร็จ: ' + e.message }; }
+  const archived = await git('archive', '--format=tar', `--output=${archivePath}`, UPDATE_REF);
+  if (!archived.ok) return { ok: false, msg: 'ส่งออกไฟล์จาก Git ไม่สำเร็จ: ' + archived.err };
+  try { fs.mkdirSync(tempFolder); }
+  catch (e) { return { ok: false, msg: 'สร้างโฟลเดอร์ staging ไม่สำเร็จ: ' + e.message }; }
+  const extracted = await new Promise(resolve => execFile('tar', ['-xf', archivePath, '-C', tempFolder],
+    { cwd: ROOT, windowsHide: true, timeout: 120000 }, (err, stdout, stderr) =>
+      resolve({ ok: !err, err: String(stderr || (err && err.message) || '').trim() })));
+  if (!extracted.ok) return { ok: false, msg: `แตกไฟล์ snapshot ไม่สำเร็จ; ไฟล์ชั่วคราวอยู่ที่ ${tempFolder}: ${extracted.err}` };
+  try {
+    fs.writeFileSync(path.join(tempFolder, 'TOKEN_PULL_INFO.txt'), `Source: ${UPDATE_REPO_URL}.git\nCommit: ${rev.out}\nCreated: ${new Date().toISOString()}\n`, 'utf8');
+    fs.unlinkSync(archivePath);
+    fs.renameSync(tempFolder, folder);
+  } catch (e) { return { ok: false, msg: `จัดเก็บ snapshot ไม่สำเร็จ: ${e.message}` }; }
+  update.lastStaged = { at: Date.now(), commit: rev.out, folder };
+  return { ok: true, msg: `เตรียม Git snapshot ${rev.out.slice(0, 7)} ไว้ในโฟลเดอร์แยกแล้ว: ${folder}`, folder, commit: rev.out };
 }
 async function runUpdateCycle() {
   if (updateBusy) return;
@@ -215,8 +267,8 @@ async function runUpdateCycle() {
   try {
     const u = await checkUpdate(true);
     if (!AUTO_PULL || !u.behind) return;
-    const r = await pullUpdate();
-    log(r.ok ? 'อัปเดตอัตโนมัติ: ' + r.msg : 'อัปเดตอัตโนมัติไม่สำเร็จ: ' + r.msg);
+    const r = await stageTokenUpdate();
+    log(r.ok ? 'เตรียมไฟล์ Token อัตโนมัติ: ' + r.msg : 'เตรียมไฟล์ Token อัตโนมัติไม่สำเร็จ: ' + r.msg);
   } finally { updateBusy = false; }
 }
 
@@ -495,16 +547,16 @@ const server = http.createServer(async (req, res) => {
       try {
         const checked = await checkUpdate(true);
         if (AUTO_PULL && checked.behind) {
-          const applied = await pullUpdate();
+          const applied = await stageTokenUpdate();
           return json(res, 200, { ok: applied.ok, update: { ...update, main: IS_MAIN, autoPull: AUTO_PULL, autoReloadHelpers: AUTO_RELOAD_HELPERS, busy: false, serverStartedAt: SERVER_STARTED_AT }, applied });
         }
         return json(res, 200, { ok: true, update: { ...update, main: IS_MAIN, autoPull: AUTO_PULL, autoReloadHelpers: AUTO_RELOAD_HELPERS, busy: false, serverStartedAt: SERVER_STARTED_AT } });
       } finally { updateBusy = false; }
     }
-    if (url.pathname === '/api/update/pull' && req.method === 'POST') {
+    if ((url.pathname === '/api/update/stage' || url.pathname === '/api/update/pull') && req.method === 'POST') {
       if (updateBusy) return json(res, 409, { ok: false, msg: 'กำลังตรวจหรืออัปเดตอยู่ กรุณารอสักครู่' });
       updateBusy = true;
-      try { return json(res, 200, await pullUpdate()); } finally { updateBusy = false; }
+      try { return json(res, 200, await stageTokenUpdate()); } finally { updateBusy = false; }
     }
     return json(res, 404, { error: 'not found' });
   } catch (e) { return json(res, 500, { ok: false, msg: e.message }); }

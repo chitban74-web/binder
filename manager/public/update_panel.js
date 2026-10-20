@@ -13,6 +13,14 @@
     offline: ['', 'ปิดอยู่']
   };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  const versionIsNewer = (remote, local) => {
+    const a = String(remote || '').split('.').map(Number), b = String(local || '').split('.').map(Number);
+    if (!a.length || !b.length || a.some(Number.isNaN) || b.some(Number.isNaN)) return false;
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+    }
+    return false;
+  };
   const ago = ts => {
     if (!ts) return '--';
     const m = Math.round((Date.now() - ts) / 60000);
@@ -25,8 +33,10 @@
   let status = null;
   let firstSeen = null;
   let reloadPending = false;
+  let notifiedVersion = '';
   let activeFilter = 'all';
-  let panel, pill, wrap;
+  let panel, pill, wrap, tokenPanel, tokenWrap, tokenButton;
+  let tokenActionMessage = '';
 
   function mount() {
     const actions = document.querySelector('.header-actions');
@@ -40,12 +50,28 @@
     panel.className = 'bu-panel';
     panel.hidden = true;
     wrap.appendChild(panel);
+    tokenWrap = document.getElementById('token-pull-wrap');
+    tokenButton = document.getElementById('btn-pull-token');
+    tokenPanel = document.getElementById('token-pull-panel');
+    if (tokenWrap && tokenButton && tokenPanel) {
+      tokenButton.addEventListener('click', event => {
+        event.preventDefault(); event.stopImmediatePropagation();
+        panel.hidden = true;
+        tokenPanel.hidden = !tokenPanel.hidden;
+        if (!tokenPanel.hidden) { tokenActionMessage = ''; load(); renderTokenPanel(); }
+      }, true);
+      tokenPanel.addEventListener('click', onTokenPanelClick);
+    }
     pill.addEventListener('click', event => {
       event.preventDefault(); event.stopImmediatePropagation();
       panel.hidden = !panel.hidden;
+      if (tokenPanel) tokenPanel.hidden = true;
       if (!panel.hidden) load();
     }, true);
-    document.addEventListener('click', event => { if (!wrap.contains(event.target)) panel.hidden = true; });
+    document.addEventListener('click', event => {
+      if (!wrap.contains(event.target)) panel.hidden = true;
+      if (tokenWrap && !tokenWrap.contains(event.target) && tokenPanel) tokenPanel.hidden = true;
+    });
     panel.addEventListener('click', onPanelClick);
   }
 
@@ -78,9 +104,85 @@
         };
       });
       status = { ...body.update, helperVersion: expectedVersion, clients };
+      notifyNewHelperVersion();
       watchForNewBuild();
       render();
+      renderTokenPanel();
     } catch (e) { }
+  }
+
+  function renderTokenPanel() {
+    if (!tokenPanel || !status) return;
+    const remote = status.remoteCommit || 'ไม่พบ';
+    const local = status.commit || 'ไม่ทราบ';
+    const behind = Number(status.behind) || 0;
+    const incoming = (status.incoming || []).slice(0, 6);
+    tokenPanel.innerHTML = `
+      <div class="bu-top-bar">
+        <div class="bu-top-title"><b>อัปเดตจาก Token</b><small>เช็กล่าสุด ${ago(status.checkedAt)}</small></div>
+        <div class="bu-top-actions">
+          <button type="button" class="bu-action-btn primary" data-token-action="check">เช็กและอัปเดตตอนนี้</button>
+          <button type="button" class="bu-close-btn" data-token-action="close" aria-label="ปิด">×</button>
+        </div>
+      </div>
+      <div class="bu-card ${behind ? 'bu-card-warn' : ''}">
+        <div class="bu-card-head"><div class="bu-card-title">Git commit</div><span class="bu-badge ${behind ? 'warn' : 'ok'}">${behind ? `มีอัปเดต ${behind} commit` : 'ตรงกันแล้ว'}</span></div>
+        <div class="bu-token-versions">
+          <div><small>จาก Token</small><b>${esc(remote)}</b><time>${esc(status.remoteDate || 'เวลาไม่ระบุ')}</time></div>
+          <div><small>ในเครื่องนี้</small><b>${esc(local)}</b><time>${esc(status.date || 'เวลาไม่ระบุ')}</time></div>
+        </div>
+      </div>
+      <div class="bu-card ${behind ? 'bu-card-warn' : ''}">
+        <div class="bu-card-head"><div class="bu-card-title">ตัวโปรแกรม Binder Town</div><span class="bu-badge ${behind ? 'warn' : 'ok'}">${behind ? `มีอัปเดต ${behind} commit` : 'ล่าสุดแล้ว'}</span></div>
+        <div class="bu-commit-line"><code>${esc(status.commit || '—')}</code><span>${esc(status.date || '')}</span></div>
+        ${incoming.length ? `<div class="bu-token-incoming">${incoming.map(esc).join('<br>')}${status.incoming.length > incoming.length ? '<br>…' : ''}</div>` : '<div class="bu-meta-line">Token ตรวจทุก 3 นาที · เตรียมสำเนาไว้ในโฟลเดอร์แยก</div>'}
+        ${status.error ? `<div class="bu-error">${esc(status.error)}</div>` : ''}
+        ${tokenActionMessage ? `<div class="bu-meta-line bu-token-message">${esc(tokenActionMessage)}</div>` : ''}
+        <div class="bu-card-actions"><button type="button" class="bu-action-btn ${behind ? 'primary' : ''}" data-token-action="pull" ${behind ? '' : 'disabled'}>${behind ? '⬇ เตรียมไฟล์จาก Token ในโฟลเดอร์แยก' : 'เป็นเวอร์ชันล่าสุดแล้ว'}</button></div>
+      </div>
+      <div class="bu-foot"><small>อ่านเวอร์ชันจาก repo ที่ Token อนุญาต · ไม่ push ข้อมูล</small><button type="button" class="btn btn-ghost btn-sm" data-token-action="check">เช็กตอนนี้</button></div>`;
+  }
+
+  async function onTokenPanelClick(event) {
+    const button = event.target.closest('[data-token-action]');
+    if (!button) return;
+    event.preventDefault(); event.stopPropagation();
+    const action = button.dataset.tokenAction;
+    if (action === 'close') { tokenPanel.hidden = true; return; }
+    if (action === 'check') {
+      button.disabled = true; button.textContent = 'กำลังเช็ก…';
+      try {
+        const response = await fetch('/api/update/check', { method: 'POST' });
+        const result = await response.json();
+        if (!response.ok || result.update?.error) tokenActionMessage = result.update?.error || result.error || 'เช็ก Token ไม่สำเร็จ';
+        else tokenActionMessage = result.update?.behind ? `พบอัปเดต ${result.update.behind} commit จาก Token` : `เช็กแล้ว · Token ${result.update?.remoteCommit || '—'} · ${result.update?.remoteDate || ''}`;
+        if (result.applied?.restart) setTimeout(() => location.reload(), 5000);
+      } catch (error) { tokenActionMessage = `เช็ก Token ไม่สำเร็จ: ${error.message}`; }
+      await load();
+      return;
+    }
+    if (action === 'pull') {
+      if (!confirm('ดาวน์โหลดไฟล์จาก Token ไปไว้ในโฟลเดอร์ .token-pulls แยกต่างหากหรือไม่? จะไม่เปลี่ยนไฟล์ในโฟลเดอร์หลัก')) return;
+      button.disabled = true; button.textContent = 'กำลังเตรียมโฟลเดอร์…';
+      try {
+        const response = await fetch('/api/update/stage', { method: 'POST' });
+        const result = await response.json();
+        tokenActionMessage = result.msg || (result.ok ? 'เตรียมสำเนาสำเร็จ' : 'เตรียมสำเนาไม่สำเร็จ');
+        if (!result.ok) tokenActionMessage = `เตรียมไม่สำเร็จ: ${tokenActionMessage}`;
+      } catch (error) { tokenActionMessage = `เตรียมไม่สำเร็จ: ${error.message}`; }
+      await load();
+    }
+  }
+
+  function notifyNewHelperVersion() {
+    const remote = status && status.remoteHelperVersion;
+    if (!versionIsNewer(remote, status && status.helperVersion) || notifiedVersion === remote) return;
+    notifiedVersion = remote;
+    const toast = document.createElement('div');
+    toast.className = 'bu-reload-toast';
+    toast.textContent = `มี Binder Helper เวอร์ชันใหม่ v${remote}`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 6000);
   }
 
   function userBusy() {
@@ -103,13 +205,14 @@
 
   function renderManagerCard() {
     const pending = Number(status.behind) || 0;
+    const versionUpdate = versionIsNewer(status.remoteHelperVersion, status.helperVersion);
     return `
       <div class="bu-card ${pending || reloadPending ? 'bu-card-warn' : ''}">
         <div class="bu-card-head">
           <div class="bu-card-title">
             <span> ตัวโปรแกรม Binder Town</span>
-            <span class="bu-badge ${pending || reloadPending ? 'warn' : 'ok'}">
-              ${reloadPending ? ' รอโหลดหน้าใหม่' : pending ? ` มีอัปเดต ${pending} commit` : ' ล่าสุดแล้ว'}
+            <span class="bu-badge ${pending || reloadPending || versionUpdate ? 'warn' : 'ok'}">
+              ${reloadPending ? ' รอโหลดหน้าใหม่' : versionUpdate ? ` Helper v${esc(status.remoteHelperVersion)} ใหม่` : pending ? ` มีอัปเดต ${pending} commit` : ' ล่าสุดแล้ว'}
             </span>
           </div>
           <button type="button" class="bu-switch ${status.autoPull ? 'on' : ''}" data-bu="mtoggle" title="เปิด/ปิด Auto-update ของ Binder Town" ${status.main ? 'disabled' : ''}><span></span></button>
@@ -119,11 +222,12 @@
           <div class="bu-meta-line">
             ${pending
               ? `<span class="bu-pending-list">${(status.incoming || []).slice(0, 5).map(esc).join('<br>')}${(status.incoming || []).length > 5 ? '<br>…' : ''}</span>`
-              : `<span>${status.main ? 'เครื่องหลัก · ไม่ดึงอัปเดตอัตโนมัติ' : 'ตรวจ GitHub ทุก 3 นาที · อัปเดตแบบ fast-forward เท่านั้น'}</span>`}
+              : `<span>${status.main ? 'เครื่องหลัก · ไม่เตรียมไฟล์อัตโนมัติ' : 'ตรวจ Token ทุก 3 นาที · เตรียมสำเนาในโฟลเดอร์แยก'}</span>`}
             ${status.lastApplied ? `<span>· อัปเดตล่าสุด ${ago(status.lastApplied.at)}</span>` : ''}
           </div>
+          ${status.remoteHelperVersion ? `<div class="bu-meta-line">เวอร์ชันใน repo จาก token: <b>v${esc(status.remoteHelperVersion)}</b>${versionUpdate ? ' · มีอัปเดตใหม่' : ''}</div>` : ''}
           ${status.error ? `<div class="bu-error"> ${esc(status.error)}</div>` : ''}
-          ${pending ? `<div class="bu-card-actions"><button type="button" class="bu-action-btn primary" data-bu="mapply">⬇ อัปเดต Binder Town ตอนนี้</button></div>` : ''}
+          ${pending ? `<div class="bu-card-actions"><button type="button" class="bu-action-btn primary" data-bu="mapply">⬇ เตรียมสำเนา Token ตอนนี้</button></div>` : ''}
         </div>
       </div>`;
   }
@@ -137,10 +241,12 @@
     const errClients = clients.filter(c => c.state === 'error');
     const pending = pendingClients.length;
     const hasError = errClients.length > 0 || Boolean(status.error);
-    const tone = !status.autoPull ? 'off' : hasError ? 'err' : (status.busy || pending || status.behind) ? 'busy' : 'ok';
+    const versionUpdate = versionIsNewer(status.remoteHelperVersion, status.helperVersion);
+    const tone = versionUpdate ? 'busy' : !status.autoPull ? 'off' : hasError ? 'err' : (status.busy || pending || status.behind) ? 'busy' : 'ok';
     pill.className = `btn btn-ghost bu-pill ${tone}`;
     pill.querySelector('.bu-text').textContent =
-      !status.autoPull ? 'Auto-update ปิด'
+      versionIsNewer(status.remoteHelperVersion, status.helperVersion) ? `มี Helper v${status.remoteHelperVersion} ใหม่`
+        : !status.autoPull ? 'Auto-update ปิด'
         : hasError ? 'Auto-update มีปัญหา'
           : status.busy || pending ? `กำลังอัปเดต (${pending || 1})`
             : status.behind ? `มีอัปเดต (${status.behind})`
@@ -221,10 +327,10 @@
       setTimeout(load, 1000); setTimeout(load, 3000);
     } else if (action === 'reload-one') await reloadClient(button.dataset.id, button);
     else if (action === 'mapply') {
-      if (!confirm('อัปเดต Binder Town ตอนนี้? ตัวจัดการอาจรีสตาร์ต (หน้าต่างเกมไม่ปิด)')) return;
+      if (!confirm('เตรียมไฟล์ Token ไว้ในโฟลเดอร์แยกโดยไม่เปลี่ยนไฟล์หลักหรือไม่?')) return;
       button.disabled = true; button.textContent = '⏳ กำลังอัปเดต...';
-      const result = await fetch('/api/update/pull', { method: 'POST' }).then(r => r.json()).catch(() => null);
-      if (result && !result.ok) alert(result.msg || 'อัปเดตไม่สำเร็จ');
+      const result = await fetch('/api/update/stage', { method: 'POST' }).then(r => r.json()).catch(() => null);
+      if (result) alert(result.msg || (result.ok ? 'เตรียมสำเนาแล้ว' : 'เตรียมสำเนาไม่สำเร็จ'));
       setTimeout(load, 2500);
     } else if (action === 'reload') location.reload();
   }
@@ -232,4 +338,5 @@
   mount();
   load();
   setInterval(load, 10000);
+  window.BinderUpdatePanel = { update: value => { if (value && status) { status = { ...status, ...value }; renderTokenPanel(); } } };
 })();

@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="market.css">
-  <link rel="stylesheet" href="update_panel.css?v=44003">
+  <link rel="stylesheet" href="update_panel.css?v=44006">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('bt-manager-theme') === 'origin' ? 'origin' : 'default'; } catch { document.documentElement.dataset.theme = 'default'; }</script>
 </head>
 <body>
@@ -35,12 +35,15 @@
         <button id="btn-script-game" class="btn btn-patcher" title="ตั้งค่าการเปิดเกมและตรวจสอบ Binder Helper">
           <span class="icon"></span> <span>สคริปต์เกม</span> <span id="helper-badge" class="badge patcher-badge">…</span>
         </button>
-        <button id="btn-update" type="button" class="btn btn-ghost bu-pill" title="อัปเดต Binder Town อัตโนมัติ">
-          <span class="bu-dot"></span><span class="bu-text" id="upd-label">Auto-update</span>
+        <button id="btn-update" type="button" class="btn btn-ghost bu-pill" title="ตรวจ Token และเตรียมสำเนาในโฟลเดอร์แยก">
+          <span class="bu-dot"></span><span class="bu-text" id="upd-label">Token update</span>
         </button>
-        <button id="btn-pull-token" type="button" class="btn btn-success" title="ดึงไฟล์จาก repo ที่ token อนุญาตด้วยตนเอง — ไม่ push">
-          📥 ดึงจาก token
-        </button>
+        <div id="token-pull-wrap" class="bu-wrap">
+          <button id="btn-pull-token" type="button" class="btn btn-success" title="ดูเวอร์ชันจาก Token และเตรียมไฟล์ในโฟลเดอร์แยก">
+            📁 ไฟล์จาก Token
+          </button>
+          <div id="token-pull-panel" class="bu-panel bt-token-panel" hidden></div>
+        </div>
       </div>
     </header>
 
@@ -273,9 +276,19 @@ function card(t) {
   const profileName = t.profileName || t.browser || 'โปรไฟล์';
   const characterName = s?.characterName?.trim() || '';
   const classId = s?.characterClass || '';
-  const className = (window.BT_WEAPON?.jobs && window.BT_WEAPON.jobs[classId]) || classId;
+  const classIconId = String(classId).trim().toLowerCase();
+  const className = (window.BT_WEAPON?.jobs && window.BT_WEAPON.jobs[classIconId]) || classId;
+  const classIcon = window.BT_WEAPON?.jobs?.[classIconId]
+    ? `https://play.bindertowngame.com/sprites/icons/job/${encodeURIComponent(classIconId)}.png`
+    : '';
   const avatarFallback = className ? className.slice(0, 1).toUpperCase() : profileName.slice(0, 1);
-  const avatar = `${s?.characterImage ? `<img src="${esc(s.characterImage)}" alt="${esc(className || 'รูปตัวละคร')}" onerror="this.remove();this.parentElement.classList.add('no-img')">` : ''}<span class="avatar-fallback">${esc(avatarFallback || '?')}</span>`;
+  const avatarImage = s?.characterImage
+    ? `<img src="${esc(s.characterImage)}" alt="${esc(className || 'รูปตัวละคร')}" onerror="this.remove();this.parentElement.classList.add('no-img')">`
+    : classIcon
+      ? `<img class="avatar-class-icon" src="${esc(classIcon)}" alt="${esc(className || 'รูปคลาส')}" onerror="this.remove();this.parentElement.classList.add('no-img')">`
+      : '';
+  const hasAvatarImage = !!s?.characterImage || !!classIcon;
+  const avatar = `${avatarImage}<span class="avatar-fallback">${esc(avatarFallback || '?')}</span>`;
   const st = !s ? 'st-off' : s.dead ? 'st-bad' : !s.running ? 'st-idle' : s.weight >= 90 ? 'st-warn' : /ฟาร์ม/.test(s.phase) ? 'st-farm' : 'st-busy';
   const stateClass = s ? 'is-online' : 'is-offline';
   const mainBadge = t.isMain ? '<span class="chip chip-main"> MAIN</span>' : '';
@@ -286,7 +299,7 @@ function card(t) {
   const xpRateValue = (n, suffix) => n > 0 ? `${new Intl.NumberFormat('th-TH').format(n)} <small>${suffix}</small>` : '—';
   const actions = t.profileId ? `<div class="card-menu-dropdown ${menuOpen ? 'is-open' : ''}"><div class="card-menu-header">จัดการโปรไฟล์: ${esc(profileName)}</div>${s ? `<button class="card-menu-item" data-toggle="${esc(t.id)}">${s.running ? 'หยุดบอท' : 'เริ่มบอท'}</button><button class="card-menu-item" data-reload="${esc(t.id)}">โหลด Helper ใหม่</button><button class="card-menu-item" data-window="focus" data-target="${esc(t.id)}">นำหน้าต่างขึ้นมา</button>` : ''}<button class="card-menu-item" data-set-main="${esc(t.profileId)}">${t.isMain ? 'โปรไฟล์หลักอยู่แล้ว' : 'ตั้งเป็นโปรไฟล์หลัก'}</button><button class="card-menu-item cm-danger" data-delete-profile="${esc(t.profileId)}">ลบโปรไฟล์</button></div>` : '';
   const head = `<div class="card-hero">
-    <div class="avatar ${s?.characterImage ? '' : 'no-img'}">${avatar}<span class="avatar-dot ${s ? 'online' : ''}"></span>${s && s.level ? `<span class="avatar-lv">${s.level}</span>` : ''}</div>
+    <div class="avatar ${hasAvatarImage ? '' : 'no-img'}">${avatar}<span class="avatar-dot ${s ? 'online' : ''}"></span>${s && s.level ? `<span class="avatar-lv">${s.level}</span>` : ''}</div>
     <div class="card-identity"><div class="card-title-row"><h3 class="profile-title" title="${esc(profileName)}">${esc(profileName)}</h3>${mainBadge}</div>
       <div class="card-subline">${characterName ? `<span class="char-live-name"> ${esc(characterName)}</span>` : ''}<span class="profile-acc">${s ? `Lv ${s.level || '?'}` : 'ยังไม่เข้าเกม'}</span></div>
       <div class="card-class-row">${s && className ? `<span class="chip chip-class">${esc(className)}</span>` : s && s.town ? `<span class="chip chip-class">${esc(s.town)}</span>` : ''}</div></div>
@@ -685,13 +698,13 @@ document.addEventListener('click', async e => {
     else if (b.id === 'btn-stop-bot-all') await each(allTabs().filter(t => t.status && t.status.running), t => `/api/tab/${t.id}/toggle`, 'หยุด');
     else if (b.id === 'btn-reload-all') await each(allTabs().filter(t => t.status), t => `/api/tab/${t.id}/reload`, 'โหลด helper ใหม่');
     else if (b.id === 'btn-pull-token') {
-      if (!confirm('ดึงไฟล์ล่าสุดจาก repo ที่ token อนุญาตตอนนี้? ตัวจัดการอาจรีสตาร์ต')) return;
-      say('กำลังดึงไฟล์จาก token…');
-      const result = await post('/api/update/pull');
-      if (result.restart) setTimeout(() => location.reload(), 5000);
+      if (!confirm('เตรียมไฟล์ล่าสุดจาก Token ไว้ในโฟลเดอร์ .token-pulls แยกต่างหากหรือไม่? จะไม่เปลี่ยนไฟล์ในโฟลเดอร์หลัก')) return;
+      say('กำลังเตรียมไฟล์จาก Token…');
+      const result = await post('/api/update/stage');
+      say(result.msg || (result.ok ? 'เตรียมไฟล์จาก Token แล้ว' : 'เตรียมไฟล์ไม่สำเร็จ'), !result.ok);
     }
     else if (b.id === 'btn-update') {
-      if (b.dataset.pull) { say('กำลังอัปเดต…'); const j = await post('/api/update/pull'); if (j.restart) setTimeout(() => location.reload(), 5000); }
+      if (b.dataset.pull) { say('กำลังเตรียมสำเนา Token…'); const j = await post('/api/update/stage'); say(j.msg || '', !j.ok); }
       else { const j = await post('/api/update/check'); if (j.update) { renderUpdate(j.update); say(j.update.behind ? `มีอัปเดต ${j.update.behind} commit:\n${j.update.incoming.join('\n')}` : (j.update.error || 'เป็นเวอร์ชันล่าสุดแล้ว'), !!j.update.error); } }
     }
   } finally { b.disabled = false; }
@@ -704,6 +717,6 @@ refresh(); setInterval(refresh, 2000);
 </script>
 <script src="item_names.js"></script>
 <script src="market.js"></script>
-<script src="update_panel.js?v=44003"></script>
+<script src="update_panel.js?v=44007"></script>
 </body>
 </html>

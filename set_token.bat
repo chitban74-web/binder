@@ -1,18 +1,18 @@
 @echo off
 setlocal
-title Binder Town - GitHub token
+title Binder Town - set update token
 cd /d "%~dp0"
 
 REM Keep this file ASCII-only with CRLF line endings (cmd.exe).
-REM One-time setup on a friend's PC: saves a read-only GitHub token in this folder's .git\config
-REM so the manager can download updates. The token is NOT stored in the project files or on GitHub.
+REM Saves a read-only GitHub token under the dedicated "token" remote in .git\config.
+REM Keep origin unchanged; the manager uses token for downloads and origin remains the push remote.
 
 where git >nul 2>nul || goto NO_GIT
 if not exist ".git" goto NO_REPO
 
 echo ==============================================================
-echo   Binder Town - set the GitHub token for automatic updates
-echo   Paste the token you got from the main PC owner (github_pat_...)
+echo   Binder Town - set the GitHub token update source
+echo   Paste the read-only token from the main PC owner (github_pat_...)
 echo ==============================================================
 echo.
 set "TOKEN="
@@ -21,18 +21,24 @@ if not defined TOKEN goto NO_TOKEN
 set "TOKEN=%TOKEN: =%"
 echo %TOKEN%| findstr /r /x "github_pat_[A-Za-z0-9_]* ghp_[A-Za-z0-9]*" >nul || goto BAD_TOKEN
 
-git remote set-url origin "https://fledotexe:%TOKEN%@github.com/fledotexe/babybinder.git"
+git remote get-url token >nul 2>nul
+if errorlevel 1 (
+  git remote add token "https://fledotexe:%TOKEN%@github.com/fledotexe/babybinder.git"
+) else (
+  git remote set-url token "https://fledotexe:%TOKEN%@github.com/fledotexe/babybinder.git"
+)
 set "GIT_TERMINAL_PROMPT=0"
-git -c credential.helper= fetch --quiet origin
+git -c credential.helper= -c http.sslBackend=openssl fetch --quiet --no-write-fetch-head token
 if errorlevel 1 goto FAIL
+git remote set-head token -a >nul 2>nul
 echo.
 echo [OK] Token works. Open http://localhost:3889 and press the update button once;
-echo      after that this PC updates by itself.
+echo      updates will come from the token remote; origin was left unchanged.
 pause
 exit /b 0
 
 :FAIL
-git remote set-url origin "https://github.com/fledotexe/babybinder.git"
+git remote set-url token "https://github.com/fledotexe/babybinder.git" >nul 2>nul
 echo.
 echo [ERROR] GitHub refused this token (wrong, expired or revoked). Nothing was saved.
 echo         Ask for a new token and run this file again.

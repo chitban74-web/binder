@@ -1036,6 +1036,15 @@ body {
   border-radius: 13px;
   background: #0b1222;
 }
+.avatar img.avatar-class-icon {
+  width: 76%;
+  height: 76%;
+  margin: 12%;
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
+  image-rendering: pixelated;
+}
 .avatar-fallback {
   display: none;
   width: 100%;

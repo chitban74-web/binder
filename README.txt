@@ -21,10 +21,10 @@ Binder Town Manager
 - เมื่อลบโปรไฟล์ ระบบจะลบข้อมูลเบราว์เซอร์ของโปรไฟล์นั้นด้วย
 
 อัปเดตจาก Private GitHub repo
-- รัน set_token.bat แล้วใส่ Fine-grained GitHub token ที่มีสิทธิ์อ่าน Contents ของ repo ต้นทาง
-- ปิดและเปิด Manager ใหม่; ตัวอัปเดตใช้ token เรียก GitHub API เพื่อหา Private repo ที่ token อนุญาต
-- ถ้า token อนุญาตหลาย Private repo ให้ตั้ง BINDER_UPDATE_REPO เป็น owner/repo ของ repo ต้นทาง
-- origin ของ Git ในเครื่องนี้เป็น repo ปลายทางสำหรับ push; ปุ่ม “ดึงจาก token” ไม่ push และไม่เปลี่ยน origin
+- รัน set_token.bat แล้วใส่ Fine-grained GitHub token ที่มีสิทธิ์อ่าน repo ต้นทาง fledotexe/babybinder
+- สคริปต์บันทึกแหล่งอัปเดตเป็น Git remote ชื่อ token; ปุ่ม “ดึงจาก token” fetch และ fast-forward จาก remote นี้
+- remote origin คงเดิมไว้สำหรับ repo ของเครื่องนี้และการ push; การดึงจะไม่เปลี่ยน origin
+- ถ้ามีไฟล์แก้ค้างหรือไฟล์ใหม่ที่ยังไม่ commit ระบบจะยกเลิกการอัปเดตและแจ้งรายชื่อไฟล์
 - อย่าแชร์หรือ commit token; token ถูกเก็บใน environment ของบัญชี Windows นี้
 
 การทำงานของ Helper

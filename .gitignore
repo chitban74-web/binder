@@ -3,6 +3,7 @@ profiles/
 release/
 tools/
 protocol/
+.token-pulls/
 # copies of the game's own files and data dumped from them (rebuild with tools/dump.js)
 raw/
 data/

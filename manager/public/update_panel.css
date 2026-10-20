@@ -1,6 +1,14 @@
 /* manager/public/bot_update.css — auto-update pill + viewport-safe panel in the header */
 .bu-wrap { position: relative; }
 .bu-pill { gap: 7px; }
+.bu-token-panel { width: 480px; }
+.bu-token-versions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bu-token-versions > div { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 3px 8px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; background: rgba(255,255,255,.025); }
+.bu-token-versions small { grid-column: 1 / -1; color: #94a3b8; font-size: 10px; }
+.bu-token-versions b { color: #e2e8f0; font-family: var(--font-mono); font-size: 11px; }
+.bu-token-versions time { color: #94a3b8; font-size: 9px; text-align: right; white-space: nowrap; }
+.bu-token-incoming { color: #fcd34d; font-size: 10.5px; line-height: 1.55; max-height: 90px; overflow: auto; }
+.bu-token-message { padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,.04); }
 .bu-dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; flex-shrink: 0; }
 .bu-pill.ok .bu-dot { background: #34d399; }
 .bu-pill.busy .bu-dot { background: #fbbf24; animation: buBlink 1s ease-in-out infinite; }
@@ -432,6 +440,8 @@
   color: var(--text-muted);
   background: var(--bg-item);
 }
+:root:not([data-theme="origin"]) .bu-token-versions > div { background: var(--bg-inset); border-color: var(--line); }
+:root:not([data-theme="origin"]) .bu-token-versions b { color: var(--text-main); }
 :root:not([data-theme="origin"]) .bu-pending-list,
 :root:not([data-theme="origin"]) .bu-client.waiting .bu-client-note,
 :root:not([data-theme="origin"]) .bu-client.outdated .bu-client-note { color: var(--accent-gold); }
