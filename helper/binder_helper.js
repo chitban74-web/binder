@@ -19,7 +19,7 @@
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
 // socialQuery, vendorBuy, huntQuery, bountyClaim, stillHere.
 (() => {
-  const BINDER_HELPER_VERSION = '1.0.5';
+  const BINDER_HELPER_VERSION = '1.0.6';
   if (window.__bth) { window.__bth.show(); return 'already running'; }
   // BEGIN GENERATED PAGE MODULES
   // bounty.js
