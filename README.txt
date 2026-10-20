@@ -34,3 +34,7 @@ Binder Town Manager
 หมายเหตุ
 - Start_Binder.bat เปิด Manager เบื้องหลังและเปิด Dashboard ในเบราว์เซอร์เริ่มต้น
 
+การทดสอบ Auto-update
+- เครื่องลูกตรวจ origin/main ทุก 3 นาที; หลัง push commit ใหม่ ให้รอรอบตรวจแล้วดูเลข commit ในแถบอัปเดต
+- เครื่องหลักที่มีไฟล์ .binder-main จะไม่ pull อัตโนมัติ
+
