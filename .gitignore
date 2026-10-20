@@ -1,5 +1,8 @@
 # browser profiles: contain your game login (cookies) - never commit
 profiles/
+release/
+tools/
+protocol/
 # copies of the game's own files and data dumped from them (rebuild with tools/dump.js)
 raw/
 data/

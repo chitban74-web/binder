@@ -266,7 +266,7 @@
       }
       st.lat = Date.now();
     } catch (e) { if (my !== st.req) return; st.lerror = e.message; st.listings = []; }
-    st.lloading = false; renderListings(); renderAt();
+    st.lloading = false; renderListings();
   }
   function renderListings() {
     if (st.view !== 'list') return;
@@ -287,7 +287,7 @@
     <div class="mk-wrap">
       <section class="mk-board">
         <div class="mk-tools">
-          <input class="mk-input" id="mk-q" type="search" placeholder="🔍 ค้นหาไอเทม…">
+          <input class="mk-input" id="mk-q" type="search" placeholder="ค้นหาไอเทม…">
           <div class="mk-cats" id="mk-cats">${CATS.map(([v, l]) => `<button type="button" data-cat="${v}" class="${v === '' ? 'on' : ''}">${l}</button>`).join('')}</div>
           <div class="mk-rars" id="mk-rars">${RARS.map(([v, l]) => `<button type="button" data-rar="${v}" class="r-${v || 'all'} ${v === '' ? 'on' : ''}">${l}</button>`).join('')}</div>
           <div class="mk-subs" id="mk-subs" hidden></div>
@@ -302,9 +302,8 @@
         <div class="mk-bar"><span id="mk-count">กำลังโหลด…</span>
           <label>เรียง <select class="mk-input" id="mk-sort">${SORTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
           <label title="โหลดหน้าที่เปิดอยู่ใหม่เองตามเวลาที่ตั้ง (เฉพาะตอนเปิดแท็บตลาด)">อัพเดตอัตโนมัติ <select class="mk-input" id="mk-auto">${AUTOS.map(([v, l]) => `<option value="${v}" ${v === st.auto ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-          <span class="mk-at" id="mk-at"></span>
-          <button type="button" class="mk-icon" id="mk-reload" title="โหลดใหม่">⟳</button></div>
-        <div class="mk-capf" id="mk-capf" hidden><span>Tier สูงสุดของชิ้น</span><button type="button" data-cap="0" class="all on">ทุก T</button>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<button type="button" data-cap="${n}" class="t${n}">T${n}</button>`).join('')}<small>กรองจากทุกหน้าของตัวกรองที่เลือก</small></div>
+          <button type="button" class="mk-icon mk-refresh" id="mk-reload">รีเฟรช</button></div>
+        <div class="mk-capf" id="mk-capf" hidden><span>Tier สูงสุดของชิ้น</span><button type="button" data-cap="0" class="all on">ทุก T</button>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<button type="button" data-cap="${n}" class="t${n}">T${n}</button>`).join('')}</div>
         <div class="mk-want" id="mk-want" hidden></div>
         <div class="mk-insf" id="mk-insf" hidden></div>
         <div class="mk-lists" id="mk-lists" hidden></div>
@@ -320,28 +319,23 @@
   // "เช็คออปชัน" panel: the wanted options (affix + minimum tier), a row to add one
   function renderWant() {
     const used = new Set(st.want.map(w => w.id));
-    $('mk-want').innerHTML = `<span>เช็คออปชัน</span>${st.want.map((w, i) => `<span class="mk-wchip t${w.t}">${esc(AFFIX_NAME[w.id] || w.id)} <b>T${w.t}+</b><button type="button" data-wdel="${i}" title="เอาออก">×</button></span>`).join('')}
-      ${st.want.length < 6 ? `<select class="mk-input" id="mk-wid"><option value="">+ เลือกออปชัน…</option>${AFFIXES.filter(([v]) => !used.has(v)).map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select>
-      <select class="mk-input" id="mk-wt">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}">T${n}+</option>`).join('')}</select>
+    $('mk-want').innerHTML = `<span>เช็คออปชัน</span>${st.want.map((w, i) => `<span class="mk-wchip t${w.t}">${esc(AFFIX_NAME[w.id] || w.id)} <b>T${w.t}</b><button type="button" data-wdel="${i}" title="เอาออก">×</button></span>`).join('')}
+      ${st.want.length < 6 ? `<select class="mk-input" id="mk-wid"><option value="">เลือกออปชัน…</option>${AFFIXES.filter(([v]) => !used.has(v)).map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select>
+      <select class="mk-input" id="mk-wt">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}">T${n}</option>`).join('')}</select>
       <button type="button" data-wadd="1">เพิ่ม</button>` : ''}${st.want.length ? `<button type="button" data-wclear="1">ล้าง</button>` : ''}
-      <small>${st.want.length ? 'แสดงเฉพาะประกาศที่มีครบทุกออปชัน · ' : ''}เช็คจากทุกหน้าของตัวกรองที่เลือก</small>`;
+      ${st.want.length ? `<small>แสดงเฉพาะประกาศที่มีครบทุกออปชัน</small>` : ''}`;
     $('mk-want').classList.toggle('active', !!st.want.length);
   }
   // Inscription filter panel: one row per class; the class button picks / drops all of its Inscriptions
   function renderIns() {
     const on = new Set(st.ins);
-    $('mk-insf').innerHTML = `<div class="mk-insh"><span>Inscription ✒</span>${st.ins.length ? `<b>เลือก ${st.ins.length}</b><button type="button" data-iclear="1">ล้าง</button>` : ''}<small>${st.ins.length ? 'แสดงเฉพาะประกาศที่มี Inscription ที่เลือก · ' : ''}เช็คจากทุกหน้าของตัวกรองที่เลือก</small></div>`
+    const collapsed = $('mk-insf').dataset.collapsed === 'true';
+    $('mk-insf').innerHTML = `<div class="mk-insh"><button type="button" class="mk-ins-toggle" data-itoggle="1" aria-expanded="${!collapsed}"><span class="mk-ins-chevron" aria-hidden="true">${collapsed ? '▸' : '▾'}</span><span>Inscription</span></button>${st.ins.length ? `<b>เลือก ${st.ins.length}</b><button type="button" data-iclear="1">ล้าง</button>` : ''}</div><div class="mk-insbody" ${collapsed ? 'hidden' : ''}>`
       + INS_JOBS.map(([job, label]) => { const list = INSCR.filter(x => x[2] === job), all = list.every(x => on.has(x[0]));
         return `<div class="mk-insr"><button type="button" class="job${all ? ' on' : ''}" data-ijob="${job}">${esc(label)}</button>${list.map(([id, n]) => `<button type="button" class="${on.has(id) ? 'on' : ''}" data-ins="${id}">${esc(n)}</button>`).join('')}</div>`; }).join('');
+    $('mk-insf').innerHTML += '</div>';
     $('mk-insf').classList.toggle('active', !!st.ins.length);
   }
-  // when the open view was last loaded
-  function renderAt() {
-    const t = st.view === 'list' ? st.lat : st.at;
-    $('mk-at').textContent = t ? `อัพเดต ${ago(t)}` : '';
-    $('mk-at').title = t ? new Date(t).toLocaleTimeString('th-TH') : '';
-  }
-
   const gearCat = () => st.cat === '' || st.cat === 'weapon' || st.cat === 'gear';
   function filterParams() {
     const p = new URLSearchParams();
@@ -422,7 +416,7 @@
       if (my !== st.req) return;   // a newer search started meanwhile
       st.rows = sortRows([...rows.values()]); st.total = st.rows.length; st.page = 0; st.at = Date.now();
     } catch (e) { if (my !== st.req) return; st.error = e.message; st.rows = []; }
-    st.loading = false; st.progress = ''; renderBoard(); renderAt();
+    st.loading = false; st.progress = ''; renderBoard();
   }
   async function loadItem() {
     if (!st.sel) return;
@@ -512,7 +506,7 @@
     $('mk-sort').innerHTML = (st.view === 'list' ? LSORTS : SORTS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
     $('mk-sort').value = st.view === 'list' ? st.lsort : st.sort;
     if (st.view === 'list') loadListings(); else renderBoard();
-    renderDetail(); renderAt();
+    renderDetail();
   };
   $('mk-want').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -524,6 +518,7 @@
   };
   $('mk-insf').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.itoggle) { $('mk-insf').dataset.collapsed = String($('mk-insf').dataset.collapsed !== 'true'); renderIns(); return; }
     if (b.dataset.ins) st.ins = st.ins.includes(b.dataset.ins) ? st.ins.filter(x => x !== b.dataset.ins) : [...st.ins, b.dataset.ins];
     else if (b.dataset.ijob !== undefined) { const ids = INSCR.filter(x => x[2] === b.dataset.ijob).map(x => x[0]), all = ids.every(id => st.ins.includes(id));
       st.ins = all ? st.ins.filter(id => !ids.includes(id)) : [...new Set([...st.ins, ...ids])]; }
@@ -579,12 +574,12 @@
   document.querySelectorAll('.tab-btn[data-tab="market"]').forEach(b => b.addEventListener('click', () => { loadBuyers(); if (!st.at) boardLoad(); }));
   setInterval(() => {
     if (!open()) return;
-    renderAt();
     if (!st.auto) return;
     const due = t => Date.now() - (t || 0) > st.auto * 60000;
     if (st.view === 'list') { if (!st.lloading && due(Math.max(st.lat, st.ltried || 0))) { st.ltried = Date.now(); loadListings(); } }
     else if (!st.loading && due(Math.max(st.at, st.tried || 0))) boardLoad();
   }, 5000);
+  $('mk-insf').dataset.collapsed = 'true';
   renderWant(); renderIns();
   if (open()) boardLoad();
 })();

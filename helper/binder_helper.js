@@ -19,6 +19,7 @@
 // through the game's own Colyseus room and are the ones the game's UI sends: moveTo, channelQuery, switchChannel,
 // socialQuery, vendorBuy, huntQuery, bountyClaim, stillHere.
 (() => {
+  const BINDER_HELPER_VERSION = '1.0.5';
   if (window.__bth) { window.__bth.show(); return 'already running'; }
   // BEGIN GENERATED PAGE MODULES
   // bounty.js
@@ -456,8 +457,12 @@
   };
   const liveGatherNodes = () => { const r = room(), nodes = r && r.state && r.state.nodes; if (!nodes) return []; if (typeof nodes.entries === 'function') return [...nodes.entries()].map(([id,node]) => ({ id, node })); if (Array.isArray(nodes)) return nodes.map((node,id) => ({ id: String(id), node })); return Object.entries(nodes).map(([id,node]) => ({ id, node })); };
   const gatherNodeProgress = new Map();
+  const gatherNodeBlacklist = new Map();
+  const gatherNodeKey = node => `${mapId()}:CH${chOf(room())}:${node.nodeType}:${(+node.x).toFixed(1)},${(+node.y).toFixed(1)}`;
   const suitableGatherNode = () => {
-    const candidates = liveGatherNodes().filter(({node:n}) => n && n.nodeType === cfg.gathering.type && +n.tier === +cfg.gathering.tier && n.available === true && +n.charges > 0);
+    const now = Date.now();
+    for (const [key, expiresAt] of gatherNodeBlacklist) if (expiresAt <= now) gatherNodeBlacklist.delete(key);
+    const candidates = liveGatherNodes().filter(({node:n}) => n && n.nodeType === cfg.gathering.type && +n.tier === +cfg.gathering.tier && n.available === true && +n.charges > 0 && !gatherNodeBlacklist.has(gatherNodeKey(n)));
     return (cfg.gathering.gold ? candidates.filter(({node:n}) => n.golden) : candidates.find(({node:n}) => n.golden) ? candidates.filter(({node:n}) => n.golden) : candidates)[0];
   };
   // send one game message and wait for the server reply that matches (server events can come batched in an array)
@@ -958,23 +963,6 @@
       if (got) log(`ซื้อ ${potName(p.item)} ×${got} (มี ${beltCount(p.item)})`);
     }
   }
-  // potions in the bag beyond what the panel tops up to: the HP / MP potion picked there keeps its "เติมถึง" amount,
-  // every other potion is sold (same message as the bag's "ขาย"). Nothing picked in the panel -> nothing sold
-  async function sellSparePotions() {
-    const plans = potionPlans();
-    if (!plans.length) return;
-    if (!invItems) { log('ยังไม่ได้ข้อมูลกระเป๋าจากเซิร์ฟ — ข้ามการขายยาส่วนเกิน'); return; }
-    const keep = Object.fromEntries(plans.map(p => [p.item, Math.max(0, p.to || 0)]));
-    for (const id of [...Object.keys(POTIONS.hp), ...Object.keys(POTIONS.mp)]) {
-      const have = invItems.get(id) || 0, q = have - (keep[id] || 0);
-      if (q <= 0 || !cfg.running) continue;
-      const r = room(); if (!r) return;
-      r.send('input', { type: 'sell', itemId: id, qty: q });
-      await sleep(1200);
-      const now = invItems.get(id) || 0;
-      log(now < have ? `ขาย ${potName(id)} ×${have - now} (เหลือ ${now})` : `ขาย ${potName(id)} ×${q} ไม่สำเร็จ (ยังมี ${now})`);
-    }
-  }
   // Deposit materials after a sale. The game exposes the exact "ฝากวัตถุดิบทั้งหมด" button
   // in the bank UI; its own filter excludes locked items and keeps equipment/consumables out.
   const BANK_NPCS = {
@@ -984,6 +972,48 @@
     Sanctum: { id: 'spirit_broker_s', x: 26, y: 23 },
   };
   const bankOpen = () => { const w = $('#bankwin'); return !!w && w.style.display === 'block'; };
+  const bankTabs = () => [...document.querySelectorAll('#bankwin .cwtab')]
+    .map(el => {
+      const m = (el.textContent || '').trim().match(/^คลัง\s*(\d+)\s*[·•]\s*(\d+)\s*\/\s*(\d+)/);
+      return m ? { el, index: +m[1], used: +m[2], capacity: +m[3] } : null;
+    }).filter(Boolean);
+  async function selectBankWithSpace() {
+    let tabs = bankTabs();
+    let target = tabs.find(t => t.used < t.capacity);
+    if (!target) {
+      const lastIndex = tabs.reduce((n, t) => Math.max(n, t.index), 0);
+      const buy = [...document.querySelectorAll('#bankwin button')].find(b => /^\+\s*เปิดคลัง\s*\d+\s*[·•]\s*[\d,]+\s*G$/i.test((b.textContent || '').trim()));
+      if (!buy || buy.disabled) { log('คลังทุกแท็บเต็ม และไม่พบปุ่มเปิดคลังใหม่/ซื้อคลังไม่ได้'); return false; }
+      const label = (buy.textContent || '').trim();
+      log(`คลังทุกแท็บเต็ม — ${label}`);
+      click(buy, label);
+      // The game may ask for an in-game confirmation before opening the next bank tab.
+      for (let i = 0; i < 10 && cfg.running; i++) {
+        await sleep(300);
+        if (dialogOpen()) {
+          if (/เปิดคลัง|ซื้อคลัง/.test(dialogTitle())) click($('#bcyes'), 'ยืนยัน ' + label);
+          else { log(`คำยืนยันไม่ตรงกับการเปิดคลัง (${dialogTitle()}) — ยกเลิกการซื้อ`); return false; }
+          break;
+        }
+        tabs = bankTabs();
+        if (tabs.some(t => t.index > lastIndex)) break;
+      }
+      for (let i = 0; i < 20 && cfg.running; i++) {
+        await sleep(300);
+        tabs = bankTabs();
+        target = tabs.find(t => t.used < t.capacity);
+        if (target) break;
+      }
+      if (!target) { log('เปิดคลังใหม่ไม่สำเร็จ หรือยังไม่มีแท็บที่ว่าง'); return false; }
+    }
+    if (!target.el.classList.contains('on')) click(target.el, `เลือกคลัง ${target.index} (${target.used}/${target.capacity})`);
+    for (let i = 0; i < 10 && cfg.running; i++) {
+      await sleep(200);
+      const active = bankTabs().find(t => t.index === target.index && t.el.classList.contains('on'));
+      if (active) return true;
+    }
+    return bankTabs().some(t => t.index === target.index && t.el.classList.contains('on'));
+  }
   async function depositMaterials() {
     const town = liveMap(), npc = BANK_NPCS[town];
     if (!npc) { log(`ไม่มีข้อมูล NPC คลังใน ${town || 'เมืองนี้'} — ข้ามการฝากวัตถุดิบ`); return false; }
@@ -998,6 +1028,7 @@
       for (let i = 0; i < 20 && cfg.running && !bankOpen(); i++) await sleep(500);
     }
     if (!bankOpen()) { log(`เปิดคลังกับ NPC ${npc.id} ไม่สำเร็จ`); return false; }
+    if (!await selectBankWithSpace()) { log('ข้ามการฝากวัตถุดิบ: ไม่มีคลังที่พร้อมรับของ'); return false; }
     const btn = $('#bankmats');
     if (!visible(btn)) { log('ไม่พบปุ่มฝากวัตถุดิบทั้งหมดในคลัง'); return false; }
     const batchesToWait = Math.ceil(document.querySelectorAll('#bankbag .slot.act').length / 15) + 4;
@@ -1016,15 +1047,14 @@
     return true;
   }
   // one trip: town -> shop -> (sell) -> top up potions
-  async function townTrip(why, sell) {
+  async function townTrip(why, sell, options = {}) {
     setPhase(why); log(why); setAuto(false); await sleep(800);
     const town = cfg.town || 'Ashford';
     if (!TOWN_IDS[mapName()] && !(await warpToTown(town) || await travelTo(town))) { log('ไปเมืองไม่ได้'); return false; }
-    if (sell && cfg.salvOn) { setPhase('แยกชิ้นอุปกรณ์'); await salvageJunk(); }
+    if (sell && cfg.salvOn && !options.skipSalvage) { setPhase('แยกชิ้นอุปกรณ์'); await salvageJunk(); }
     setPhase('ที่ร้านค้า ' + mapName());
     if (!await openShop()) return false;
     if (sell) await sellAll();
-    await sellSparePotions();
     await buyPotions();
     closeShop();
     if (sell) await depositMaterials();
@@ -1119,31 +1149,60 @@
     await backToFarm();
   }
   const stopWith = (why, msg) => { log(msg); cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); save(); render(); setPhase('หยุด: ' + why); };
+  async function resumeGathering(map, channel) {
+    const target = map || (gatherMaps().filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id))[gatherMapIndex] || '');
+    if (!target) return false;
+    setAuto(false);
+    if (!await travelTo(MAP_NAMES[target] || target)) return false;
+    if (channel) {
+      const r = room();
+      if (r && chOf(r) !== channel) await switchTo(r, chOf(r), channel, null, 'กลับสู่ Gathering เดิม');
+    }
+    setAuto(false); // Gathering operates with AUTO off; gatheringStep resumes on the next loop.
+    return true;
+  }
   let lastGatherCommand = 0;
   async function gatherNodeStep(found) {
     const {id, node} = found, p = myPos(), r = room();
     if (!p || !r) return;
-    const now = Date.now(), key = `${mapId()}:${node.nodeType}:${(+node.x).toFixed(1)},${(+node.y).toFixed(1)}`;
+    const maxStack = Math.max(1, +node.maxCharges || +node.maxStack || 5);
+    const stackCount = Math.max(0, Math.min(maxStack, +node.charges || 0));
+    const stackLabel = `${stackCount}/${maxStack} stack`;
+    const now = Date.now(), key = gatherNodeKey(node);
     let progress = gatherNodeProgress.get(key);
-    if (!progress) { progress = { charges: +node.charges, lastChargeAt: now, startedAt: now, lastResultAt: 0, lastMoveAt: 0 }; gatherNodeProgress.set(key, progress); }
+    if (!progress) { progress = { charges: +node.charges, lastChargeAt: 0, startedAt: now, lastResultAt: 0, lastMoveAt: 0, lastSeenAt: 0 }; gatherNodeProgress.set(key, progress); }
     else if (+node.charges < progress.charges) { progress.charges = +node.charges; progress.lastChargeAt = now; }
     else progress.charges = +node.charges;
+    // A node tracker may survive a channel/travel trip in memory. Never count that away-time
+    // toward a no-progress blacklist when we come back to the same node.
+    if (progress.lastSeenAt && now - progress.lastSeenAt > 5000) progress.lastChargeAt = 0;
+    progress.lastSeenAt = now;
     if (recentGatherResult && recentGatherResult.at > progress.startedAt && recentGatherResult.at > progress.lastResultAt
       && (recentGatherResult.nodeId === String(id) || (recentGatherResult.nodeId == null && recentGatherResult.nodeType === node.nodeType))) {
-      progress.lastChargeAt = recentGatherResult.at; progress.lastResultAt = recentGatherResult.at;
+      progress.lastResultAt = recentGatherResult.at;
     }
     const target = { x: +node.x, y: +node.y };
     setAuto(false);
     if (dist(p, target) > 1.5) {
+      progress.lastChargeAt = 0;
       setPhase(`Gathering · เดินไป ${node.golden ? 'node ทอง' : cfg.gathering.type} T${node.tier}`);
       if (now - progress.lastMoveAt >= 5000) { progress.lastMoveAt = now; r.send('input', { type: 'moveTo', x: target.x, y: target.y }); }
       return;
     }
     const me = r.state.players && r.state.players.get(r.sessionId);
-    if (me && (me.st === 2 || me.st === 3)) { setPhase(`Gathering · กำลังเก็บ ${node.nodeType} T${node.tier} (${node.charges} charge)`); return; }
+    if (me && (me.st === 2 || me.st === 3)) { setPhase(`Gathering · กำลังเก็บ ${node.nodeType} T${node.tier} (${stackLabel})`); return; }
+    if (!progress.lastChargeAt) progress.lastChargeAt = now;
+    if (now - progress.lastChargeAt >= 30_000) {
+      gatherNodeBlacklist.set(key, now + 60_000);
+      gatherNodeProgress.delete(key);
+      const label = `${node.nodeType} T${node.tier} (${stackLabel})`;
+      log(`Blacklist node ${label} · stack ไม่ลด 30 วิ · ลองใหม่ใน 60 วิ`);
+      setPhase(`Gathering · ข้าม node ติด blacklist 60 วิ · ${label}`);
+      return;
+    }
     if (Date.now() - lastGatherCommand < 1800) return;
     lastGatherCommand = Date.now();
-    setPhase(`Gathering · เก็บ ${node.golden ? 'node ทอง ' : ''}${node.nodeType} T${node.tier} (${node.charges} charge)`);
+    setPhase(`Gathering · เก็บ ${node.golden ? 'node ทอง ' : ''}${node.nodeType} T${node.tier} (${stackLabel})`);
     r.send('input', cfg.gathering.type === 'fish' ? { type: 'fish' } : { type: 'gather', nodeId: id });
   }
 
@@ -1211,10 +1270,15 @@
       } else if (cfg.worldBoss && (mapId() === WB_ARENA || (wbOpen() && wb.view.id !== wb.doneId))) {
         await worldBossTrip();   // also when the helper starts already inside the arena
       } else if (bagFull()) {
+        const wasGathering = cfg.gathering.enabled && !bq.active;
+        const gatherMap = wasGathering ? mapId() : '';
+        const gatherChannel = wasGathering ? chOf(room()) : 0;
         await townTrip(`ของเต็ม (น้ำหนัก ${weightPct()}%${slotsFull() ? ' / ช่องเต็ม' : ''}) — กลับเมือง`, true);
         // still full after selling (sell filter keeps the rest) -> stop instead of warping again and again
         if (bagFull()) return stopWith('ขายแล้วของยังเต็ม', `ขายแล้วยังเต็ม (${weightPct()}%) — หยุด helper: ติ๊กหมวดขายเพิ่ม หรือฝาก Bank`);
-        await backToFarm();
+        if (wasGathering) {
+          if (!await resumeGathering(gatherMap, gatherChannel)) log('กลับไป Gathering เดิมไม่สำเร็จ — จะลองต่อในรอบถัดไป');
+        } else await backToFarm();
       } else if (mapName() === tgt().map && lowPotions().length) {
         const low = lowPotions().map(p => `${potName(p.item)} ${p.have}/${p.min}`).join(', ');
         const reached = await townTrip(`ยาใกล้หมด (${low}) — กลับเมืองซื้อ`, weightPct() >= cfg.sellAfterDeathPct);
@@ -1683,24 +1747,20 @@
     busy = true;
     cfg.running = true; // travelTo / townTrip use this as their cancellation signal
     try {
-      log('เริ่มทดสอบ full routine จริง: เปิดร้าน → ขายตามตัวกรอง → ซื้อยา → เปิดคลัง → ฝากวัตถุดิบ');
+      log('เริ่มทดสอบร้านค้า: ขายตามตัวกรอง → ซื้อยา → ฝากวัตถุดิบ');
       setAuto(false);
       if (!BANK_NPCS[town]) throw new Error(`ไม่มีข้อมูล NPC คลังใน ${town}`);
       if (!TOWN_IDS[mapName()] && !(await warpToTown(town) || await travelTo(town))) throw new Error(`ไป ${town} ไม่สำเร็จ`);
-      if (!await townTrip('ทดสอบ full routine: ขายของ / ซื้อยา / ฝากคลัง', true)) throw new Error('routine ร้านค้า / คลังทำไม่ครบ');
-      if (cfg.farmMap) {
-        if (!await backToFarm(tgt())) throw new Error(`กลับไปฟาร์ม ${tgt().map} ไม่สำเร็จ`);
-      } else log('ยังไม่ได้บันทึกจุดฟาร์ม — จบการทดสอบที่เมือง');
+      if (!await townTrip('ทดสอบร้านค้า: ขายของ / ซื้อยา / ฝากคลัง', true, { skipSalvage: true })) throw new Error('routine ร้านค้า / คลังทำไม่ครบ');
       completed = true;
-      log('ทดสอบ full routine เสร็จ: ขาย / ซื้อยา / ฝากคลัง' + (cfg.farmMap ? ' / กลับฟาร์ม' : ''));
+      log('ทดสอบร้านค้าเสร็จ: ขาย / ซื้อยา / ฝากคลัง · จบที่เมือง');
       return true;
     } catch (e) {
       log('ทดสอบ routine ไม่สำเร็จ: ' + e.message);
       return false;
     } finally {
       cfg.running = wasRunning;
-      if (wasAuto && (completed || mapName() === tgt().map)) setAuto(true);
-      else setAuto(false);
+      setAuto(wasAuto);
       busy = false;
       if (!wasRunning) { save(); render(); setPhase('หยุดอยู่'); }
     }
@@ -1762,6 +1822,7 @@
       const imageValue = me && (me.classImage ?? me.jobImage ?? me.portrait ?? me.avatar ?? me.faceImage ?? me.image);
       const characterImage = typeof imageValue === 'string' && /^(https?:|data:image\/|blob:|\/)/i.test(imageValue) ? imageValue : '';
       return {
+        version: BINDER_HELPER_VERSION,
         running: cfg.running, mode: cfg.mode, gathering: { enabled: cfg.gathering.enabled }, phase, map: mapName(), channel: chOf(r), level: myLevel(), characterName: me && typeof me.name === 'string' ? me.name : '',
         characterClass: classValue == null ? '' : String(classValue), characterImage, weight: weightPct(), auto: autoOn(), dead: isDead(),
         farmMap: cfg.farmMap, farmSpot: cfg.farmSpot, town: cfg.town,

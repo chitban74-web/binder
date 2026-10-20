@@ -20,6 +20,13 @@ Binder Town Manager
 - รายการโปรไฟล์และข้อมูลเบราว์เซอร์เก็บใน %APPDATA%\Binder Town Manager
 - เมื่อลบโปรไฟล์ ระบบจะลบข้อมูลเบราว์เซอร์ของโปรไฟล์นั้นด้วย
 
+อัปเดตจาก Private GitHub repo
+- รัน set_token.bat แล้วใส่ Fine-grained GitHub token ที่มีสิทธิ์อ่าน Contents ของ repo ต้นทาง
+- ปิดและเปิด Manager ใหม่; ตัวอัปเดตใช้ token เรียก GitHub API เพื่อหา Private repo ที่ token อนุญาต
+- ถ้า token อนุญาตหลาย Private repo ให้ตั้ง BINDER_UPDATE_REPO เป็น owner/repo ของ repo ต้นทาง
+- origin ของ Git ในเครื่องนี้เป็น repo ปลายทางสำหรับ push; ปุ่ม “ดึงจาก token” ไม่ push และไม่เปลี่ยน origin
+- อย่าแชร์หรือ commit token; token ถูกเก็บใน environment ของบัญชี Windows นี้
+
 การทำงานของ Helper
 - สถานะฟาร์มและ Gathering จะจำโหมดที่เลือกไว้เมื่อรีโหลด helper หรือเปิดแท็บเกมใหม่
 - ปุ่มทดสอบ full routine ในเมนูขายของทำรายการจริงตามตัวกรอง ซื้อยา และฝากวัตถุดิบ

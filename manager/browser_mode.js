@@ -253,14 +253,31 @@ function createBrowserMode({ getSettings, rootDir = ROOT, port = SHARED_BROWSER_
     if (ws) { const socket = ws; ws = null; socket.close(); }
   }
 
+  const parkedWindows = new Map();
   async function windowAction(targetId, action, bounds = {}) {
     await connect();
     const { windowId } = await send('Browser.getWindowForTarget', { targetId });
+    if (action === 'park') {
+      const current = await send('Browser.getWindowBounds', { windowId }).catch(() => null);
+      if (current?.bounds && current.bounds.windowState !== 'minimized') parkedWindows.set(targetId, current.bounds);
+      await send('Browser.setWindowBounds', { windowId, bounds: { left: -32000, top: -32000, width: 1, height: 1, windowState: 'normal' } });
+    } else if (action === 'show') {
+      const saved = parkedWindows.get(targetId);
+      await send('Browser.setWindowBounds', { windowId, bounds: saved ? { left: saved.left, top: saved.top, width: saved.width, height: saved.height, windowState: 'normal' } : { windowState: 'normal' } });
+      parkedWindows.delete(targetId);
+      await send('Target.activateTarget', { targetId });
+    }
     if (['focus', 'top', 'show', 'restore'].includes(action)) {
-      await send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } });
+      const saved = parkedWindows.get(targetId);
+      await send('Browser.setWindowBounds', { windowId, bounds: saved ? { left: saved.left, top: saved.top, width: saved.width, height: saved.height, windowState: 'normal' } : { windowState: 'normal' } });
+      parkedWindows.delete(targetId);
       await send('Target.activateTarget', { targetId });
     } else if (action === 'minimize') await send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'minimized' } });
-    else if (action === 'set-bounds') await send('Browser.setWindowBounds', { windowId, bounds: { left: +bounds.x || 0, top: +bounds.y || 0, width: +bounds.w || 800, height: +bounds.h || 600 } });
+    else if (action === 'set-bounds') {
+      const saved = parkedWindows.get(targetId);
+      if (saved) { await send('Browser.setWindowBounds', { windowId, bounds: { left: saved.left, top: saved.top, width: saved.width, height: saved.height, windowState: 'normal' } }); parkedWindows.delete(targetId); }
+      await send('Browser.setWindowBounds', { windowId, bounds: { left: +bounds.x || 0, top: +bounds.y || 0, width: +bounds.w || 800, height: +bounds.h || 600 } });
+    }
   }
 
   async function recoverCrashedTarget(targetId) {

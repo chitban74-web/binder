@@ -2,9 +2,10 @@
 //  • opens each saved game profile in its own persistent Chrome / Edge / Brave data directory
 //  • loads helper/binder_helper.js and its per-menu modules in every game tab
 //  • shows each tab's helper status, start / stop / reload helper from the web
-//  • updates from Git clones or GitHub ZIP installs; after an update the manager restarts itself
+//  • updates from git (fetch / pull --ff-only); after a pull the helper is reloaded in every tab,
+//    and if manager/ itself changed the server exits with code 3 so Start_Binder.bat restarts it
 // usage: node manager/server.js   (Start_Binder.bat does this)
-const fs = require('fs'), path = require('path'), os = require('os'), http = require('http'), crypto = require('crypto'), { execFile } = require('child_process');
+const fs = require('fs'), path = require('path'), http = require('http'), crypto = require('crypto'), { execFile } = require('child_process');
 const { GAME_URL, ROOT, exeOf, targets, Tab } = require('./browser');
 const { createBrowserMode } = require('./browser_mode');
 
@@ -17,11 +18,19 @@ const HELPER_PAGES = path.join(ROOT, 'helper', 'pages');
 const PUBLIC = path.join(__dirname, 'public');
 const BROWSER_PREFS = path.join(DATA_ROOT, 'profiles', '.manager-settings.json');
 const GAME_PROFILES = path.join(DATA_ROOT, 'profiles', '.game-profiles.json');
+const UPDATE_PREFS = path.join(DATA_ROOT, 'profiles', '.update-settings.json');
 const CHECK_MS = 3000, UPDATE_CHECK_MS = 3 * 60e3;
+const SERVER_STARTED_AT = Date.now();
 // main machine (has the git-ignored file .binder-main): pushes, never fetches / pulls by itself.
 // every other machine follows it: fetch every 3 minutes and pull as soon as there is a new commit.
 const IS_MAIN = fs.existsSync(path.join(ROOT, '.binder-main'));
-const AUTO_PULL = !IS_MAIN && process.env.BINDER_AUTO_UPDATE !== '0';
+function readUpdatePrefs() {
+  try { return JSON.parse(fs.readFileSync(UPDATE_PREFS, 'utf8')); } catch { return {}; }
+}
+const savedUpdatePrefs = readUpdatePrefs();
+let AUTO_PULL = !IS_MAIN && (typeof savedUpdatePrefs.autoPull === 'boolean' ? savedUpdatePrefs.autoPull : process.env.BINDER_AUTO_UPDATE !== '0');
+let AUTO_RELOAD_HELPERS = savedUpdatePrefs.autoReloadHelpers !== false;
+let updateBusy = false;
 const RESTART_CODE = 3;
 
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
@@ -36,6 +45,7 @@ function readBrowserPrefs() {
 let browserPrefs = readBrowserPrefs();
 const profileBrowserModes = new Map();
 const profilePorts = new Map();
+let gameWindowsParked = false;
 function profilePort(profileId) {
   if (profilePorts.has(profileId)) return profilePorts.get(profileId);
   const occupied = new Set(profilePorts.values());
@@ -160,144 +170,19 @@ async function loop() {
 // ---------------- git update ----------------
 const git = (...args) => new Promise(resolve => execFile('git', args, { cwd: ROOT, windowsHide: true, timeout: 60000 }, (err, stdout, stderr) =>
   resolve({ ok: !err, out: String(stdout).trim(), err: String(stderr || (err && err.message) || '').trim() })));
-async function isGitInstall() {
-  const top = await git('rev-parse', '--show-toplevel');
-  return top.ok && path.resolve(top.out).toLowerCase() === path.resolve(ROOT).toLowerCase();
-}
-const UPDATE_REPO_URL = 'https://github.com/chitban74-web/binder.git';
-const UPDATE_REPO_API = 'https://api.github.com/repos/chitban74-web/binder';
-const ZIP_VERSION_FILE = path.join(DATA_ROOT, 'profiles', '.binder-zip-version.json');
 const update = { isRepo: false, branch: '', commit: '', date: '', behind: 0, incoming: [], checkedAt: 0, error: '' };
-async function latestZipCommit() {
-  const r = await fetch(`${UPDATE_REPO_API}/commits/main`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Binder-Town-Updater' }, signal: AbortSignal.timeout(15000) });
-  if (!r.ok) throw new Error(`GitHub API ตอบกลับ HTTP ${r.status}`);
-  const c = await r.json();
-  if (!/^[a-f0-9]{40}$/i.test(c.sha || '')) throw new Error('อ่าน commit ล่าสุดจาก GitHub ไม่สำเร็จ');
-  return { sha: c.sha, date: c.commit?.committer?.date || c.commit?.author?.date || '' };
-}
-async function checkZipUpdate() {
-  update.isRepo = false;
-  update.source = 'zip';
-  update.branch = 'main';
-  update.behind = 0;
-  update.incoming = [];
-  update.error = '';
-  try {
-    const latest = await latestZipCommit();
-    let installed = '';
-    try { installed = JSON.parse(fs.readFileSync(ZIP_VERSION_FILE, 'utf8')).sha || ''; } catch { }
-    update.commit = latest.sha.slice(0, 7);
-    update.date = latest.date ? latest.date.slice(0, 16).replace('T', ' ') : '';
-    update.behind = installed === latest.sha ? 0 : 1;
-    update.incoming = update.behind ? [`${latest.sha.slice(0, 7)} GitHub ZIP update`] : [];
-    update.error = '';
-  } catch (e) {
-    update.error = 'เช็ก ZIP อัปเดตจาก GitHub ไม่สำเร็จ: ' + e.message;
-  }
-  update.checkedAt = Date.now();
-  return update;
-}
-function runPowerShell(args, env) {
-  return new Promise((resolve, reject) => execFile('powershell.exe', args, { windowsHide: true, timeout: 120000, env: { ...process.env, ...env } }, (err, stdout, stderr) =>
-    err ? reject(new Error(String(stderr || err.message).trim())) : resolve(String(stdout).trim())));
-}
-function copyZipFiles(source, destination, backupRoot) {
-  const preserve = new Set(['.git', '.binder-main', 'bin', 'profiles', 'raw', 'data']);
-  let copied = 0, backedUp = 0;
-  const changedFiles = [], createdFiles = [];
-  function visit(src, rel = '') {
-    const name = path.basename(src);
-    const nextRel = rel ? path.join(rel, name) : name;
-    const parts = nextRel.split(path.sep);
-    if (parts.some(p => preserve.has(p)) || /^Binder-Town-Manager\.exe$/i.test(name) || (parts[0] === 'manager' && name === 'server.log')) return;
-    const dst = path.join(destination, nextRel);
-    const st = fs.statSync(src);
-    if (st.isDirectory()) {
-      fs.mkdirSync(dst, { recursive: true });
-      for (const child of fs.readdirSync(src)) visit(path.join(src, child), nextRel);
-      return;
-    }
-    if (!st.isFile()) return;
-    fs.mkdirSync(path.dirname(dst), { recursive: true });
-    if (fs.existsSync(dst)) {
-      const old = fs.readFileSync(dst), incoming = fs.readFileSync(src);
-      if (!old.equals(incoming)) {
-        const backup = path.join(backupRoot, nextRel);
-        fs.mkdirSync(path.dirname(backup), { recursive: true });
-        fs.copyFileSync(dst, backup);
-        changedFiles.push({ dst, backup });
-        backedUp++;
-      }
-    } else {
-      createdFiles.push(dst);
-    }
-    fs.copyFileSync(src, dst);
-    copied++;
-  }
-  try {
-    for (const child of fs.readdirSync(source)) visit(path.join(source, child));
-  } catch (e) {
-    const rollbackErrors = [];
-    for (const file of changedFiles.reverse()) {
-      try { fs.copyFileSync(file.backup, file.dst); } catch (rollbackError) { rollbackErrors.push(rollbackError.message); }
-    }
-    for (const file of createdFiles.reverse()) {
-      try { fs.rmSync(file, { force: true }); } catch (rollbackError) { rollbackErrors.push(rollbackError.message); }
-    }
-    if (rollbackErrors.length) throw new Error(`${e.message}; rollback incomplete: ${rollbackErrors.join('; ')}`);
-    throw e;
-  }
-  return { copied, backedUp };
-}
-async function pullZipUpdate() {
-  let tempDir = '';
-  try {
-    const latest = await latestZipCommit();
-    let installed = '';
-    try { installed = JSON.parse(fs.readFileSync(ZIP_VERSION_FILE, 'utf8')).sha || ''; } catch { }
-    if (installed === latest.sha) return { ok: true, msg: 'เป็นเวอร์ชันล่าสุดแล้ว' };
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'binder-town-update-'));
-    const response = await fetch(`https://codeload.github.com/chitban74-web/binder/zip/${latest.sha}`, { headers: { 'User-Agent': 'Binder-Town-Updater' }, signal: AbortSignal.timeout(120000) });
-    if (!response.ok) throw new Error(`ดาวน์โหลด ZIP ไม่สำเร็จ (HTTP ${response.status})`);
-    const archive = path.join(tempDir, 'source.zip');
-    fs.writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
-    const extracted = path.join(tempDir, 'extracted');
-    fs.mkdirSync(extracted);
-    await runPowerShell(['-NoProfile', '-NonInteractive', '-Command', '$ErrorActionPreference="Stop"; Expand-Archive -LiteralPath $env:BINDER_UPDATE_ARCHIVE -DestinationPath $env:BINDER_UPDATE_EXTRACTED -Force; if (!$?) { exit 1 }'], {
-      BINDER_UPDATE_ARCHIVE: archive, BINDER_UPDATE_EXTRACTED: extracted,
-    });
-    const root = fs.readdirSync(extracted).map(n => path.join(extracted, n)).find(p => fs.statSync(p).isDirectory());
-    if (!root || !fs.existsSync(path.join(root, 'manager', 'server.js'))) throw new Error('ZIP ไม่มีไฟล์ Binder Town ที่คาดไว้');
-    const backupRoot = path.join(DATA_ROOT, 'profiles', 'zip-update-backup', new Date().toISOString().replace(/[:.]/g, '-'));
-    const result = copyZipFiles(root, ROOT, backupRoot);
-    fs.mkdirSync(path.dirname(ZIP_VERSION_FILE), { recursive: true });
-    fs.writeFileSync(ZIP_VERSION_FILE, JSON.stringify({ sha: latest.sha, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
-    setTimeout(() => { log('ตัวจัดการถูกอัปเดตจาก ZIP — รีสตาร์ต'); process.exit(RESTART_CODE); }, 800);
-    return { ok: true, msg: `อัปเดตจาก GitHub ZIP แล้ว (${result.copied} ไฟล์)` + (result.backedUp ? ` · สำรองไฟล์เดิม ${result.backedUp} ไฟล์ไว้ใน profiles/zip-update-backup` : '') , restart: true };
-  } catch (e) {
-    return { ok: false, msg: 'อัปเดตจาก GitHub ZIP ไม่สำเร็จ: ' + e.message };
-  } finally {
-    if (tempDir) { try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { } }
-  }
-}
 async function checkUpdate(fetchFirst = true) {
-  update.isRepo = await isGitInstall();
-  if (!update.isRepo) return checkZipUpdate();
-  update.source = 'git';
+  const repo = await git('rev-parse', '--is-inside-work-tree');
+  update.isRepo = repo.ok && repo.out === 'true';
+  if (!update.isRepo) { update.error = 'โฟลเดอร์นี้ไม่ใช่ git repo (clone มาจาก GitHub ก่อนถึงอัปเดตได้)'; return update; }
   update.branch = (await git('rev-parse', '--abbrev-ref', 'HEAD')).out;
   const head = await git('log', '-1', '--format=%h|%cd', '--date=format:%Y-%m-%d %H:%M');
   [update.commit, update.date] = head.out.split('|');
   if (fetchFirst) {
-    // Always use the public repository URL and ignore saved credentials; no token is needed.
-    const remote = await git('remote', 'set-url', 'origin', UPDATE_REPO_URL);
-    if (!remote.ok) {
-      update.error = 'ตั้งค่า GitHub URL ไม่สำเร็จ: ' + remote.err;
-      update.checkedAt = Date.now();
-      return update;
-    }
-    const f = await git('-c', 'credential.helper=', 'fetch', '--quiet', 'origin');
+    const f = await git('fetch', '--quiet', 'origin');
+    // GitHub wants a login: this PC needs the read-only token (set_token.bat in the Binder_Town folder)
     const auth = /could not read Username|Invalid username or token|Authentication failed|terminal prompts disabled/i.test(f.err);
-    update.error = f.ok ? '' : auth ? 'ดาวน์โหลดไม่ได้ — ตรวจว่า repository เปิดเป็นสาธารณะ: ' + UPDATE_REPO_URL : 'git fetch ไม่สำเร็จ: ' + f.err;
+    update.error = f.ok ? '' : auth ? 'GitHub ต้องใช้ token — ดับเบิลคลิก set_token.bat ในโฟลเดอร์ Binder_Town แล้ววาง token' : 'git fetch ไม่สำเร็จ: ' + f.err;
   }
   const up = await git('rev-list', '--count', 'HEAD..@{u}');
   update.behind = up.ok ? +up.out || 0 : 0;
@@ -306,48 +191,52 @@ async function checkUpdate(fetchFirst = true) {
   update.checkedAt = Date.now();
   return update;
 }
-async function performPullUpdate() {
-  if (!(await isGitInstall())) return pullZipUpdate();
+async function pullUpdate() {
   const before = (await git('rev-parse', 'HEAD')).out;
   const st = await git('status', '--porcelain', '--untracked-files=no');
-  if (!IS_MAIN) {
-    // Preserve tracked edits and untracked files that could block incoming paths.
-    const saved = await git('stash', 'push', '--include-untracked', '-m', 'Binder Town auto-update backup');
-    if (!saved.ok) return { ok: false, msg: 'บันทึกไฟล์ในเครื่องลง Git stash ไม่สำเร็จ — อัปเดตไม่ได้:\n' + saved.err };
-  } else if (st.out) {
-    return { ok: false, msg: 'มีไฟล์ที่แก้ในเครื่องยังไม่ได้ commit — อัปเดตไม่ได้:\n' + st.out };
-  }
-  const p = await git('-c', 'credential.helper=', 'pull', '--ff-only');
+  if (st.out) return { ok: false, msg: 'มีไฟล์ที่แก้ในเครื่องยังไม่ได้ commit — อัปเดตไม่ได้:\n' + st.out };
+  const p = await git('pull', '--ff-only');
   if (!p.ok) return { ok: false, msg: 'git pull ไม่สำเร็จ: ' + p.err };
   const after = (await git('rev-parse', 'HEAD')).out;
   if (before === after) return { ok: true, msg: 'เป็นเวอร์ชันล่าสุดแล้ว' };
   const changed = (await git('diff', '--name-only', before, after)).out.split('\n').filter(Boolean);
+  update.lastApplied = { at: Date.now(), files: changed };
   await checkUpdate(false);
   // new helper -> reload it in every tab (keeps ▶ state)
   let reloaded = 0;
-  if (changed.some(f => f.startsWith('helper/'))) for (const t of tabs.values()) if (t.state === 'helper') { try { await reloadHelper(t); reloaded++; } catch { } }
+  if (AUTO_RELOAD_HELPERS && changed.some(f => f.startsWith('helper/'))) for (const t of tabs.values()) if (t.state === 'helper') { try { await reloadHelper(t); reloaded++; } catch { } }
   const restart = changed.some(f => f.startsWith('manager/'));
   if (restart) setTimeout(() => { log('ตัวจัดการถูกอัปเดต — รีสตาร์ต'); process.exit(RESTART_CODE); }, 800);
   return { ok: true, msg: `อัปเดตแล้ว ${before.slice(0, 7)} → ${after.slice(0, 7)} (${changed.length} ไฟล์)` + (reloaded ? ` · โหลด helper ใหม่ ${reloaded} แท็บ` : '') + (restart ? ' · ตัวจัดการกำลังรีสตาร์ต' : ''), changed, restart };
 }
-let pullInProgress = null;
-async function pullUpdate() {
-  if (pullInProgress) return pullInProgress;
-  pullInProgress = performPullUpdate();
-  try { return await pullInProgress; } finally { pullInProgress = null; }
+async function runUpdateCycle() {
+  if (updateBusy) return;
+  updateBusy = true;
+  try {
+    const u = await checkUpdate(true);
+    if (!AUTO_PULL || !u.behind) return;
+    const r = await pullUpdate();
+    log(r.ok ? 'อัปเดตอัตโนมัติ: ' + r.msg : 'อัปเดตอัตโนมัติไม่สำเร็จ: ' + r.msg);
+  } finally { updateBusy = false; }
 }
 
 // ---------------- http ----------------
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
+function readHelperVersion() {
+  try { return (fs.readFileSync(HELPER, 'utf8').match(/\bconst BINDER_HELPER_VERSION\s*=\s*['"]([^'"]+)['"]/) || [])[1] || 'unknown'; }
+  catch { return 'unknown'; }
+}
 
 function statusBody() {
   const findBrowser = kind => exeOf(kind);
   return {
-    update: { ...update, main: IS_MAIN, autoPull: AUTO_PULL },
+    helperVersion: readHelperVersion(),
+    update: { ...update, main: IS_MAIN, autoPull: AUTO_PULL, autoReloadHelpers: AUTO_RELOAD_HELPERS, busy: updateBusy, serverStartedAt: SERVER_STARTED_AT },
     gameProfiles: readGameProfiles(),
       browserMode: { kind: browserPrefs.kind, name: ({ edge: 'Microsoft Edge', brave: 'Brave', chrome: 'Google Chrome' })[browserPrefs.kind],
       path: findBrowser(browserPrefs.kind) || '',
       installed: !!findBrowser(browserPrefs.kind), running: sharedTabs().some(t => !t.tab.closed), port: 'แยกตามโปรไฟล์',
+      gameWindowsParked,
       tabs: sharedTabs().length,
       choices: { chrome: !!findBrowser('chrome'), edge: !!findBrowser('edge'), brave: !!findBrowser('brave') } },
     browsers: browserEntries().map(([key, b]) => ({
@@ -397,7 +286,7 @@ const server = http.createServer(async (req, res) => {
           profileName = `${baseName.slice(0, 48 - tail.length)}${tail}`;
         }
         usedNames.add(profileName.toLocaleLowerCase());
-        created.push({ id: crypto.randomUUID(), name: profileName, createdAt: Date.now() + i });
+        created.push({ id: crypto.randomUUID(), name: profileName, createdAt: Date.now() + i, isMain: profiles.length === 0 && i === 0 });
       }
       profiles.push(...created); saveGameProfiles(profiles);
       return json(res, 201, { ok: true, profile: created[0], created, profiles });
@@ -415,8 +304,18 @@ const server = http.createServer(async (req, res) => {
         return json(res, 500, { ok: false, error: 'ลบข้อมูลเบราว์เซอร์ของโปรไฟล์ไม่สำเร็จ จึงยังไม่ลบโปรไฟล์' });
       }
       mode.dispose(); profileBrowserModes.delete(profileId); profilePorts.delete(profileId);
-      saveGameProfiles(profiles.filter(p => p.id !== profileId));
+      const remainingProfiles = profiles.filter(p => p.id !== profileId);
+      if (profiles.find(p => p.id === profileId)?.isMain && remainingProfiles.length) remainingProfiles[0].isMain = true;
+      saveGameProfiles(remainingProfiles);
       return json(res, 200, { ok: true, profiles: readGameProfiles() });
+    }
+    const mainProfileMatch = url.pathname.match(/^\/api\/profiles\/([\w-]+)\/main$/);
+    if (mainProfileMatch && req.method === 'POST') {
+      const profileId = mainProfileMatch[1], profiles = readGameProfiles();
+      if (!profiles.some(p => p.id === profileId)) return json(res, 404, { ok: false, error: 'ไม่พบโปรไฟล์นี้' });
+      const updated = profiles.map(p => ({ ...p, isMain: p.id === profileId }));
+      saveGameProfiles(updated);
+      return json(res, 200, { ok: true, profiles: updated });
     }
     // other files of the page (style.css, …): plain names inside manager/public only
     const sf = req.method === 'GET' && url.pathname.match(/^\/([\w-]+\.(css|js|png|svg|ico))$/);
@@ -441,9 +340,8 @@ const server = http.createServer(async (req, res) => {
       const sort = ['def', 'vol', 'asc', 'desc', 'up', 'down'].includes(qp('sort')) ? qp('sort') : 'def';
       const msg = url.pathname === '/api/market/board' ? { type: 'marketBoard', ...filters, bsort: sort }
         : url.pathname === '/api/market/counts' ? { type: 'marketQuery', ...filters, sort: 'def' }
-        // all listings (the game's "ประกาศทั้งหมด"): 100 per page, page index p; the game pages by row offset `off`
-        // (it ignores `p` and always answers the first 100)
-        : url.pathname === '/api/market/listings' ? { type: 'marketQuery', ...filters, off: num('p', 10000) * 100,
+        // all listings (the game's "ประกาศทั้งหมด"): 100 per page, page index p
+        : url.pathname === '/api/market/listings' ? { type: 'marketQuery', ...filters, p: num('p', 10000),
           sort: ['def', 'asc', 'desc', 'unit', 'tier', 'lvhi', 'lvlo'].includes(qp('sort')) ? qp('sort') : 'def' }
         : { type: 'marketItem', itemId: qp('id').slice(0, 300), range: ['7d', '30d'].includes(qp('range')) ? qp('range') : '7d' };
       const want = msg.type === 'marketQuery' ? 'market' : msg.type;
@@ -465,13 +363,18 @@ const server = http.createServer(async (req, res) => {
         return json(res, r && r.ok ? 200 : 502, r || { ok: false, error: 'อ่านไม่สำเร็จ' });
       } catch (e) { return json(res, 502, { ok: false, error: e.message }); } finally { release(); }
     }
-    // characters that can buy from the market: every game tab with the helper (name + Gold)
+    // Read live character wallet and base (non-job) EXP for profile dashboards and market.
     if (req.method === 'GET' && url.pathname === '/api/market/buyers') {
       const list = [];
       for (const t of tabs.values()) if (t.state === 'helper' && !t.tab.closed) {
         try {
           const r = await t.tab.eval(`(() => { const room = window.__bthRoom; const me = room && room.state && room.state.players && room.state.players.get(room.sessionId);
-            return me ? { name: me.name, gold: Number(me.silver ?? me.gold ?? 0) } : null; })()`);
+            if (!me) return null;
+            const expKeys = ['exp', 'xp', 'experience', 'levelExp', 'levelXp', 'currentExp', 'currentXp', 'baseExp', 'baseXp', 'totalExp', 'totalXp', 'expNow', 'xpNow'];
+            const expKey = expKeys.find(key => !/job/i.test(key) && typeof me[key] === 'number' && Number.isFinite(me[key]))
+              || Object.keys(me).find(key => /^(?:base|level|current|total)?(?:exp|xp|experience)(?:now|current|total|progress)?$/i.test(key) && !/job/i.test(key) && typeof me[key] === 'number' && Number.isFinite(me[key]));
+            const levelExpFields = Object.keys(me).filter(key => /exp|xp/i.test(key) && !/job/i.test(key)).map(key => ({ key, value: typeof me[key] === 'number' && Number.isFinite(me[key]) ? me[key] : null }));
+            return { name: me.name, gold: Number(me.silver ?? me.gold ?? 0), level: Number(me.level ?? 0), levelExp: expKey ? me[expKey] : null, levelExpSource: expKey || null, levelExpFields }; })()`);
           if (r) list.push({ tabId: t.id, browser: t.browser, ...r });
         } catch { }
       }
@@ -539,14 +442,70 @@ const server = http.createServer(async (req, res) => {
       if (!tab?.mode) return json(res, 404, { ok: false, error: 'ไม่พบหน้าต่างนี้' });
       await tab.mode.windowAction(m[1], url.searchParams.get('action'), url.searchParams); return json(res, 200, { ok: true });
     }
+    if (url.pathname === '/api/window-layout' && req.method === 'POST') {
+      const requestedLayout = url.searchParams.get('layout');
+      const layout = ['compact', 'side', 'grid', 'custom'].includes(requestedLayout) ? requestedLayout : 'grid';
+      const colsArg = Math.max(1, Math.min(10, Number.parseInt(url.searchParams.get('cols'), 10) || 3));
+      const rowsArg = Math.max(1, Math.min(10, Number.parseInt(url.searchParams.get('rows'), 10) || 3));
+      const orderedProfiles = readGameProfiles();
+      const windows = orderedProfiles.map(profile => sharedTabs().find(tab => tab.clientId === profile.id && tab.mode && !tab.tab.closed)).filter(Boolean);
+      if (!windows.length) return json(res, 409, { ok: false, error: 'ยังไม่มีหน้าต่างเกมที่เปิดอยู่' });
+      const screenSize = await new Promise(resolve => execFile('powershell.exe', ['-NoProfile', '-Command', 'Add-Type -AssemblyName System.Windows.Forms; $a=[System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea; Write-Output "$($a.Width),$($a.Height)"'], { windowsHide: true, timeout: 5000 }, (_error, stdout) => {
+        const match = String(stdout || '').match(/(\d+)\s*,\s*(\d+)/);
+        resolve(match ? { width: +match[1], height: +match[2] } : { width: 1920, height: 1040 });
+      }));
+      const { width, height } = screenSize, count = windows.length;
+      const cols = layout === 'custom' ? colsArg : layout === 'side' ? count : layout === 'compact' ? Math.max(1, Math.floor(width / 640)) : (count <= 2 ? count : count <= 4 ? 2 : count <= 9 ? 3 : 4);
+      const rows = layout === 'custom' ? rowsArg : layout === 'compact' ? Math.max(1, Math.floor(height / 520)) : Math.ceil(count / cols);
+      const cellWidth = Math.max(320, Math.floor(width / cols)), cellHeight = Math.max(260, Math.floor(height / rows));
+      const results = await Promise.all(windows.map((tab, index) => {
+        const cell = index % (cols * rows);
+        return tab.mode.windowAction(tab.id, 'set-bounds', { x: (cell % cols) * cellWidth, y: Math.floor(cell / cols) * cellHeight, w: cellWidth, h: cellHeight }).then(() => true, () => false);
+      }));
+      const moved = results.filter(Boolean).length;
+      return json(res, moved ? 200 : 502, { ok: moved > 0, count: moved, total: windows.length, cols, rows, error: moved ? '' : 'จัดตำแหน่งหน้าต่างไม่สำเร็จ' });
+    }
+    if (url.pathname === '/api/window-visibility' && req.method === 'POST') {
+      const windows = sharedTabs().filter(tab => tab.mode && !tab.tab.closed);
+      if (!windows.length) return json(res, 409, { ok: false, error: 'ยังไม่มีหน้าต่างเกมที่เปิดอยู่' });
+      const hide = !gameWindowsParked;
+      const results = await Promise.all(windows.map(tab => tab.mode.windowAction(tab.id, hide ? 'park' : 'show').then(() => true, () => false)));
+      gameWindowsParked = hide && results.some(Boolean);
+      return json(res, 200, { ok: results.some(Boolean), gameWindowsParked, count: results.filter(Boolean).length });
+    }
     if ((m = url.pathname.match(/^\/api\/tab\/([\w-]+)\/(toggle|reload)$/))) {
       const t = tabs.get(m[1]);
       if (!t) return json(res, 404, { ok: false, msg: 'ไม่เจอแท็บนี้' });
       if (m[2] === 'toggle') { await t.tab.eval(`window.__bth ? (window.__bth.toggle(), window.__bth.cfg.running) : null`); return json(res, 200, { ok: true }); }
       await reloadHelper(t); return json(res, 200, { ok: true, msg: 'โหลด helper ใหม่แล้ว' });
     }
-    if (url.pathname === '/api/update/check') return json(res, 200, { ok: true, update: { ...await checkUpdate(true), main: IS_MAIN, autoPull: AUTO_PULL } });
-    if (url.pathname === '/api/update/pull') return json(res, 200, await pullUpdate());
+    if (url.pathname === '/api/update/settings' && req.method === 'POST') {
+      const body = await new Promise(resolve => { let data = ''; req.on('data', chunk => { data += chunk; }); req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve({}); } }); });
+      if (body.autoPull !== undefined && typeof body.autoPull !== 'boolean' || body.autoReloadHelpers !== undefined && typeof body.autoReloadHelpers !== 'boolean') return json(res, 400, { ok: false, error: 'ข้อมูลการตั้งค่าไม่ถูกต้อง' });
+      if (IS_MAIN && body.autoPull === true) return json(res, 409, { ok: false, error: 'เครื่องหลักไม่ดึงอัปเดตอัตโนมัติ' });
+      if (typeof body.autoPull === 'boolean') AUTO_PULL = body.autoPull;
+      if (typeof body.autoReloadHelpers === 'boolean') AUTO_RELOAD_HELPERS = body.autoReloadHelpers;
+      fs.mkdirSync(path.dirname(UPDATE_PREFS), { recursive: true });
+      fs.writeFileSync(UPDATE_PREFS, JSON.stringify({ autoPull: AUTO_PULL, autoReloadHelpers: AUTO_RELOAD_HELPERS }, null, 2), 'utf8');
+      return json(res, 200, { ok: true, autoPull: AUTO_PULL, autoReloadHelpers: AUTO_RELOAD_HELPERS });
+    }
+    if (url.pathname === '/api/update/check' && req.method === 'POST') {
+      if (updateBusy) return json(res, 409, { ok: false, error: 'กำลังตรวจหรืออัปเดตอยู่ กรุณารอสักครู่' });
+      updateBusy = true;
+      try {
+        const checked = await checkUpdate(true);
+        if (AUTO_PULL && checked.behind) {
+          const applied = await pullUpdate();
+          return json(res, 200, { ok: applied.ok, update: { ...update, main: IS_MAIN, autoPull: AUTO_PULL, autoReloadHelpers: AUTO_RELOAD_HELPERS, busy: false, serverStartedAt: SERVER_STARTED_AT }, applied });
+        }
+        return json(res, 200, { ok: true, update: { ...update, main: IS_MAIN, autoPull: AUTO_PULL, autoReloadHelpers: AUTO_RELOAD_HELPERS, busy: false, serverStartedAt: SERVER_STARTED_AT } });
+      } finally { updateBusy = false; }
+    }
+    if (url.pathname === '/api/update/pull' && req.method === 'POST') {
+      if (updateBusy) return json(res, 409, { ok: false, msg: 'กำลังตรวจหรืออัปเดตอยู่ กรุณารอสักครู่' });
+      updateBusy = true;
+      try { return json(res, 200, await pullUpdate()); } finally { updateBusy = false; }
+    }
     return json(res, 404, { error: 'not found' });
   } catch (e) { return json(res, 500, { ok: false, msg: e.message }); }
 });
@@ -556,14 +515,9 @@ const server = http.createServer(async (req, res) => {
   server.on('error', e => { log(e.code === 'EADDRINUSE' ? `port ${PORT} ถูกใช้อยู่ — เปิดตัวจัดการซ้ำอยู่หรือเปล่า?` : e.message); process.exit(1); });
   server.listen(PORT, '127.0.0.1', () => log(`ตัวจัดการ Binder Town: http://localhost:${PORT}`));
   if (IS_MAIN) log('เครื่องหลัก (.binder-main) — ไม่ pull อัตโนมัติ');
-  const autoPull = async () => {
-    const u = await checkUpdate(true);
-    if (!u.behind) return;
-    const r = await pullUpdate();
-    log(r.ok ? 'อัปเดตอัตโนมัติ: ' + r.msg : 'อัปเดตอัตโนมัติไม่สำเร็จ: ' + r.msg);
-  };
-  if (AUTO_PULL) { autoPull(); setInterval(() => autoPull().catch(e => log('อัปเดตอัตโนมัติ error: ' + e.message)), UPDATE_CHECK_MS); }
+  if (AUTO_PULL) runUpdateCycle();
   else checkUpdate(false);
+  setInterval(() => runUpdateCycle().catch(e => log('อัปเดตอัตโนมัติ error: ' + e.message)), UPDATE_CHECK_MS);
   for (const profile of readGameProfiles()) browserModeForProfile(profile.id).start().catch(e => log(`เริ่มจัดการจอ ${profile.name} ไม่สำเร็จ:`, e.message));
   loop();
 })();

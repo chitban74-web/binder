@@ -8,7 +8,7 @@
       <label class="bth-switch"><input id="bthsalv" type="checkbox"><span class="bth-switch-ui"></span><span>แยกชิ้นอุปกรณ์ Normal / Magic ก่อนขาย</span></label>
       <label class="bth-inline" for="bthsalvlv"><span>เฉพาะเลเวลไอเทมต่ำกว่า</span><span>Lv <input id="bthsalvlv" type="number" min="2" max="99" style="width:48px"></span></label>
       <div class="bth-note">ไม่แยกชิ้น Rare / Epic / Unique / ของตีบวก / ของล็อก</div>
-      <button id="bthdebugtown" type="button" style="width:100%">▶ ทดสอบ full routine: ขาย / ซื้อยา / คลัง</button>
+      <button id="bthdebugtown" type="button" style="width:100%">▶ ทดสอบร้านค้า: ขาย / ซื้อยา / ฝากคลัง</button>
       <div class="bth-note">ทำรายการจริง: ขายตามหมวดที่เลือก ซื้อยาให้ถึงจำนวน และฝากวัตถุดิบ</div>
     </section>`,
     render: ({ $, cfg, TOWN_IDS }) => {
@@ -23,9 +23,9 @@
       const debug = $('#bthdebugtown');
       debug.onclick = async () => {
         if (debug.disabled) return;
-        debug.disabled = true; debug.textContent = 'กำลังทดสอบ full routine…';
+        debug.disabled = true; debug.textContent = 'กำลังทดสอบร้านค้า…';
         try { await simulateTownTrip(); }
-        finally { debug.disabled = false; debug.textContent = '▶ ทดสอบ full routine: ขาย / ซื้อยา / คลัง'; }
+        finally { debug.disabled = false; debug.textContent = '▶ ทดสอบร้านค้า: ขาย / ซื้อยา / ฝากคลัง'; }
       };
     },
   };
