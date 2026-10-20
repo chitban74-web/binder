@@ -743,10 +743,14 @@ const server = http.createServer(async (req, res) => {
       gameWindowsParked = hide && results.some(Boolean);
       return json(res, 200, { ok: results.some(Boolean), gameWindowsParked, count: results.filter(Boolean).length });
     }
-    if ((m = url.pathname.match(/^\/api\/tab\/([\w-]+)\/(toggle|reload)$/))) {
+    if ((m = url.pathname.match(/^\/api\/tab\/([\w-]+)\/(toggle|reload|bank-test)$/))) {
       const t = tabs.get(m[1]);
       if (!t) return json(res, 404, { ok: false, msg: 'ไม่เจอแท็บนี้' });
       if (m[2] === 'toggle') { await t.tab.eval(`window.__bth ? (window.__bth.toggle(), window.__bth.cfg.running) : null`); return json(res, 200, { ok: true }); }
+      if (m[2] === 'bank-test') {
+        const result = await t.tab.eval(`window.__bth?.testBankDeposit ? window.__bth.testBankDeposit() : false`);
+        return json(res, result ? 200 : 502, { ok: !!result, msg: result ? 'ทดสอบคลังเสร็จ' : 'ทดสอบคลังไม่สำเร็จ' });
+      }
       await reloadHelper(t); return json(res, 200, { ok: true, msg: 'โหลด helper ใหม่แล้ว' });
     }
     if (url.pathname === '/api/update/settings' && req.method === 'POST') {
