@@ -23,20 +23,22 @@
       <label class="bth-switch"><input id="bthggold" type="checkbox"><span class="bth-switch-ui"></span><span>ต้องเป็น node ทอง</span></label>
       <div id="bthgmaps" class="bth-note"></div>
       <button id="bthgrun" type="button" style="width:100%"></button>
-      <div class="bth-note" id="bthghelp">ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · แมพจะเรียงจากระดับต่ำไปสูง</div>
+      <div class="bth-note" id="bthghelp">ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · เมืองก่อน แล้วเรียงตามระดับแมพ</div>
     </section>`,
-    render: ({ $, cfg, GATHER_MAPS, GATHER_MAP_LEVEL, GATHER_PVP_MAPS, MAP_NAMES, gatherMaps }) => {
+    render: ({ $, cfg, TOWN_IDS, GATHER_MAPS, GATHER_MAP_LEVEL, GATHER_PVP_MAPS, MAP_NAMES, gatherMaps }) => {
       $('#bthgrun').textContent = cfg.running && cfg.gathering.enabled ? '■ หยุด Gathering' : '▶ เริ่ม Gathering';
       $('#bthgtype').value = cfg.gathering.type; $('#bthgtier').value = cfg.gathering.tier; $('#bthgpvp').checked = !!cfg.gathering.pvp; $('#bthggold').checked = !!cfg.gathering.gold; $('#bthgchannels').checked = !!cfg.gathering.scanChannels; $('#bthgmapsweep').checked = !!cfg.gathering.rotateMaps;
-      const mapChoices = [...new Set((GATHER_MAPS[cfg.gathering.type] || {})[+cfg.gathering.tier] || [])].filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).sort((a,b) => (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999));
+      const townMaps = new Set(Object.values(TOWN_IDS || {}));
+      const orderMaps = (a,b) => Number(townMaps.has(b)) - Number(townMaps.has(a)) || (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999);
+      const mapChoices = [...new Set((GATHER_MAPS[cfg.gathering.type] || {})[+cfg.gathering.tier] || [])].filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).sort(orderMaps);
       if (cfg.gathering.preferredMap && !mapChoices.includes(cfg.gathering.preferredMap)) cfg.gathering.preferredMap = '';
       $('#bthgmap').innerHTML = `<option value="">ระดับแมพต่ำสุดก่อน (อัตโนมัติ)</option>${mapChoices.map(id => `<option value="${id}">${MAP_NAMES[id] || id}</option>`).join('')}`;
       $('#bthgmap').value = cfg.gathering.preferredMap;
-      $('#bthgmaps').textContent = gatherMaps().filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).sort((a,b) => (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999)).map(id => MAP_NAMES[id] || id).join(' → ') || 'ไม่มีแมพตามตัวเลือก';
+      $('#bthgmaps').textContent = gatherMaps().filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).map(id => MAP_NAMES[id] || id).join(' → ') || 'ไม่มีแมพตามตัวเลือก';
       const fish = cfg.gathering.type === 'fish';
       for (const id of ['bthgchannels','bthggold']) $('#' + id).closest('label').style.display = fish ? 'none' : '';
       $('#bthgmapsweep').closest('label').style.display = '';
-      $('#bthghelp').textContent = fish ? 'เดินหา node ปลาในแมพและตกให้อัตโนมัติ · เปิด “ไปแมพถัดไป” เพื่อไล่ตามแมพ Tier' : 'ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · แมพจะเรียงจากระดับต่ำไปสูง';
+      $('#bthghelp').textContent = fish ? 'เดินหา node ปลาในแมพและตกให้อัตโนมัติ · เมืองก่อน แล้วไปแมพถัดไปตาม Tier' : 'ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · เมืองก่อน แล้วเรียงตามระดับแมพ';
     },
     bind: ({ $, updateGather, updatePreferredMap, toggleGather }) => {
       for (const id of ['bthgtype','bthgtier','bthgpvp','bthggold','bthgchannels','bthgmapsweep']) $('#' + id).onchange = updateGather;

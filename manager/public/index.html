@@ -290,7 +290,8 @@ function card(t) {
       : '';
   const hasAvatarImage = !!s?.characterImage || !!classIcon;
   const avatar = `${avatarImage}<span class="avatar-fallback">${esc(avatarFallback || '?')}</span>`;
-  const st = !s ? 'st-off' : s.dead ? 'st-bad' : !s.running ? 'st-idle' : s.weight >= 90 ? 'st-warn' : /ฟาร์ม/.test(s.phase) ? 'st-farm' : 'st-busy';
+  const stopped = s?.botState ? s.botState === 'stopped' : !s?.running;
+  const st = !s ? 'st-off' : s.dead ? 'st-bad' : stopped ? 'st-idle' : s.weight >= 90 ? 'st-warn' : /ฟาร์ม/.test(s.phase) ? 'st-farm' : 'st-busy';
   const stateClass = s ? 'is-online' : 'is-offline';
   const mainBadge = t.isMain ? '<span class="chip chip-main"> MAIN</span>' : '';
   const menuOpen = t.profileId && openProfileMenuId === t.profileId;
@@ -309,11 +310,15 @@ function card(t) {
   if (!s) return `<article class="profile-card ${menuOpen ? 'menu-open' : ''} ${t.isMain ? 'is-main' : ''} is-offline" data-card-key="${esc(t.profileId || t.id)}" style="--h:${hue}">${head}<div class="card-status-row"><span class="activity-pill tone-offline"><i></i>ออฟไลน์</span></div><div class="profile-target"><span> แผนที่ฟาร์ม</span><b>${esc(t.farmMap || 'ยังไม่ได้ตั้งค่า')}</b></div><div class="reference-metrics"><div><b> GP/M</b><strong>${goldRateValue(goldRate.gpm, 'G/m')}</strong></div><div><b> GP/H</b><strong>${goldRateValue(goldRate.gph, 'G/h')}</strong></div><div><b> XP/M</b><strong>${xpRateValue(xpRate.xpm, 'XP/m')}</strong></div><div><b> XP/H</b><strong>${xpRateValue(xpRate.xph, 'XP/h')}</strong></div></div><div class="card-footer-controls"><div class="card-action-row main-actions"><button class="btn btn-sm btn-launch" data-open-profile="${esc(t.profileId)}">เปิดจอเกม</button><button class="btn btn-sm btn-bot-menu" data-plan-profile="${esc(t.profileId)}">Plan Script</button></div></div></article>`;
   const w = s.weight || 0;
   const b = s.bounty;
-  const statusTone = s.dead ? 'tone-danger' : w >= 90 ? 'tone-warn' : !s.running ? 'tone-idle' : /ฟาร์ม/.test(s.phase) ? 'tone-farm' : 'tone-travel';
-  const alert = s.dead ? ' ตัวละครตาย · Helper จะพากลับไปฟาร์ม' : !s.running ? '⏸ Helper หยุดอยู่' : w >= 90 ? ` กระเป๋าใกล้เต็ม (${w}%)` : '';
+  const statusTone = s.dead ? 'tone-danger' : stopped ? 'tone-idle' : w >= 90 ? 'tone-warn' : /ฟาร์ม/.test(s.phase) ? 'tone-farm' : 'tone-travel';
+  const alert = s.dead ? ' ตัวละครตาย · Helper จะพากลับไปฟาร์ม' : stopped ? '⏸ Helper หยุดอยู่' : w >= 90 ? ` กระเป๋าใกล้เต็ม (${w}%)` : '';
+  const statusContext = !stopped
+    ? `กำลังทำ: ${s.activity || s.phase || 'กำลังทำงาน'} · ${s.map || 'ไม่ทราบแมพ'}${s.channel ? ` · CH${s.channel}` : ''}`
+    : `หยุดที่: ${s.stopMap || s.map || 'ไม่ทราบแมพ'} · ${s.stopReason || 'หยุดอยู่'}${s.stopActivity ? ` · ตอนหยุดกำลัง: ${s.stopActivity}` : ''}`;
   const potions = (s.potions || []).slice(0, 2).map(p => `<div class="tab-card-pot" title="${esc(p.name)}"><span>${esc((p.k || 'ยา').toUpperCase())}</span><b>${p.have ?? '?'}</b></div>`).join('');
   return `<article class="profile-card ${menuOpen ? 'menu-open' : ''} ${t.isMain ? 'is-main' : ''} ${stateClass} ${s.running ? 'is-farming' : ''} ${st}" data-card-key="${esc(t.profileId || t.id)}" style="--h:${hue}">${head}
     <div class="card-status-row"><span class="activity-pill ${statusTone}" title="${esc(s.phase)}"><i></i>${esc(s.phase || 'พร้อม')}</span>${alert ? `<span class="tab-card-alert">${alert}</span>` : ''}</div>
+    <div class="card-status-context">${esc(statusContext)}</div>
     <div class="char-gauges tab-card-gauges"><div class="gauge-row"><span class="gauge-lbl wt">WT</span><div class="gauge-track"><div class="gauge-fill wt ${w >= 90 ? 'full' : ''}" style="width:${Math.min(100, w)}%"></div></div><span class="gauge-val">${w}%</span></div>${potions}</div>
     ${b ? `<div class="exp-row"><div class="exp-item"><span class="exp-lbl">ค่าหัว · ${esc(b.mob)}</span><span class="exp-val">${b.prog}/${b.need}</span><div class="gauge-track thin"><div class="gauge-fill exp" style="width:${pct(b.prog, b.need)}%"></div></div></div></div>` : ''}
     <div class="profile-target"><span> ${s.map ? 'แมพปัจจุบัน' : 'แผนที่ฟาร์ม'}</span><b>${esc(s.map || s.farmMap || '—')}</b></div>

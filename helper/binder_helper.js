@@ -147,20 +147,22 @@
       <label class="bth-switch"><input id="bthggold" type="checkbox"><span class="bth-switch-ui"></span><span>ต้องเป็น node ทอง</span></label>
       <div id="bthgmaps" class="bth-note"></div>
       <button id="bthgrun" type="button" style="width:100%"></button>
-      <div class="bth-note" id="bthghelp">ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · แมพจะเรียงจากระดับต่ำไปสูง</div>
+      <div class="bth-note" id="bthghelp">ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · เมืองก่อน แล้วเรียงตามระดับแมพ</div>
     </section>`,
-    render: ({ $, cfg, GATHER_MAPS, GATHER_MAP_LEVEL, GATHER_PVP_MAPS, MAP_NAMES, gatherMaps }) => {
+    render: ({ $, cfg, TOWN_IDS, GATHER_MAPS, GATHER_MAP_LEVEL, GATHER_PVP_MAPS, MAP_NAMES, gatherMaps }) => {
       $('#bthgrun').textContent = cfg.running && cfg.gathering.enabled ? '■ หยุด Gathering' : '▶ เริ่ม Gathering';
       $('#bthgtype').value = cfg.gathering.type; $('#bthgtier').value = cfg.gathering.tier; $('#bthgpvp').checked = !!cfg.gathering.pvp; $('#bthggold').checked = !!cfg.gathering.gold; $('#bthgchannels').checked = !!cfg.gathering.scanChannels; $('#bthgmapsweep').checked = !!cfg.gathering.rotateMaps;
-      const mapChoices = [...new Set((GATHER_MAPS[cfg.gathering.type] || {})[+cfg.gathering.tier] || [])].filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).sort((a,b) => (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999));
+      const townMaps = new Set(Object.values(TOWN_IDS || {}));
+      const orderMaps = (a,b) => Number(townMaps.has(b)) - Number(townMaps.has(a)) || (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999);
+      const mapChoices = [...new Set((GATHER_MAPS[cfg.gathering.type] || {})[+cfg.gathering.tier] || [])].filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).sort(orderMaps);
       if (cfg.gathering.preferredMap && !mapChoices.includes(cfg.gathering.preferredMap)) cfg.gathering.preferredMap = '';
       $('#bthgmap').innerHTML = `<option value="">ระดับแมพต่ำสุดก่อน (อัตโนมัติ)</option>${mapChoices.map(id => `<option value="${id}">${MAP_NAMES[id] || id}</option>`).join('')}`;
       $('#bthgmap').value = cfg.gathering.preferredMap;
-      $('#bthgmaps').textContent = gatherMaps().filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).sort((a,b) => (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999)).map(id => MAP_NAMES[id] || id).join(' → ') || 'ไม่มีแมพตามตัวเลือก';
+      $('#bthgmaps').textContent = gatherMaps().filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id)).map(id => MAP_NAMES[id] || id).join(' → ') || 'ไม่มีแมพตามตัวเลือก';
       const fish = cfg.gathering.type === 'fish';
       for (const id of ['bthgchannels','bthggold']) $('#' + id).closest('label').style.display = fish ? 'none' : '';
       $('#bthgmapsweep').closest('label').style.display = '';
-      $('#bthghelp').textContent = fish ? 'เดินหา node ปลาในแมพและตกให้อัตโนมัติ · เปิด “ไปแมพถัดไป” เพื่อไล่ตามแมพ Tier' : 'ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · แมพจะเรียงจากระดับต่ำไปสูง';
+      $('#bthghelp').textContent = fish ? 'เดินหา node ปลาในแมพและตกให้อัตโนมัติ · เมืองก่อน แล้วไปแมพถัดไปตาม Tier' : 'ตั้งค่าการวน CH และการเปลี่ยนแมพแยกกันได้ · เมืองก่อน แล้วเรียงตามระดับแมพ';
     },
     bind: ({ $, updateGather, updatePreferredMap, toggleGather }) => {
       for (const id of ['bthgtype','bthgtier','bthgpvp','bthggold','bthgchannels','bthgmapsweep']) $('#' + id).onchange = updateGather;
@@ -263,12 +265,13 @@
     salvOn: false, salvBelow: 30,
     // potions: below `min` (0 = off) -> trip to town; in town always top up to `to`
     buy: { hp: { enabled: true, item: 'hi_potion', min: 50, to: 200 }, mp: { enabled: true, item: 'mana_potion', min: 30, to: 150 } },
-    panel: { x: 8, y: 120, min: false }, running: false,
+    panel: { x: 8, y: 120, min: false }, running: false, botStop: { reason: '', map: '', activity: '' },
     gathering: { enabled: false, type: 'tree', tier: 5, pvp: false, gold: false, preferredMap: '', scanChannels: false, rotateMaps: false },
   };
   const load = () => { try { return { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { ...DEF }; } };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch { } };
   const cfg = load();
+  cfg.botStop = { ...DEF.botStop, ...(cfg.botStop || {}) };
   cfg.gathering = { ...DEF.gathering, ...(cfg.gathering || {}) };
   cfg.plan = { enabled: false, steps: [], ...(cfg.plan || {}) };
   if (!Array.isArray(cfg.plan.steps)) cfg.plan.steps = [];
@@ -309,7 +312,12 @@
   const weightPct = () => { const m = (($('#wtwarn') || {}).textContent || '').match(/(\d+)\s*%/); return m ? +m[1] : 0; };
   // full = weight over the threshold, or the game's own bag alarm (weight 100% or no free slot)
   const slotsFull = () => { const b = $('#mbbag'); return !!b && b.classList.contains('alarm'); };
-  const bagFull = () => weightPct() >= cfg.sellPct || slotsFull();
+  let deferredWeightThreshold = false;
+  const bagFull = () => {
+    const weight = weightPct();
+    if (weight < cfg.sellPct) deferredWeightThreshold = false;
+    return (weight >= cfg.sellPct && !deferredWeightThreshold) || slotsFull();
+  };
   const autoOn = () => document.body.classList.contains('auto-on');
   const isDead = () => visible($('#drespawn'));
   const dialogTitle = () => (($('#bctitle') || {}).textContent || '').trim();
@@ -352,6 +360,7 @@
   // the bag from the server's "inv" messages: { items: [{ id, qty }] } is the whole bag, with d: true only the changed
   // stacks (items) and the removed ones (gone) — merged the same way as the game does. null until a whole bag was seen
   let invItems = null;
+  let bankServerSnapshot = null, bankServerAt = 0;
   let recentGatherResult = null;
   let fishCastKey = '', fishCastAt = 0, fishMoveAt = 0, fishNoNodeSince = 0, fishConfirmedKey = '';
   let lastStillHereAt = 0;
@@ -371,6 +380,14 @@
         if (!invItems) continue;
         for (const id of e.gone || []) invItems.delete(id);
         for (const it of e.items) invItems.set(it.id, it.qty);
+      }
+      if (e && e.type === 'bank' && Array.isArray(e.vaults)) {
+        bankServerSnapshot = e.vaults.map((vault, i) => ({ index: i + 1, stacks: Array.isArray(vault) ? vault.length : null }));
+        bankServerAt = Date.now();
+        log(`เซิร์ฟส่งข้อมูลคลัง ${bankServerSnapshot.map(v => `${v.index}:${v.stacks ?? '?'}`).join(', ')} · Gold ${Number(e.gold) || 0}`);
+      }
+      if (e && e.type === 'bankResult') {
+        log(`ผลฝาก/เปิดคลังจากเซิร์ฟ: ${e.ok ? 'สำเร็จ' : 'ไม่สำเร็จ'}${e.reason ? ` · ${String(e.reason).slice(0, 180)}` : ''}`);
       }
     }
   };
@@ -486,7 +503,8 @@
     discoverGameMaps();
     const base = ((GATHER_MAPS[cfg.gathering.type] || {})[+cfg.gathering.tier] || []).slice();
     if (cfg.gathering.preferredMap && !base.includes(cfg.gathering.preferredMap)) base.push(cfg.gathering.preferredMap);
-    return base.sort((a,b) => (a === cfg.gathering.preferredMap ? -1 : b === cfg.gathering.preferredMap ? 1 : (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999)));
+    const townMaps = new Set(Object.values(TOWN_IDS));
+    return base.sort((a,b) => (a === cfg.gathering.preferredMap ? -1 : b === cfg.gathering.preferredMap ? 1 : Number(townMaps.has(b)) - Number(townMaps.has(a)) || (GATHER_MAP_LEVEL[a]||999)-(GATHER_MAP_LEVEL[b]||999)));
   };
   delete cfg.gathering.fishSpots;
   const liveGatherNodes = () => { const r = room(), nodes = r && r.state && r.state.nodes; if (!nodes) return []; if (typeof nodes.entries === 'function') return [...nodes.entries()].map(([id,node]) => ({ id, node })); if (Array.isArray(nodes)) return nodes.map((node,id) => ({ id: String(id), node })); return Object.entries(nodes).map(([id,node]) => ({ id, node })); };
@@ -1064,7 +1082,7 @@
   // town warp (500 G, free with Premium): HUD warp button -> card "วาร์ป" of that town
   const TOWN_IDS = { 'Valebrook': 'valebrook', 'Ashford': 'ashford', 'Stormwall City': 'stormwall_city', 'Sanctum': 'sanctum' };
   async function warpToTown(name) {
-    if (mapName() === name) return true;
+    if (liveMap() === name) return true;
     const id = TOWN_IDS[name];
     if (!id) return false;
     if (!await waitForCombatToFinish('วาร์ป')) return false; // the game does not warp while in combat
@@ -1072,8 +1090,8 @@
     const go = $(`.wp2go[data-warp="${id}"]`);
     if (!go || go.disabled) { log(`วาร์ปไป ${name} ไม่ได้ (${go ? go.textContent.trim() : 'ยังไม่ปลดล็อก'})`); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return false; }
     click(go, 'วาร์ปไป ' + name);
-    for (let i = 0; i < 30 && cfg.running; i++) { if (mapName() === name) return true; await sleep(1000); }
-    return mapName() === name;
+    for (let i = 0; i < 30 && cfg.running; i++) { if (liveMap() === name) return true; await sleep(1000); }
+    return liveMap() === name;
   }
 
   // ---- town: walk to the merchant (game's own "walk to NPC" dialog) until the shop window (#sellwin) opens ----
@@ -1173,23 +1191,44 @@
     'Stormwall City': { id: 'spirit_broker_c', x: 23, y: 29 },
     Sanctum: { id: 'spirit_broker_s', x: 26, y: 23 },
   };
-  // Fishing outputs of every tier. T1 raw fish is tagged as a consumable by the
-  // game, so “deposit all materials” deliberately skips it; bank these by item id.
-  const BANK_FISH_ITEMS = ['raw_fish', 'river_trout', 'silverfin', 'frost_koi', 'spirit_koi'];
   const bankOpen = () => { const w = $('#bankwin'); return !!w && w.style.display === 'block'; };
   const bankTabs = () => [...document.querySelectorAll('#bankwin .cwtab')]
     .map(el => {
       const m = (el.textContent || '').trim().match(/^คลัง\s*(\d+)\s*[·•]\s*(\d+)\s*\/\s*(\d+)/);
       return m ? { el, index: +m[1], used: +m[2], capacity: +m[3] } : null;
     }).filter(Boolean);
+  const bankTabsLabel = tabs => tabs.length
+    ? tabs.map(t => `คลัง ${t.index} ${t.used}/${t.capacity}${t.el.classList.contains('on') ? ' [เลือก]' : ''}`).join(' | ')
+    : 'ไม่พบแท็บคลังใน UI';
+  async function refreshBankState(r, reason) {
+    if (!r || !bankOpen()) return false;
+    const previousAt = bankServerAt;
+    setPhase(`ตรวจสถานะคลัง · ${reason}`);
+    log(`ขอข้อมูลคลังล่าสุดก่อน${reason} · ${bankTabsLabel(bankTabs())}`);
+    r.send('input', { type: 'bankQuery' });
+    for (let i = 0; i < 12 && cfg.running; i++) {
+      await sleep(250);
+      if (bankServerAt > previousAt) {
+        // Let the game's own bank handler update the tab UI after our message hook sees the response.
+        await sleep(100);
+        log(`ข้อมูลคลังล่าสุดพร้อมใช้ก่อน${reason} · ${bankTabsLabel(bankTabs())}`);
+        return true;
+      }
+    }
+    log(`ไม่ได้รับข้อมูล bank จากเซิร์ฟภายใน 3 วิ ก่อน${reason} · ใช้แท็บที่แสดงอยู่แทน: ${bankTabsLabel(bankTabs())}`);
+    return false;
+  }
   async function selectBankWithSpace() {
+    await refreshBankState(room(), 'เลือกคลัง');
     let tabs = bankTabs();
+    log(`ตรวจช่องคลังก่อนฝาก: ${bankTabsLabel(tabs)}${bankServerSnapshot ? ` · เซิร์ฟเห็น ${bankServerSnapshot.map(v => `${v.index}:${v.stacks ?? '?'}`).join(',')}` : ' · ยังไม่มีข้อมูล bank จากเซิร์ฟในรอบนี้'}`);
     let target = tabs.find(t => t.used < t.capacity);
     if (!target) {
       const lastIndex = tabs.reduce((n, t) => Math.max(n, t.index), 0);
-      const buy = [...document.querySelectorAll('#bankwin button')].find(b => {
+      const buy = [...document.querySelectorAll('#bankexpand button')].find(b => {
         const label = (b.textContent || '').replace(/\s+/g, ' ').trim();
-        return /เปิดคลัง/i.test(label) && /\d[\d,]*\s*G\b/i.test(label);
+        // The game labels this button “+ เปิดคลัง 2 · 500” (Gold is shown without a “G”).
+        return /เปิดคลัง\s*\d+/i.test(label);
       });
       if (!buy || buy.disabled) { log('คลังทุกแท็บเต็ม และไม่พบปุ่มเปิดคลังใหม่/ซื้อคลังไม่ได้'); return false; }
       const label = (buy.textContent || '').trim();
@@ -1199,70 +1238,64 @@
       for (let i = 0; i < 10 && cfg.running; i++) {
         await sleep(300);
         if (dialogOpen()) {
-          if (/เปิดคลัง|ซื้อคลัง|คลังใหม่/.test(dialogTitle())) click($('#bcyes'), 'ยืนยันซื้อ ' + label);
+          if (/เปิดคลัง|ซื้อคลัง|คลังใหม่/.test(dialogTitle())) { log(`พบหน้าต่างยืนยันเปิดคลัง: ${dialogTitle()}`); click($('#bcyes'), 'ยืนยันซื้อ ' + label); }
           else { log(`คำยืนยันไม่ตรงกับการเปิดคลัง (${dialogTitle()}) — ยกเลิกการซื้อ`); return false; }
           break;
         }
         tabs = bankTabs();
         if (tabs.some(t => t.index > lastIndex)) break;
       }
+      if (!tabs.some(t => t.index > lastIndex)) log(`หลังส่งคำสั่งซื้อ ไม่พบแท็บใหม่ใน UI · แท็บล่าสุดเดิม ${lastIndex}`);
       for (let i = 0; i < 20 && cfg.running; i++) {
         await sleep(300);
         tabs = bankTabs();
-        if (tabs.some(t => t.index > lastIndex)) log(`ซื้อคลังสำเร็จ — เปิดคลัง ${Math.max(...tabs.map(t => t.index))}`);
+        if (tabs.some(t => t.index > lastIndex) && !target) log(`พบแท็บคลังใหม่: ${bankTabsLabel(tabs)}`);
         target = tabs.find(t => t.used < t.capacity);
         if (target) break;
       }
       if (!target) { log('เปิดคลังใหม่ไม่สำเร็จ หรือยังไม่มีแท็บที่ว่าง'); return false; }
     }
+    if (!target) { log(`เลือกคลังไม่สำเร็จ · สถานะสุดท้าย ${bankTabsLabel(bankTabs())}`); return false; }
     if (!target.el.classList.contains('on')) click(target.el, `เลือกคลัง ${target.index} (${target.used}/${target.capacity})`);
     for (let i = 0; i < 10 && cfg.running; i++) {
       await sleep(200);
       const active = bankTabs().find(t => t.index === target.index && t.el.classList.contains('on'));
-      if (active) return true;
+      if (active) { log(`เลือกคลัง ${active.index} สำเร็จ · ${active.used}/${active.capacity}`); return true; }
     }
-    return bankTabs().some(t => t.index === target.index && t.el.classList.contains('on'));
-  }
-  async function depositCaughtFish(r) {
-    if (!invItems) { log('ยังไม่มีข้อมูลกระเป๋าจากเซิร์ฟ — ยืนยันรายการปลาเพื่อฝากไม่ได้'); return false; }
-    for (const itemId of BANK_FISH_ITEMS) {
-      const qty = Number(invItems.get(itemId)) || 0;
-      if (qty <= 0) continue;
-      if (!await selectBankWithSpace()) { log('ไม่มีช่องคลังสำหรับฝากปลา'); return false; }
-      const active = bankTabs().find(t => t.el.classList.contains('on'));
-      if (!active) { log('ไม่พบแท็บคลังที่เลือกสำหรับฝากปลา'); return false; }
-      const before = Number(invItems.get(itemId)) || 0;
-      r.send('input', { type: 'bankItem', action: 'deposit', vault: active.index - 1, itemId, qty: before });
-      log(`ส่งคำสั่งฝากปลา ${itemId} ×${before} เข้าคลัง ${active.index}`);
-      for (let i = 0; i < 30 && cfg.running && (Number(invItems.get(itemId)) || 0) >= before; i++) await sleep(300);
-      const after = Number(invItems.get(itemId)) || 0;
-      if (after >= before) { log(`เซิร์ฟยังไม่ยืนยันการฝาก ${itemId} — เก็บของไว้และหยุดรอบฝาก`); return false; }
-      log(`ฝากปลา ${itemId} แล้ว ${before - after} ชิ้น`);
-    }
-    return true;
+    const selected = bankTabs().find(t => t.index === target.index && t.el.classList.contains('on'));
+    log(selected ? `คลัง ${selected.index} ถูกเลือกแล้ว · ${selected.used}/${selected.capacity}` : `เลือกคลัง ${target.index} ไม่สำเร็จ · ${bankTabsLabel(bankTabs())}`);
+    return !!selected;
   }
   async function depositMaterials() {
     const town = liveMap(), npc = BANK_NPCS[town];
     if (!npc) { log(`ไม่มีข้อมูล NPC คลังใน ${town || 'เมืองนี้'} — ข้ามการฝากวัตถุดิบ`); return false; }
     const r = room();
     if (!r) { log('ไม่ได้เชื่อมต่อเกม — ข้ามการเปิดคลัง'); return false; }
+    setPhase(`เข้าถึงคลัง · ${town}`);
+    log(`ตรวจสถานะเมือง: ${town} · mapId ${r.state.mapId} · เชื่อมต่อ ${r.connection?.isOpen === false ? 'ปิด' : 'เปิด'} · NPC คลัง ${npc.id}`);
     if (!bankOpen()) {
       setPhase(`เดินไปคลัง ${town}`);
+      log(`เริ่มรอบฝากคลัง · แผนที่ ${town} · NPC ${npc.id} (${npc.x},${npc.y}) · น้ำหนัก ${weightPct()}%`);
       if (!await walkToSpot({ x: npc.x, y: npc.y }, () => cfg.running, 'NPC คลัง')) {
         log(`เดินไป NPC คลัง ${town} ไม่สำเร็จ — ข้ามการฝาก`); return false;
       }
+      const pos = myPos();
+      if (liveMap() !== town || !pos || dist(pos, npc) > 1.5) {
+        log(`ตรวจถึง NPC ไม่ผ่าน · map ${liveMap() || 'ไม่ทราบ'} · ตำแหน่ง ${pos ? `${pos.x.toFixed(1)},${pos.y.toFixed(1)}` : 'ไม่มี'} · ระยะ ${pos ? dist(pos, npc).toFixed(1) : 'ไม่ทราบ'}`);
+        return false;
+      }
+      setPhase(`คุยกับ NPC คลัง · ${town}`);
       r.send('input', { type: 'talk', npcId: npc.id });
-      await sleep(1000);
+      log(`ส่ง talk หา NPC คลัง ${npc.id} · รอหน้าคลัง`);
+      for (let i = 0; i < 12 && cfg.running && !bankOpen(); i++) await sleep(250);
       // Use the bank service as a fallback if the NPC interaction does not open the bank.
-      if (!bankOpen()) click($('button[data-svc="bank"]'), 'เปิดหน้าคลัง');
+      if (!bankOpen()) { log('NPC ยังไม่เปิดหน้าคลัง · ลองปุ่มบริการคลัง'); click($('button[data-svc="bank"]'), 'เปิดหน้าคลัง'); }
     }
-    for (let i = 0; i < 10 && cfg.running && !bankOpen(); i++) await sleep(500);
-    // Keep a talk fallback for accounts without remote access when already in a town.
-    if (!bankOpen()) {
-      r.send('input', { type: 'talk', npcId: npc.id });
-      for (let i = 0; i < 20 && cfg.running && !bankOpen(); i++) await sleep(500);
-    }
-    if (!bankOpen()) { log(`เปิดคลังกับ NPC ${npc.id} ไม่สำเร็จ`); return false; }
+    for (let i = 0; i < 20 && cfg.running && !bankOpen(); i++) await sleep(250);
+    if (!bankOpen()) { log(`เปิดคลังกับ NPC ${npc.id} ไม่สำเร็จ · service button ${visible($('button[data-svc="bank"]')) ? 'มองเห็น' : 'ไม่พบ/ซ่อน'} · map ${mapName()}`); return false; }
+    setPhase(`ตรวจหน้าคลัง · ${town}`);
+    log(`หน้าคลังเปิดแล้ว · ${bankTabsLabel(bankTabs())} · กระเป๋าแสดง ${document.querySelectorAll('#bankbag .slot.act').length} ช่อง`);
+    await refreshBankState(r, 'ฝากวัตถุดิบ');
     const btn = $('#bankmats') || [...document.querySelectorAll('#bankwin button')]
       .find(b => /ฝากวัตถุดิบทั้งหมด/.test((b.textContent || '').trim()));
     if (!visible(btn)) { log('ไม่พบปุ่มฝากวัตถุดิบทั้งหมดในคลัง'); return false; }
@@ -1272,6 +1305,8 @@
       if (!await selectBankWithSpace()) { log('ข้ามการฝากวัตถุดิบ: ไม่มีคลังที่พร้อมรับของ'); return false; }
       const before = bagCount();
       if (!before) break;
+      setPhase(`ฝากวัตถุดิบ · รอบ ${pass + 1}`);
+      log(`เริ่มฝากวัตถุดิบรอบ ${pass + 1} · กระเป๋าแสดง ${before} ช่อง · ${bankTabsLabel(bankTabs())}`);
       const batchesToWait = Math.ceil(before / 15) + 4;
       click(btn, 'ฝากวัตถุดิบทั้งหมด');
       for (let i = 0; i < 10 && cfg.running && !dialogOpen(); i++) await sleep(200);
@@ -1282,25 +1317,47 @@
         return false;
       }
       // The game deposits at most 15 stacks every 700 ms. Confirm progress from the bag UI.
+      setPhase(`รอผลฝากวัตถุดิบ · รอบ ${pass + 1}`);
       for (let i = 0; i < batchesToWait && cfg.running && bagCount() >= before; i++) await sleep(700);
       const after = bagCount();
-      if (after >= before) { log('ฝากวัตถุดิบเพิ่มไม่ได้ — จะลองฝากปลาที่ปุ่มฝากทั้งหมดไม่รองรับ'); break; }
+      if (after >= before) { log(`ฝากวัตถุดิบไม่มีความคืบหน้าในรอบ ${pass + 1} · ก่อน ${before} ช่อง → หลัง ${after} ช่อง · dialog ${dialogOpen() ? dialogTitle() : 'ปิด'} · ${bankTabsLabel(bankTabs())} · จบขั้นฝากวัตถุดิบ`); break; }
       deposited += before - after;
+      log(`ฝากวัตถุดิบมีความคืบหน้า · ${before} → ${after} ช่อง (ลด ${before - after}) · สะสม ${deposited}`);
       if (!after) break;
     }
-    if (!await depositCaughtFish(r)) return false;
+    setPhase(`สรุปฝากคลัง · ${town}`);
     const remaining = bagCount();
-    if (remaining) log(`ฝากวัตถุดิบ ${deposited} ช่องแล้ว · กระเป๋ายังเหลือ ${remaining} ช่องที่อาจเป็นของชนิดอื่น`);
+    if (remaining) log(`ฝากวัตถุดิบ ${deposited} ช่องแล้ว · เหลือ ${remaining} ช่องที่ปุ่มฝากวัตถุดิบไม่รับ`);
     log(deposited ? `ฝากวัตถุดิบแล้ว ${deposited} ช่อง` : 'ไม่มีวัตถุดิบในกระเป๋าให้ฝาก');
     const close = $('#bankwin .close');
-    if (bankOpen() && close) click(close, 'ปิดหน้าคลัง');
+    if (bankOpen() && !close) { log('หน้าคลังยังเปิดอยู่แต่ไม่พบปุ่มปิด — ไม่ไปขั้นถัดไป'); return false; }
+    if (bankOpen()) {
+      setPhase(`ปิดหน้าคลัง · ${town}`);
+      click(close, 'ปิดหน้าคลัง');
+      for (let i = 0; i < 12 && cfg.running && bankOpen(); i++) await sleep(250);
+      if (bankOpen()) { log('สั่งปิดหน้าคลังแล้ว แต่สถานะยังเปิดอยู่ — ไม่ไปขั้นถัดไป'); return false; }
+      log('ยืนยันแล้วว่าหน้าคลังปิด');
+    }
     return true;
   }
   // one trip: town -> shop -> (sell) -> top up potions
   async function townTrip(why, sell, options = {}) {
     setPhase(why); log(why); setAuto(false); await sleep(800);
     const town = cfg.town || 'Ashford';
-    if (!TOWN_IDS[mapName()] && !(await warpToTown(town) || await travelTo(town))) { log('ไปเมืองไม่ได้'); return false; }
+    if (!TOWN_IDS[liveMap()]) {
+      setPhase(`เข้าเมือง · ${town}`);
+      log(`เริ่มเข้าเมือง · map ปัจจุบัน ${liveMap() || 'ยังไม่อ่านจากเซิร์ฟ'} · เป้าหมาย ${town}`);
+      const warped = await warpToTown(town);
+      log(`ผลวาร์ปเข้าเมือง: ${warped ? `สำเร็จ · ${liveMap()}` : 'ไม่สำเร็จ · ลองเดินทางตามแผนที่'}`);
+      if (!warped) {
+        const traveled = await travelTo(town);
+        log(`ผลเดินทางเข้าเมือง: ${traveled ? `สำเร็จ · ${liveMap()}` : `ไม่สำเร็จ · map ${liveMap() || 'ไม่ทราบ'}`}`);
+        if (!traveled) return false;
+      }
+    }
+    const arrivedTown = liveMap();
+    if (!TOWN_IDS[arrivedTown]) { log(`ยืนยันเข้าเมืองไม่ผ่าน · live map = ${arrivedTown || 'ไม่ทราบ'} · หยุดก่อนเริ่มฝาก`); return false; }
+    log(`ยืนยันอยู่ในเมืองแล้ว · ${arrivedTown} · เริ่มขั้นตอนคลัง`);
     // A full inventory during Gathering is a bank run: keep the gathered items and
     // do not run the normal shop/sell routine before returning to the same map.
     if (options.bankOnly) return await depositMaterials();
@@ -1310,7 +1367,8 @@
     if (sell) await sellAll();
     await buyPotions();
     closeShop();
-    await depositMaterials();
+    setPhase(`ฝากคลัง · ${liveMap()}`);
+    if (!await depositMaterials()) { log('ขั้นฝากคลังหลังซื้อยาไม่สำเร็จ — ไม่รายงานว่ารอบเมืองเสร็จ'); return false; }
     return true;
   }
   // World Boss round open: stop farming, warp into the arena, AUTO until the boss is dead / gone / time is up, leave,
@@ -1401,7 +1459,7 @@
     await sleep(1500);
     await backToFarm();
   }
-  const stopWith = (why, msg) => { log(msg); cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); save(); render(); setPhase('หยุด: ' + why); };
+  const stopWith = (why, msg) => { log(msg); cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); markStopped(why); save(); render(); };
   async function resumeGathering(map, channel) {
     const target = map || (gatherMaps().filter(id => cfg.gathering.pvp || !GATHER_PVP_MAPS.has(id))[gatherMapIndex] || '');
     if (!target) return false;
@@ -1557,7 +1615,7 @@
   }
 
   // ---- main loop ----
-  let busy = false, phase = 'stopped', startCheck = cfg.mode === 'farm';
+  let busy = false, phase = 'stopped', stopReason = cfg.botStop.reason || '', stopMap = cfg.botStop.map || '', stopActivity = cfg.botStop.activity || '', startCheck = cfg.mode === 'farm';
   async function tick() {
     if (!cfg.running || busy) return;
     busy = true;
@@ -1593,8 +1651,13 @@
         const gatherChannel = wasGathering ? chOf(room()) : 0;
         const banked = await townTrip(`ของเต็ม (น้ำหนัก ${weightPct()}%${slotsFull() ? ' / ช่องเต็ม' : ''}) — กลับเมืองฝากคลัง`, false, { bankOnly: true });
         if (!banked) return stopWith('ฝากคลังไม่สำเร็จ', 'ฝากของเข้าคลังไม่สำเร็จ — หยุด helper เพื่อไม่ให้วนกลับเมืองซ้ำ');
-        // The bank's “deposit materials” action can leave non-material items behind.
-        if (bagFull()) return stopWith('ฝากแล้วกระเป๋ายังเต็ม', `ฝากวัตถุดิบแล้วแต่กระเป๋ายังเต็ม (${weightPct()}%) — ตรวจของที่ฝากไม่ได้ก่อนเริ่มต่อ`);
+        // Materials-only deposit can leave non-material items above the weight threshold.
+        // Resume farming while free slots remain; retry the bank when the game's bag alarm triggers.
+        if (slotsFull()) return stopWith('ฝากแล้วช่องกระเป๋ายังเต็ม', `ฝากของแล้วแต่ช่องกระเป๋ายังเต็ม (${weightPct()}%) — ตรวจของที่ฝากไม่ได้ก่อนเริ่มต่อ`);
+        if (weightPct() >= cfg.sellPct) {
+          deferredWeightThreshold = true;
+          log(`ฝากวัตถุดิบแล้วแต่น้ำหนักยัง ${weightPct()}% จากของที่ฝากไม่ได้ — กลับไปฟาร์มต่อ และจะฝากอีกครั้งเมื่อช่องกระเป๋าเต็ม`);
+        }
         if (wasGathering) {
           if (!await resumeGathering(gatherMap, gatherChannel)) log('กลับไป Gathering เดิมไม่สำเร็จ — จะลองต่อในรอบถัดไป');
         } else await backToFarm();
@@ -1620,7 +1683,7 @@
         // not caused by the helper (its own trips return inside the same tick): you moved yourself -> pause, don't drag you back
         else if (mapName()) {
           if (TOWN_IDS[mapName()]) { setAuto(false); await depositMaterials(); }
-          cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); save(); render(); setPhase('หยุดชั่วคราว: คุณย้ายแมพเอง'); log(`ย้ายไป ${mapName()} เอง — หยุดไว้ก่อน · กด "จำจุดนี้" ที่จุดใหม่ แล้วกด ▶`);
+          cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); markStopped('คุณย้ายแมพเอง'); save(); render(); log(`ย้ายไป ${mapName()} เอง — หยุดไว้ก่อน · กด "จำจุดนี้" ที่จุดใหม่ แล้วกด ▶`);
         }
       } else if (bq.active) {
         startCheck = false;
@@ -1981,15 +2044,26 @@
     return farmWeight ? 'น้ำหนัก ' + farmWeight[1].trim() : t.slice(0, 24);
   }
   function setPhase(t) {
+    if (cfg.running && t !== 'หยุดอยู่' && (stopReason || stopMap || stopActivity || cfg.botStop.reason || cfg.botStop.map || cfg.botStop.activity)) {
+      stopReason = ''; stopMap = ''; stopActivity = ''; cfg.botStop = { reason: '', map: '', activity: '' }; save();
+    }
+    if (t === 'หยุดอยู่' && stopReason) t = `หยุด: ${stopReason}`;
     phase = t;
     showMini();
     if (t === 'หยุดอยู่' && !stoppedLogged) { console.info('[Binder Helper]', t); stoppedLogged = true; }
     else if (t !== 'หยุดอยู่') stoppedLogged = false;
   }
+  function markStopped(reason) {
+    stopActivity = phase && phase !== 'หยุดอยู่' && !phase.startsWith('หยุด:') ? phase : stopActivity || 'ไม่ทราบกิจกรรม';
+    stopReason = String(reason || 'หยุดอยู่');
+    stopMap = mapName() || 'ไม่ทราบแมพ';
+    cfg.botStop = { reason: stopReason, map: stopMap, activity: stopActivity }; save();
+    setPhase(`หยุด: ${stopReason}`);
+  }
   let pageContext = null;
   function render() {
     if (pageContext) for (const name of ['farm', 'return', 'supply', 'travel', 'gathering']) PAGE_MODULES[name]?.render?.(pageContext);
-    if (!cfg.running) setPhase('หยุดอยู่');
+    if (!cfg.running) setPhase(stopReason ? `หยุด: ${stopReason}` : 'หยุดอยู่');
   }
   const remember = () => {
     if (TOWN_IDS[mapName()]) { log(`${mapName()} เป็นเมือง — ไปยืนที่จุดฟาร์มก่อนแล้วกด "จำจุดนี้"`); return; }
@@ -2022,6 +2096,9 @@
   const sentKinds = new Set();
   window.__bthSendHook = (type, msg) => {
     const kind = type + ':' + (msg && msg.type || '');
+    if (type === 'input' && msg && msg.type === 'bankItem') log(`ส่ง bankItem: ${msg.action || '?'} ${msg.itemId || '?'} ×${Number(msg.qty) || 0} → vault ${Number(msg.vault) + 1}`);
+    if (type === 'input' && msg && msg.type === 'bankBuyVault') log('ส่งคำสั่ง bankBuyVault ไปยังเซิร์ฟ');
+    if (type === 'input' && msg && msg.type === 'bankQuery') log('ส่งคำขอ bankQuery เพื่อขอข้อมูลคลังล่าสุด');
     // last walk target, for learning map exits (exitTimer)
     if (type === 'input' && msg && msg.type === 'moveTo') { const r = room(); lastMove = { map: r && r.state.mapId, x: +msg.x, y: +msg.y, at: Date.now() }; }
     if (!sentKinds.has(kind)) { sentKinds.add(kind); let j = ''; try { j = JSON.stringify(msg); } catch { } log(`ส่งถึงเซิร์ฟ (ครั้งแรก) ${kind} ${(j || '').slice(0, 160)}`); }
@@ -2049,7 +2126,10 @@
     else { cfg.running = !cfg.running; startCheck = cfg.running; }
     cfg.mode = cfg.running ? 'farm' : 'stopped';
     clearResumeMarkers();
-    if (cfg.running) stoppedLogged = false; save(); render(); log(switchingFromGathering ? 'หยุด Gathering แล้วเริ่มฟาร์ม' : cfg.running ? 'เริ่มฟาร์ม' : 'หยุดฟาร์ม');
+    if (cfg.running) { stoppedLogged = false; stopReason = ''; stopMap = ''; setPhase('เตรียมเริ่มฟาร์ม'); }
+    if (!cfg.running) markStopped('ผู้ใช้สั่งหยุดฟาร์ม');
+    save(); render();
+    log(switchingFromGathering ? 'หยุด Gathering แล้วเริ่มฟาร์ม' : cfg.running ? 'เริ่มฟาร์ม' : 'หยุดฟาร์ม');
   };
   const updateGather = () => {
     cfg.gathering.type = $('#bthgtype').value; cfg.gathering.tier = +$('#bthgtier').value; cfg.gathering.pvp = $('#bthgpvp').checked; cfg.gathering.gold = $('#bthggold').checked; cfg.gathering.scanChannels = $('#bthgchannels').checked; cfg.gathering.rotateMaps = $('#bthgmapsweep').checked;
@@ -2060,9 +2140,12 @@
   const updatePreferredMap = e => { cfg.gathering.preferredMap = e.target.value; gatherMapIndex = 0; gatherScannedMap = ''; gatherChannelOrder = []; save(); render(); };
   const toggleGather = () => {
     if (cfg.gathering.enabled) { cfg.gathering.enabled = false; if (!bq.active) cfg.running = false; }
-    else { cfg.gathering.enabled = true; cfg.running = true; startCheck = false; gatherMapIndex = 0; gatherScannedMap = ''; gatherChannelOrder = []; setAuto(false); stoppedLogged = false; }
+    else { cfg.gathering.enabled = true; cfg.running = true; startCheck = false; gatherMapIndex = 0; gatherScannedMap = ''; gatherChannelOrder = []; setAuto(false); stoppedLogged = false; stopReason = ''; stopMap = ''; setPhase('เตรียมเริ่ม Gathering'); }
     cfg.mode = cfg.running ? (cfg.gathering.enabled ? 'gathering' : 'farm') : 'stopped';
-    clearResumeMarkers(); save(); render(); log(cfg.gathering.enabled ? `หยุดฟาร์มแล้วเริ่ม Gathering ${cfg.gathering.type} Tier ${cfg.gathering.tier}` : 'หยุด Gathering');
+    clearResumeMarkers();
+    if (!cfg.running) markStopped('ผู้ใช้สั่งหยุด Gathering');
+    save(); render();
+    log(cfg.gathering.enabled ? `หยุดฟาร์มแล้วเริ่ม Gathering ${cfg.gathering.type} Tier ${cfg.gathering.tier}` : 'หยุด Gathering');
   };
   const reachable = b => !b.claimed && b.lo <= myLevel() + (+bq.maxAbove || 0);
   function renderBq() { if (pageContext) PAGE_MODULES.bounty?.render?.(pageContext); }
@@ -2187,7 +2270,7 @@
   const chInfoTimer = setInterval(() => { showChInfo(); showWbInfo(); }, 1000);
 
   window.__bth = {
-    cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); save(); render(); },
+    cfg, show: () => { box.style.display = 'block'; }, stop: () => { cfg.running = false; cfg.gathering.enabled = false; cfg.mode = 'stopped'; clearResumeMarkers(); markStopped('ผู้ใช้สั่งหยุด'); save(); render(); },
     applyPlan, applySkillPlan, testBankDeposit,
     remove: () => { cfg.running = false; clearInterval(timer); clearInterval(skillPlanTimer); clearInterval(jobChangeTimer); clearInterval(statusPlanTimer); clearInterval(miniTimer); clearInterval(mobMapTimer); unhookMaps(); for (const o of overlays.values()) o.remove(); box.remove(); uiStyle.remove(); clearInterval(combatTimer); clearInterval(chInfoTimer); clearInterval(eliteTimer); clearInterval(exitTimer); for (const o of eliteOverlays.values()) o.remove(); chObs.disconnect(); document.querySelectorAll('#chmenu .bthcnt').forEach(e => e.remove()); delete window.__bthSendHook; delete window.__bthOnServer; delete window.__bthPageModules; delete window.__bth; }, // running=false also ends a trip in progress
     toggle: () => $('#bthrun').click(), // same as pressing ▶ / ■ on the panel
@@ -2200,7 +2283,10 @@
       const characterImage = typeof imageValue === 'string' && /^(https?:|data:image\/|blob:|\/)/i.test(imageValue) ? imageValue : '';
       return {
         version: BINDER_HELPER_VERSION,
-        running: cfg.running, mode: cfg.mode, gathering: { enabled: cfg.gathering.enabled }, phase, map: mapName(), channel: chOf(r), level: myLevel(), characterName: me && typeof me.name === 'string' ? me.name : '',
+        running: cfg.running, botState: cfg.running ? 'running' : 'stopped', mode: cfg.mode, gathering: { enabled: cfg.gathering.enabled }, phase,
+        activity: cfg.running ? phase : '', stopReason: cfg.running ? '' : stopReason,
+        stopMap: cfg.running ? '' : stopMap || mapName(), stopActivity: cfg.running ? '' : stopActivity,
+        map: mapName(), channel: chOf(r), level: myLevel(), characterName: me && typeof me.name === 'string' ? me.name : '',
         characterClass: classValue == null ? '' : String(classValue), characterImage, weight: weightPct(), auto: autoOn(), dead: isDead(),
         farmMap: cfg.farmMap, farmSpot: cfg.farmSpot, town: cfg.town,
         potions: potionPlans().map(p => ({ k: p.k, name: potName(p.item), have: p.have, min: p.min, to: p.to })),

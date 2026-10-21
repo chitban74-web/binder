@@ -4096,6 +4096,7 @@ label {
 .profile-card .chip-main { font-size: 9px; padding: 0 5px; }
 .profile-card .card-status-row { min-height: 27px; }
 .profile-card .activity-pill { padding: 3px 9px; font-size: 10.5px; }
+.profile-card .card-status-context { margin: -2px 2px 7px; color: var(--text-muted); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
 .profile-target { display:flex; flex-direction:column; gap:4px; min-height:42px; padding:7px 9px; border:1px solid var(--line); border-radius:10px; background:rgba(8,13,28,.72); }
 .profile-target span { color:var(--text-faint); font-size:9.5px; }
 .profile-target b { color:var(--text-muted); font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
