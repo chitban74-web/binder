@@ -1173,6 +1173,23 @@
     await sleep(400);
     return n;
   }
+  // Keep the selected HP / MP potions up to their configured target, and sell the rest from the bag.
+  // This uses the same server sell message as the game's sell UI and verifies each stack against fresh inventory updates.
+  async function sellSparePotions() {
+    const plans = potionPlans();
+    if (!plans.length) return;
+    if (!invItems) { log('ยังไม่ได้ข้อมูลกระเป๋าจากเซิร์ฟ — ข้ามการขายยาส่วนเกิน'); return; }
+    const keep = Object.fromEntries(plans.map(p => [p.item, Math.max(0, p.to || 0)]));
+    for (const id of [...Object.keys(POTIONS.hp), ...Object.keys(POTIONS.mp)]) {
+      const have = invItems.get(id) || 0, qty = have - (keep[id] || 0);
+      if (qty <= 0 || !cfg.running) continue;
+      const r = room(); if (!r) return;
+      r.send('input', { type: 'sell', itemId: id, qty });
+      await sleep(1200);
+      const now = invItems.get(id) || 0;
+      log(now < have ? `ขาย ${potName(id)} ×${have - now} (เหลือ ${now})` : `ขาย ${potName(id)} ×${qty} ไม่สำเร็จ (ยังมี ${now})`);
+    }
+  }
   // top every potion plan up to its `to` (NPC sells max 99 per purchase; same message as the shop's buy button)
   async function buyPotions() {
     for (const p of potionPlans()) {
@@ -1377,6 +1394,7 @@
     setPhase('ที่ร้านค้า ' + mapName());
     if (!await openShop()) return false;
     if (sell) await sellAll();
+    await sellSparePotions();
     await buyPotions();
     closeShop();
     setPhase(`ฝากคลัง · ${liveMap()}`);
