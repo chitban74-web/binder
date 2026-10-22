@@ -312,10 +312,22 @@
   const weightPct = () => { const m = (($('#wtwarn') || {}).textContent || '').match(/(\d+)\s*%/); return m ? +m[1] : 0; };
   // full = weight over the threshold, or the game's own bag alarm (weight 100% or no free slot)
   const slotsFull = () => { const b = $('#mbbag'); return !!b && b.classList.contains('alarm'); };
-  let deferredWeightThreshold = false;
+  let deferredWeightThreshold = false, deferredWeightRetryAt = null, deferredSellPct = cfg.sellPct;
   const bagFull = () => {
     const weight = weightPct();
-    if (weight < cfg.sellPct) deferredWeightThreshold = false;
+    if (cfg.sellPct !== deferredSellPct) {
+      deferredSellPct = cfg.sellPct;
+      deferredWeightThreshold = false;
+      deferredWeightRetryAt = null;
+    }
+    if (weight < cfg.sellPct) {
+      deferredWeightThreshold = false;
+      deferredWeightRetryAt = null;
+    } else if (deferredWeightThreshold && deferredWeightRetryAt !== null && weight >= deferredWeightRetryAt) {
+      deferredWeightThreshold = false;
+      deferredWeightRetryAt = null;
+      log(`น้ำหนักเพิ่มถึง ${weight}% หลังกลับเมืองครั้งก่อน — เปิดเงื่อนไขกลับเมืองอีกครั้ง`);
+    }
     return (weight >= cfg.sellPct && !deferredWeightThreshold) || slotsFull();
   };
   const autoOn = () => document.body.classList.contains('auto-on');
@@ -1649,14 +1661,18 @@
         const wasGathering = cfg.gathering.enabled && !bq.active;
         const gatherMap = wasGathering ? mapId() : '';
         const gatherChannel = wasGathering ? chOf(room()) : 0;
-        const banked = await townTrip(`ของเต็ม (น้ำหนัก ${weightPct()}%${slotsFull() ? ' / ช่องเต็ม' : ''}) — กลับเมืองฝากคลัง`, false, { bankOnly: true });
-        if (!banked) return stopWith('ฝากคลังไม่สำเร็จ', 'ฝากของเข้าคลังไม่สำเร็จ — หยุด helper เพื่อไม่ให้วนกลับเมืองซ้ำ');
-        // Materials-only deposit can leave non-material items above the weight threshold.
-        // Resume farming while free slots remain; retry the bank when the game's bag alarm triggers.
-        if (slotsFull()) return stopWith('ฝากแล้วช่องกระเป๋ายังเต็ม', `ฝากของแล้วแต่ช่องกระเป๋ายังเต็ม (${weightPct()}%) — ตรวจของที่ฝากไม่ได้ก่อนเริ่มต่อ`);
+        const bankOnly = wasGathering;
+        const tripLabel = bankOnly ? 'ฝากคลัง' : 'ขายของ / ฝากคลัง';
+        const banked = await townTrip(`ของเต็ม (น้ำหนัก ${weightPct()}%${slotsFull() ? ' / ช่องเต็ม' : ''}) — กลับเมือง${tripLabel}`, !bankOnly, bankOnly ? { bankOnly: true } : {});
+        if (!banked) return stopWith(bankOnly ? 'ฝากคลังไม่สำเร็จ' : 'ขายของ/ฝากคลังไม่สำเร็จ', `กลับเมือง${tripLabel}ไม่สำเร็จ — หยุด helper เพื่อไม่ให้วนกลับเมืองซ้ำ`);
+        // A bank-only Gathering trip or a filtered sale can leave non-transferable items above the threshold.
+        // Resume while free slots remain; retry after more weight is collected or when the game's bag alarm triggers.
+        if (slotsFull()) return stopWith(bankOnly ? 'ฝากแล้วช่องกระเป๋ายังเต็ม' : 'ขาย/ฝากแล้วช่องกระเป๋ายังเต็ม', `กลับเมือง${tripLabel}แล้วแต่ช่องกระเป๋ายังเต็ม (${weightPct()}%) — ตรวจของที่จัดการไม่ได้ก่อนเริ่มต่อ`);
         if (weightPct() >= cfg.sellPct) {
           deferredWeightThreshold = true;
-          log(`ฝากวัตถุดิบแล้วแต่น้ำหนักยัง ${weightPct()}% จากของที่ฝากไม่ได้ — กลับไปฟาร์มต่อ และจะฝากอีกครั้งเมื่อช่องกระเป๋าเต็ม`);
+          deferredWeightRetryAt = Math.min(100, Math.max(cfg.sellPct, weightPct() + 5));
+          deferredSellPct = cfg.sellPct;
+          log(`กลับเมือง${tripLabel}แล้วแต่น้ำหนักยัง ${weightPct()}% จากของที่จัดการไม่ได้ — กลับไปฟาร์มต่อ และจะกลับเมืองอีกครั้งเมื่อถึง ${deferredWeightRetryAt}% หรือช่องเต็ม`);
         }
         if (wasGathering) {
           if (!await resumeGathering(gatherMap, gatherChannel)) log('กลับไป Gathering เดิมไม่สำเร็จ — จะลองต่อในรอบถัดไป');
